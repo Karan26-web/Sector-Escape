@@ -1,0 +1,45 @@
+// Registry: manifest key → placeholder generator(def, assets) → canvas
+import { heroSheet, botSheet, bossSheet } from './chars.js';
+import * as T from './textures.js';
+import * as F from './fx.js';
+import * as U from './ui.js';
+
+export const PLACEHOLDERS = {
+  hero_front: () => heroSheet(false),
+  hero_back: () => heroSheet(true),
+  enemy_bot: () => botSheet(),
+  boss_warden: () => bossSheet(),
+  torch: () => T.torchSheet(),
+  cannon: () => T.cannonSprite(),
+  jungle_tree: () => T.treeSheet(),
+  jungle_plant: () => T.plantSheet(),
+  stone_idol: () => T.stoneIdol(),
+  rubble: () => T.rubbleSheet(),
+  arena_floor: () => T.arenaFloor(),
+  arena_wall: () => T.arenaWall(1024, 1024),
+  wall_top: () => T.wallTop(),
+  ground_jungle: () => T.groundJungle(),
+  path_dirt: () => T.pathDirt(),
+  jungle_panorama: () => T.junglePanorama(),
+  sky: () => T.skyDome(),
+  gate_small_frame: () => T.gateFrame(1024, false),
+  gate_small_door: () => T.gateDoor(512, 1024, false),
+  gate_large_frame: () => T.gateFrame(2048, true),
+  gate_large_door: () => T.gateDoor(1024, 2048, true),
+  energy_lock: () => T.energyLock(),
+  fx_explosion: () => F.explosionSheet(),
+  fx_spark: () => F.sparkTex(),
+  fx_glow: () => F.glowTex(),
+  fx_smoke: () => F.smokeTex(),
+  fx_shockwave: () => F.shockwaveTex(),
+  fx_laser: () => F.laserTex(),
+  ui_logo: () => U.logo(),
+  ui_parchment: () => U.parchment(),
+  ui_story_art: () => U.storyArt(),
+  ui_map_bg: () => U.mapBg(),
+  ui_map_node: () => U.mapNodeSheet(),
+  ui_map_marker: () => U.mapMarker(),
+  ui_map_temple: () => U.mapTemple(),
+  ui_shield: () => U.shieldSheet(),
+  ui_icons: () => U.iconSheet(),
+};

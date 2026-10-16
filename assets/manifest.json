@@ -1,0 +1,403 @@
+{
+  "_readme": "Every image listed here is optional. If the file is missing the game draws a procedural placeholder. Sheets: cols × rows grid; anims map a name to a row, a frame count and fps. chromaKey (e.g. \"#FF00FF\") makes that colour transparent for sheets generated on a flat background. worldHeight = metres the full frame height spans in the 3D arena. Gate frames: \"opening\" = transparent arch width as a fraction of the image width, \"top\" = arch top as a fraction of the height. \"fallback\" names another image to use when this file is missing.",
+  "images": {
+    "hero_front": {
+      "path": "sprites/hero_front.png",
+      "worldHeight": 1.75,
+      "chromaKey": null,
+      "sheet": {
+        "cols": 8,
+        "rows": 5,
+        "anims": {
+          "idle": {
+            "row": 0,
+            "frames": 6,
+            "fps": 6
+          },
+          "run": {
+            "row": 1,
+            "frames": 8,
+            "fps": 13
+          },
+          "activate": {
+            "row": 2,
+            "frames": 6,
+            "fps": 10,
+            "loop": false
+          },
+          "hurt": {
+            "row": 3,
+            "frames": 4,
+            "fps": 10,
+            "loop": false
+          },
+          "win": {
+            "row": 4,
+            "frames": 6,
+            "fps": 8
+          }
+        }
+      }
+    },
+    "hero_back": {
+      "path": "sprites/hero_back.png",
+      "worldHeight": 1.75,
+      "chromaKey": null,
+      "sheet": {
+        "cols": 8,
+        "rows": 2,
+        "anims": {
+          "idle": {
+            "row": 0,
+            "frames": 6,
+            "fps": 6
+          },
+          "run": {
+            "row": 1,
+            "frames": 8,
+            "fps": 13
+          }
+        }
+      }
+    },
+    "enemy_bot": {
+      "path": "sprites/enemy_bot.png",
+      "worldHeight": 2.1,
+      "chromaKey": null,
+      "sheet": {
+        "cols": 8,
+        "rows": 4,
+        "anims": {
+          "idle": {
+            "row": 0,
+            "frames": 4,
+            "fps": 5
+          },
+          "walk": {
+            "row": 1,
+            "frames": 8,
+            "fps": 10
+          },
+          "lunge": {
+            "row": 2,
+            "frames": 6,
+            "fps": 12,
+            "loop": false
+          },
+          "death": {
+            "row": 3,
+            "frames": 8,
+            "fps": 14,
+            "loop": false
+          }
+        }
+      }
+    },
+    "boss_warden": {
+      "path": "sprites/boss_warden.png",
+      "worldHeight": 6.5,
+      "chromaKey": null,
+      "sheet": {
+        "cols": 8,
+        "rows": 3,
+        "anims": {
+          "idle": {
+            "row": 0,
+            "frames": 6,
+            "fps": 5
+          },
+          "hurt": {
+            "row": 1,
+            "frames": 4,
+            "fps": 8,
+            "loop": false
+          },
+          "defeat": {
+            "row": 2,
+            "frames": 8,
+            "fps": 7,
+            "loop": false
+          }
+        }
+      }
+    },
+    "torch": {
+      "path": "sprites/torch.png",
+      "worldHeight": 1.5,
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "idle": {
+            "row": 0,
+            "frames": 4,
+            "fps": 9
+          }
+        }
+      }
+    },
+    "cannon": {
+      "path": "sprites/cannon.png",
+      "worldHeight": 3.2
+    },
+    "jungle_tree": {
+      "path": "sprites/jungle_tree.png",
+      "worldHeight": 9,
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "a": {
+            "col": 0,
+            "frames": 1
+          },
+          "b": {
+            "col": 1,
+            "frames": 1
+          },
+          "c": {
+            "col": 2,
+            "frames": 1
+          },
+          "d": {
+            "col": 3,
+            "frames": 1
+          }
+        }
+      }
+    },
+    "jungle_plant": {
+      "path": "sprites/jungle_plant.png",
+      "worldHeight": 1.6,
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "a": {
+            "col": 0,
+            "frames": 1
+          },
+          "b": {
+            "col": 1,
+            "frames": 1
+          },
+          "c": {
+            "col": 2,
+            "frames": 1
+          },
+          "d": {
+            "col": 3,
+            "frames": 1
+          }
+        }
+      }
+    },
+    "stone_idol": {
+      "path": "sprites/stone_idol.png",
+      "worldHeight": 4
+    },
+    "rubble": {
+      "path": "sprites/rubble.png",
+      "worldHeight": 1.2,
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "a": {
+            "col": 0,
+            "frames": 1
+          },
+          "b": {
+            "col": 1,
+            "frames": 1
+          },
+          "c": {
+            "col": 2,
+            "frames": 1
+          },
+          "d": {
+            "col": 3,
+            "frames": 1
+          }
+        }
+      }
+    },
+    "arena_floor": {
+      "path": "textures/arena_floor.png"
+    },
+    "arena_wall": {
+      "path": "textures/arena_wall.png"
+    },
+    "wall_top": {
+      "path": "textures/wall_top.png"
+    },
+    "ground_jungle": {
+      "path": "textures/ground_jungle.png"
+    },
+    "path_dirt": {
+      "path": "textures/path_dirt.png"
+    },
+    "jungle_panorama": {
+      "path": "textures/jungle_panorama.png"
+    },
+    "sky": {
+      "path": "textures/sky.png"
+    },
+    "gate_small_frame": {
+      "path": "textures/gate_small_frame.png",
+      "opening": 0.461,
+      "top": 0.301
+    },
+    "gate_small_door": {
+      "path": "textures/gate_small_door.png"
+    },
+    "gate_large_frame": {
+      "path": "textures/gate_large_frame.png",
+      "opening": 0.56,
+      "top": 0.22,
+      "fallback": "gate_small_frame",
+      "fallbackOpening": 0.461,
+      "fallbackTop": 0.301
+    },
+    "gate_large_door": {
+      "path": "textures/gate_large_door.png"
+    },
+    "energy_lock": {
+      "path": "textures/energy_lock.png"
+    },
+    "fx_explosion": {
+      "path": "sprites/fx_explosion.png",
+      "worldHeight": 2.8,
+      "sheet": {
+        "cols": 8,
+        "rows": 1,
+        "anims": {
+          "boom": {
+            "row": 0,
+            "frames": 8,
+            "fps": 16,
+            "loop": false
+          }
+        }
+      }
+    },
+    "fx_spark": {
+      "path": "sprites/fx_spark.png"
+    },
+    "fx_glow": {
+      "path": "sprites/fx_glow.png"
+    },
+    "fx_smoke": {
+      "path": "sprites/fx_smoke.png"
+    },
+    "fx_shockwave": {
+      "path": "sprites/fx_shockwave.png"
+    },
+    "fx_laser": {
+      "path": "sprites/fx_laser.png"
+    },
+    "ui_logo": {
+      "path": "ui/logo.png"
+    },
+    "ui_parchment": {
+      "path": "ui/parchment.png"
+    },
+    "ui_story_art": {
+      "path": "ui/story_illustration.png"
+    },
+    "ui_map_bg": {
+      "path": "ui/map_bg.png"
+    },
+    "ui_map_node": {
+      "path": "ui/map_node.png",
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "locked": {
+            "col": 0,
+            "frames": 1
+          },
+          "open": {
+            "col": 1,
+            "frames": 1
+          },
+          "cleared": {
+            "col": 2,
+            "frames": 1
+          },
+          "boss": {
+            "col": 3,
+            "frames": 1
+          }
+        }
+      }
+    },
+    "ui_map_marker": {
+      "path": "ui/map_marker.png"
+    },
+    "ui_map_temple": {
+      "path": "ui/map_temple.png"
+    },
+    "ui_shield": {
+      "path": "ui/shield.png",
+      "sheet": {
+        "cols": 2,
+        "rows": 1,
+        "anims": {
+          "full": {
+            "col": 0,
+            "frames": 1
+          },
+          "empty": {
+            "col": 1,
+            "frames": 1
+          }
+        }
+      }
+    },
+    "ui_icons": {
+      "path": "ui/icons.png",
+      "sheet": {
+        "cols": 8,
+        "rows": 1,
+        "anims": {
+          "timer": {
+            "col": 0,
+            "frames": 1
+          },
+          "star": {
+            "col": 1,
+            "frames": 1
+          },
+          "star_empty": {
+            "col": 2,
+            "frames": 1
+          },
+          "hint": {
+            "col": 3,
+            "frames": 1
+          },
+          "sound_on": {
+            "col": 4,
+            "frames": 1
+          },
+          "sound_off": {
+            "col": 5,
+            "frames": 1
+          },
+          "pause": {
+            "col": 6,
+            "frames": 1
+          },
+          "play": {
+            "col": 7,
+            "frames": 1
+          }
+        }
+      }
+    }
+  },
+  "sfx": {},
+  "music": {}
+}

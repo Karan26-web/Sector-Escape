@@ -1,0 +1,8 @@
+# keep the deployment small: screenshots and local test scripts are not part of the game
+playtest/screens
+playtest/*.py
+*.py
+.DS_Store
+art-source
+playtest/screens
+.DS_Store

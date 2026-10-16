@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sector Escape – Sprite Sheet Viewer</title>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#1b1f24;color:#eee;display:grid;grid-template-columns:320px 1fr;height:100vh}
+  aside{padding:16px;background:#12151a;border-right:1px solid #333;overflow:auto}
+  main{padding:16px;overflow:auto}
+  label{display:block;margin:10px 0 4px;font-size:12px;color:#9ab}
+  input,select,button{width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#222;color:#eee}
+  button{cursor:pointer;background:#2aa8b7;border:none;font-weight:700;margin-top:10px}
+  .drop{border:2px dashed #555;border-radius:10px;padding:18px;text-align:center;color:#9ab;margin-bottom:8px}
+  .drop.over{border-color:#7fe6ff;color:#fff}
+  canvas{image-rendering:auto;background:repeating-conic-gradient(#2a2f36 0 25%,#1f2429 0 50%) 0 0/24px 24px;border-radius:8px}
+  #preview{margin-top:14px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+  .frame{display:inline-block;margin:2px;border:1px solid #333}
+  h1{font-size:18px;margin:0 0 8px}
+  #gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .card{background:#12151a;border:1px solid #333;border-radius:10px;padding:10px}
+  .card h3{margin:0 0 6px;font-size:13px;color:#7fe6ff;font-weight:600}
+  .card canvas{width:100%;height:auto}
+  small{color:#789}
+</style></head>
+<body>
+<aside>
+  <h1>Sheet viewer</h1>
+  <div id="drop" class="drop">Drop a PNG here<br><small>or choose a file</small></div>
+  <input type="file" id="file" accept="image/*">
+  <label>Preset (from manifest)</label><select id="preset"></select>
+  <label>Columns</label><input id="cols" type="number" value="8" min="1">
+  <label>Rows</label><input id="rows" type="number" value="4" min="1">
+  <label>Animation row</label><input id="row" type="number" value="1" min="0">
+  <label>Frames in row</label><input id="frames" type="number" value="8" min="1">
+  <label>FPS</label><input id="fps" type="number" value="10" min="1">
+  <label>Chroma key (optional, e.g. #FF00FF)</label><input id="chroma" type="text" placeholder="#FF00FF">
+  <button id="gal">Show procedural placeholders</button>
+  <p><small>Tip: generate sheets on a flat #FF00FF background if transparency fails, then set chromaKey in assets/manifest.json.</small></p>
+</aside>
+<main>
+  <div id="preview"><canvas id="anim" width="256" height="256"></canvas><div id="frames"></div></div>
+  <div id="gallery"></div>
+</main>
+<script type="module">
+  import { PLACEHOLDERS } from '../src/placeholders/index.js';
+  import { chromaKey } from '../src/engine/assets.js';
+  const $ = (id) => document.getElementById(id);
+  let img = null, manifest = null;
+  try { manifest = await (await fetch('../assets/manifest.json')).json(); } catch {}
+  const sel = $('preset'); sel.innerHTML = '<option value="">— custom —</option>' + Object.entries(manifest?.images || {}).filter(([, d]) => d.sheet).map(([k, d]) => `<option value="${k}">${k} (${d.sheet.cols}×${d.sheet.rows})</option>`).join('');
+  sel.onchange = () => { const d = manifest.images[sel.value]; if (!d) return; $('cols').value = d.sheet.cols; $('rows').value = d.sheet.rows; const a = Object.values(d.sheet.anims)[0]; $('row').value = a.row ?? 0; $('frames').value = a.frames ?? 1; $('fps').value = a.fps ?? 8; if (!img) { img = PLACEHOLDERS[sel.value]?.(); } };
+  const load = (file) => { const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { img = im; const c = $('chroma').value.trim(); if (/^#[0-9a-f]{6}$/i.test(c)) img = chromaKey(im, c); }; im.src = r.result; }; r.readAsDataURL(file); };
+  $('file').onchange = (e) => load(e.target.files[0]);
+  const drop = $('drop'); drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); }; drop.ondragleave = () => drop.classList.remove('over'); drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); load(e.dataTransfer.files[0]); };
+  const cv = $('anim'), g = cv.getContext('2d'); let t0 = performance.now();
+  function tick() {
+    requestAnimationFrame(tick); if (!img) return;
+    const cols = +$('cols').value, rows = +$('rows').value, row = +$('row').value, frames = +$('frames').value, fps = +$('fps').value;
+    const fw = img.width / cols, fh = img.height / rows, f = Math.floor(((performance.now() - t0) / 1000) * fps) % frames;
+    cv.width = Math.min(512, fw); cv.height = Math.min(512, fh);
+    g.clearRect(0, 0, cv.width, cv.height); g.drawImage(img, f * fw, row * fh, fw, fh, 0, 0, cv.width, cv.height);
+    // strip of all frames in the row
+    const strip = $('frames'); if (strip.dataset.key !== `${cols}-${rows}-${row}-${frames}-${img.src || img.width}`) { strip.dataset.key = `${cols}-${rows}-${row}-${frames}-${img.src || img.width}`; strip.innerHTML = ''; for (let i = 0; i < frames; i++) { const c = document.createElement('canvas'); c.width = 96; c.height = 96 * (fh / fw); c.className = 'frame'; c.getContext('2d').drawImage(img, i * fw, row * fh, fw, fh, 0, 0, c.width, c.height); strip.appendChild(c); } }
+  }
+  tick();
+  $('gal').onclick = () => {
+    const gal = $('gallery'); gal.innerHTML = '';
+    for (const [name, fn] of Object.entries(PLACEHOLDERS)) { const c = fn(); const card = document.createElement('div'); card.className = 'card'; card.innerHTML = `<h3>${name} <small>${c.width}×${c.height}</small></h3>`; card.appendChild(c); gal.appendChild(card); }
+  };
+  if (location.hash === '#gallery') $('gal').click();
+</script>
+</body></html>
