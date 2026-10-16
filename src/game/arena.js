@@ -46,7 +46,7 @@ export class Arena {
 
     // floor
     const floorTex = assets.texture('arena_floor', { wrap: false });
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(R, 96), new THREE.MeshLambertMaterial({ map: floorTex, color: new THREE.Color(env.floor).multiplyScalar(1.15), transparent: true }));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(R, 96), new THREE.MeshLambertMaterial({ map: floorTex, color: new THREE.Color(env.floor).multiplyScalar(1.15), transparent: false, alphaTest: 0.5 }));
     floor.rotation.x = -Math.PI / 2; floor.position.y = 0; floor.renderOrder = 0; this.group.add(floor); this.floor = floor;
 
     // outside ground
@@ -83,7 +83,7 @@ export class Arena {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(4.6, length), new THREE.MeshLambertMaterial({ map: tex, color: 0xffffff, transparent: true, depthWrite: false }));
     const mid = polar(deg, R + length / 2);
     m.rotation.x = -Math.PI / 2; m.rotation.z = -(deg * DEG) + Math.PI / 2; // plane length axis along the radial direction
-    m.position.set(mid.x, -0.012, mid.z); m.renderOrder = 1; this.group.add(m);
+    m.position.set(mid.x, -0.012, mid.z); m.renderOrder = -2; this.group.add(m);
   }
 
   features() {

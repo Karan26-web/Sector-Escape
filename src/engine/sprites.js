@@ -73,7 +73,7 @@ function shadowTexture() {
 /** Soft blob shadow lying on the floor. */
 export function makeShadow(radius = 0.5, opacity = 1) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false, opacity }));
-  m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.renderOrder = 1; return m;
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.renderOrder = -1; return m;
 }
 
 /** Static billboard (single image or one cell of a sheet) e.g. torch flame, tree, fern. */

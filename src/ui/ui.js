@@ -126,7 +126,9 @@ export const ui = {
       this.selected = l; Object.values(this.nodes).forEach((g) => g.classList.remove('selected')); this.nodes[l.id].classList.add('selected');
       $('#mc-num').textContent = l.id; $('#mc-name').textContent = l.name; $('#mc-tag').textContent = l.tagline;
       const stars = saveData.stars[l.id] || 0; $('#mc-stars').innerHTML = [0, 1, 2].map((i) => `<img src="${frameUrl('ui_icons', i < stars ? 1 : 2)}" alt="">`).join('');
-      $('#mc-best').textContent = saveData.best[l.id] ? `Best score: ${saveData.best[l.id]}` : (l.boss ? 'Final arena · 3 sector shields' : `Radius ${l.radius} m · ${l.waves.length} wave${l.waves.length > 1 ? 's' : ''}`);
+      const clears = (saveData.clears && saveData.clears[l.id]) || 0, vi = clears % l.variants.length;
+      const base = l.boss ? 'Final arena · 3 sector shields' : `${l.waves.length} wave${l.waves.length > 1 ? 's' : ''}`;
+      $('#mc-best').textContent = (saveData.best[l.id] ? `Best score: ${saveData.best[l.id]} · ` : '') + base + (clears ? ` · replay with new numbers (set ${vi + 1}/${l.variants.length})` : l.tier >= 4 ? ' · answers in terms of π' : '');
       $('#map-card').classList.add('show');
     },
     /** Walk the marker from level a to level b (ids; 0 = start). */
@@ -198,14 +200,19 @@ export const ui = {
   panel: {
     cfg: null, hintLevel: 0,
     init() {
-      const keys = ['7', '8', '9', '⌫', '4', '5', '6', '/', '1', '2', '3', '.', '0', 'C'];
+      const keys = ['7', '8', '9', '⌫', '4', '5', '6', '/', '1', '2', '3', '.', '0', 'π', 'C'];
       const pad = $('#keypad'); pad.innerHTML = '';
       for (const k of keys) { const b = document.createElement('button'); b.textContent = k; b.className = 'silent' + (k === '0' ? ' wide' : ''); b.addEventListener('click', () => this.key(k)); pad.appendChild(b); }
       const inp = $('#answer');
-      inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^0-9./]/g, ''); this.refresh(); audio.play('ui.type', { minGap: 0.03 }); });
+      inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^0-9./πpiPI*() ]/g, ''); this.refresh(); audio.play('ui.type', { minGap: 0.03 }); });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.fire(); } });
       $('#btn-fire').addEventListener('click', () => this.fire());
       $('#btn-hint').addEventListener('click', () => this.hint());
+      // on-screen keypad: shown by default on touch devices, toggle elsewhere
+      const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      let pref = null; try { pref = localStorage.getItem('se_keypad'); } catch {}
+      $('#cannon-panel').classList.toggle('show-keypad', pref === null ? coarse : pref === '1');
+      $('#btn-keypad').addEventListener('click', () => { const on = $('#cannon-panel').classList.toggle('show-keypad'); try { localStorage.setItem('se_keypad', on ? '1' : '0'); } catch {} });
     },
     key(k) {
       const inp = $('#answer'); audio.play('ui.type', { minGap: 0.02 });
@@ -216,7 +223,7 @@ export const ui = {
     open(cfg) {
       this.cfg = cfg; this.hintLevel = cfg.hintLevel ?? 0; this.locked = false;
       $('#cannon-panel').classList.add('open'); $('#cannon-panel').classList.remove('locked'); audio.play('ui.panel');
-      $('#values').innerHTML = `<li>r = <b>${cfg.r} m</b></li><li class="theta">θ = <b>${cfg.theta}°</b></li><li>π = <b>${PI.label}</b></li>`;
+      $('#values').innerHTML = `<li>r = <b>${cfg.r} m</b></li><li class="theta">θ = <b>${cfg.theta}°</b></li>` + (cfg.piFriendly === false ? `<li class="pi">answer in π, e.g. <b>50π</b> (or use 22/7)</li>` : `<li>π = <b>${PI.label}</b> <span class="muted-small">or type …π</span></li>`);
       $('#answer').value = ''; $('#btn-fire').disabled = false; this.setFeedback(null); this.setAttempts(cfg.attempts > 1 ? `Attempt ${cfg.attempts}` : '');
       this.renderFormula(); this.refresh(); setTimeout(() => $('#answer').focus({ preventScroll: true }), 350);
     },

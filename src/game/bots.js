@@ -8,7 +8,8 @@ import { audio } from '../engine/audio.js';
 import { polar, degDiff, clamp, lerp, Ease } from '../engine/util.js';
 import { tweens } from '../engine/tween.js';
 
-const ATTACK_R = 2.3;
+const ATTACK_R = 2.7;
+const PEDESTAL_R = 2.4;
 
 export class BotManager {
   constructor(world, fx) {
@@ -81,7 +82,8 @@ export class BotManager {
       let hit = false;
       bots.forEach((b, i) => {
         b.state = 'lunging';
-        const from = b.g.position.clone(), to = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.2, 0, (Math.random() - 0.5) * 1.2));
+        const from = b.g.position.clone(), to = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.4, 0, (Math.random() - 0.5) * 1.4));
+        if (to.length() < PEDESTAL_R) to.setLength(PEDESTAL_R);
         const dist = from.distanceTo(to), dur = clamp(dist / 14, 0.45, 1.3), dl = i * 0.12;
         tweens.delay(dl).promise.then(() => { b.spr.play('lunge', { restart: true }); audio.play('bot.lunge', { pan: clamp(from.x / this.R, -1, 1) * 0.5, minGap: 0.05 }); });
         tweens.add({ duration: dur, delay: dl, ease: Ease.linear, onUpdate: (e) => {

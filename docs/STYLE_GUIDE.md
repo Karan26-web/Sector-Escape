@@ -66,7 +66,7 @@ SPRITE SHEET RULES: a strict grid of C columns × R rows, every cell exactly W×
 - QA every sheet in `tools/sheet-viewer.html` (drop the PNG, pick the preset). Feet must not bounce between frames; the figure must not drift sideways.
 
 ## 7. Files & naming
-Save at the exact path listed in each spec (`assets/sprites/…`, `assets/textures/…`, `assets/ui/…`). PNG-32 with alpha. The game reloads assets on refresh and silently falls back to the procedural placeholder for anything missing or mis-sized.
+Save at the exact path listed in each spec (`assets/sprites/…`, `assets/textures/…`, `assets/ui/…`). PNG-32 with alpha; then run `python3 tools/optimize_assets.py` to convert to WebP and update the manifest. The game reloads assets on refresh and silently falls back to the procedural placeholder for anything missing or mis-sized.
 
 ## 8. Quick production order (recommended)
 1. `enemy_bot` → `hero_back` → `hero_front` (characters define the look)

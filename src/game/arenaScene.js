@@ -63,6 +63,7 @@ export class ArenaScene {
   async flow() {
     const L = this.level;
     ui.hud.setArena(L); ui.hud.setShields(this.shields, this.maxShields); ui.hud.setWave(1, L.waves.length); ui.hud.setScore(this.game.sessionScore || 0);
+    if (L.variantIndex) ui.caption(`Replay — new numbers (problem set ${L.variantIndex + 1} of ${L.variantCount})`, 3);
     audio.ambient.start('jungle'); audio.music.start('explore'); audio.music.setMode('explore');
     this.hero.group.visible = true;
     if (this.skipIntro) this.placeInside(); else await this.s(this.approachAndEnter());
@@ -139,17 +140,17 @@ export class ArenaScene {
       this.setPhase('run');
       this.hero.faceTo(this.center);
       this.followHero(() => this.hero.vel.lengthSq() > 0.5 ? this.hero.vel.clone().normalize() : this.hero.facing.clone(), 2.8);
-      this.hero.control = true; this.hero.boundsRadius = R - 1.2; this.cannon.setBeacon(true);
+      this.hero.control = true; this.hero.boundsRadius = R - 1.2; this.hero.keepOutRadius = 2.0; this.cannon.setBeacon(true);
       ui.objective('Run to the central cannon to activate it'); ui.caption('Run to the central cannon to activate it.', 3.2);
-      await this.waitFor(() => this.hero.pos.length() < 1.9, { autoAfter: this.game.autoRun ? 0.2 : 9, auto: () => { this.hero.control = false; this.hero.runTo(this.center, 7); } });
-      this.hero.control = false; this.hero.stop(); this.hero.boundsRadius = null; ui.objective(null);
-      const stand = this.dirDeg(w.breachDeg).multiplyScalar(-1.4); this.hero.setPosition(stand); this.hero.faceTo(bp);
+      await this.waitFor(() => this.hero.pos.length() < 2.7, { autoAfter: this.game.autoRun ? 0.2 : 9, auto: () => { this.hero.control = false; this.hero.runTo(this.center, 7); } });
+      this.hero.control = false; this.hero.stop(); this.hero.boundsRadius = null; this.hero.keepOutRadius = null; ui.objective(null);
+      const stand = this.dirDeg(w.breachDeg).multiplyScalar(-2.2); this.hero.setPosition(stand); this.hero.faceTo(bp);
       // ---- activate
       this.setPhase('activate');
       this.rig.moveTo(this.behindPose(this.hero.pos, this.dirDeg(w.breachDeg), 5, 2.6, 52), 0.6);
       await Promise.all([this.hero.playSpecial('activate', { hold: 0.2 }), this.cannon.activate()]);
     } else {
-      const stand = this.dirDeg(w.breachDeg).multiplyScalar(-1.4); this.hero.stop(); this.hero.setPosition(stand); this.hero.faceTo(bp);
+      const stand = this.dirDeg(w.breachDeg).multiplyScalar(-2.2); this.hero.stop(); this.hero.setPosition(stand); this.hero.faceTo(bp);
     }
     // ---- tactical view
     this.setPhase('tactical');
@@ -162,7 +163,7 @@ export class ArenaScene {
     while (true) {
       this.attempt++;
       this.setPhase('input');
-      if (this.attempt === 1) ui.panel.open({ r: R, theta: w.theta, scaffold: L.scaffold, hintLevel: this.hintLevel, attempts: this.attempt, onFire: (v) => this._resolveFire && this._resolveFire(v), onHint: (lvl) => { this.usedHints = true; this.hintLevel = lvl; } });
+      if (this.attempt === 1) ui.panel.open({ r: R, theta: w.theta, scaffold: L.scaffold, piFriendly: L.piFriendly !== false, hintLevel: this.hintLevel, attempts: this.attempt, onFire: (v) => this._resolveFire && this._resolveFire(v), onHint: (lvl) => { this.usedHints = true; this.hintLevel = lvl; } });
       else ui.panel.setAttempts(`Attempt ${this.attempt}`);
       ui.hud.setThreat(this.bots.threat, true);
       this.bots.onReach = () => this._resolveFire && this._resolveFire(TIMEOUT);
@@ -196,7 +197,7 @@ export class ArenaScene {
       if (res.status === 'correct') {
         if (this.attempt === 1) this.firstTry[i] = true; else this.firstTry[i] = false;
         audio.play('sting.perfect');
-        await ui.stamp('perfect', 'PERFECT SHOT!', 'Exact area — every guardian destroyed');
+        await ui.stamp('perfect', 'PERFECT SHOT!', `Exact area ${res.exactText} m² — every guardian destroyed`);
         ui.panel.close();
         if (this.boss) { await this.boss.breakShield(i); if (i === L.waves.length - 1) { await this.boss.defeat(); await this.arena.breakLock(); } else { await this.arena.closeBreach(i); } }
         else if (i === L.waves.length - 1) { await this.arena.breakLock(); }
@@ -218,7 +219,7 @@ export class ArenaScene {
       }
       // ---- retry same problem with stronger scaffolding
       const d = res.diagnosis;
-      ui.panel.setFeedback({ type: 'bad', title: d.title, html: `${d.tip}<br><span style="color:#b9cbd4">You entered <b>${res.entered}</b> m² — the laser covered <b>${Math.round(res.firedTheta)}°</b> of the <b>${w.theta}°</b> breach.</span>` });
+      ui.panel.setFeedback({ type: 'bad', title: d.title, html: `${d.tip}<br><span style="color:#b9cbd4">You entered <b>${res.enteredText}</b> m² — the laser covered <b>${Math.round(res.firedTheta)}°</b> of the <b>${w.theta}°</b> breach.</span>` });
       this.hintLevel = Math.min(3, this.hintLevel + 1); this.usedHints = this.usedHints || this.hintLevel >= 3;
       this.spawn(w, count, w.timeBudget * 0.85);
       ui.panel.unlock(); ui.panel.hintLevel = this.hintLevel; ui.panel.renderFormula(); ui.panel.setAttempts(`Attempt ${this.attempt + 1}`);

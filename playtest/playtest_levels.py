@@ -83,7 +83,7 @@ async def main():
         async def ctx_factory(vp, dsf=1, touch=False): return await b.new_context(viewport=vp, device_scale_factor=dsf, has_touch=touch, is_mobile=touch)
         ctx = await ctx_factory({"width": 1280, "height": 720})
         await run_level(ctx, 5, ["308", "924"], "L5", logs)
-        await run_level(ctx, 7, ["616", "924", "308"], "L7boss", logs)
+        await run_level(ctx, 7, ["616", "924", "1540"], "L7boss", logs)
         await gameover(ctx, logs)
         await pause_quit(ctx, logs)
         await mobile(ctx_factory, logs)

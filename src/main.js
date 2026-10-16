@@ -10,7 +10,7 @@ import { FX } from './engine/fx.js';
 import { Hero } from './game/hero.js';
 import { Arena } from './game/arena.js';
 import { ArenaScene } from './game/arenaScene.js';
-import { LEVELS, TOTAL_LEVELS, getLevel, validateLevels } from './game/levels.js';
+import { LEVELS, TOTAL_LEVELS, getLevel, validateLevels, resolveLevel } from './game/levels.js';
 import { save } from './game/save.js';
 import { ui } from './ui/ui.js';
 import { polar } from './engine/util.js';
@@ -86,13 +86,16 @@ class Game {
   }
   afterLevel(id, res) { if (res.outcome === 'cleared') save.clearedLevel(id, res.score.stars, res.score.total, TOTAL_LEVELS); }
 
-  async playLevel(id, skipIntro = false) {
-    const level = getLevel(id); this.hideBackdrop(); ui.hideAll(); ui.hud.show();
+  async playLevel(id, skipIntro = false, resolved = null) {
+    // variant: cycles with the number of times this arena was cleared (new numbers on replay); ?variant=K overrides
+    const forced = parseInt(params.get('variant') || '', 10);
+    const level = resolved || resolveLevel(getLevel(id), Number.isFinite(forced) ? forced : (save.load().clears?.[id] || 0));
+    this.hideBackdrop(); ui.hideAll(); ui.hud.show();
     const scene = new ArenaScene(this, level, { skipIntro }); this.scene = scene;
     const res = await scene.run();
     if (res.outcome === 'gameover') {
       const c = await ui.gameover.show(); scene.dispose(); this.scene = null;
-      if (c === 'retry') return this.playLevel(id, true);
+      if (c === 'retry') return this.playLevel(id, true, level);
       return res;
     }
     if (res.outcome === 'cleared') { this.sessionScore += res.score.total; ui.hud.setScore(this.sessionScore); await ui.results.show({ level, score: res.score }); }

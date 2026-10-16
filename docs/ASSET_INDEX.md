@@ -4,7 +4,7 @@ Every visual asset the game loads, with its spec sheet. **The game runs without 
 
 Priority: **P0** core look · **P1** polish · **P2** optional (procedural version is fine).
 
-**Status (2026-10-16):** 36 of 37 assets are installed in `assets/`. Only `gate_large_frame` is missing; the game reuses `gate_small_frame` for the exit gate until it arrives (set via `fallback` in `assets/manifest.json`). Source packs, alternates and the concept sheet live in `art-source/` (excluded from deploys).
+**Status (2026-10-16):** 36 of 37 assets are installed in `assets/`. Only `gate_large_frame` is missing; the game reuses `gate_small_frame` for the exit gate until it arrives (set via `fallback` in `assets/manifest.json`). Installed files are WebP (converted by `tools/optimize_assets.py`, lossless alpha); the manifest paths therefore end in `.webp`. Source PNG packs, alternates and the concept sheet live outside the project in `../Sector Escape - art source/`.
 
 Shared rules for every prompt are in [STYLE_GUIDE.md](STYLE_GUIDE.md). Verify sprite sheets with `tools/sheet-viewer.html`.
 

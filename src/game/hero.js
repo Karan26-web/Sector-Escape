@@ -23,6 +23,7 @@ export class Hero {
     this.control = false;        // player control enabled
     this.target = null;          // click-to-move target
     this.boundsRadius = null;    // keep inside arena
+    this.keepOutRadius = null;   // stay off the cannon pedestal
     this.special = null;         // name of a non-locomotion anim currently playing
     this.stepTimer = 0; this.surface = 'stone';
     this.onArrive = null;
@@ -83,6 +84,7 @@ export class Hero {
     else this.vel.multiplyScalar(Math.exp(-14 * dt));
     this.pos.addScaledVector(this.vel, dt);
     if (this.boundsRadius) { const l = Math.hypot(this.pos.x, this.pos.z); if (l > this.boundsRadius) { this.pos.x *= this.boundsRadius / l; this.pos.z *= this.boundsRadius / l; } }
+    if (this.keepOutRadius) { const l = Math.hypot(this.pos.x, this.pos.z); if (l < this.keepOutRadius && l > 1e-4) { this.pos.x *= this.keepOutRadius / l; this.pos.z *= this.keepOutRadius / l; } }
     const speedNow = this.vel.length();
     // ---- footsteps
     if (speedNow > 1.5) { this.stepTimer -= dt * (speedNow / 6); if (this.stepTimer <= 0) { this.stepTimer = 0.3; audio.play(this.surface === 'grass' ? 'step.grass' : 'step.stone', { minGap: 0.12 }); if (this.fx) this.fx.dust(this.pos); } }

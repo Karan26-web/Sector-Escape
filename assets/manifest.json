@@ -2,7 +2,7 @@
   "_readme": "Every image listed here is optional. If the file is missing the game draws a procedural placeholder. Sheets: cols × rows grid; anims map a name to a row, a frame count and fps. chromaKey (e.g. \"#FF00FF\") makes that colour transparent for sheets generated on a flat background. worldHeight = metres the full frame height spans in the 3D arena. Gate frames: \"opening\" = transparent arch width as a fraction of the image width, \"top\" = arch top as a fraction of the height. \"fallback\" names another image to use when this file is missing.",
   "images": {
     "hero_front": {
-      "path": "sprites/hero_front.png",
+      "path": "sprites/hero_front.webp",
       "worldHeight": 1.75,
       "chromaKey": null,
       "sheet": {
@@ -40,7 +40,7 @@
       }
     },
     "hero_back": {
-      "path": "sprites/hero_back.png",
+      "path": "sprites/hero_back.webp",
       "worldHeight": 1.75,
       "chromaKey": null,
       "sheet": {
@@ -61,7 +61,7 @@
       }
     },
     "enemy_bot": {
-      "path": "sprites/enemy_bot.png",
+      "path": "sprites/enemy_bot.webp",
       "worldHeight": 2.1,
       "chromaKey": null,
       "sheet": {
@@ -94,7 +94,7 @@
       }
     },
     "boss_warden": {
-      "path": "sprites/boss_warden.png",
+      "path": "sprites/boss_warden.webp",
       "worldHeight": 6.5,
       "chromaKey": null,
       "sheet": {
@@ -122,7 +122,7 @@
       }
     },
     "torch": {
-      "path": "sprites/torch.png",
+      "path": "sprites/torch.webp",
       "worldHeight": 1.5,
       "sheet": {
         "cols": 4,
@@ -137,11 +137,11 @@
       }
     },
     "cannon": {
-      "path": "sprites/cannon.png",
+      "path": "sprites/cannon.webp",
       "worldHeight": 3.2
     },
     "jungle_tree": {
-      "path": "sprites/jungle_tree.png",
+      "path": "sprites/jungle_tree.webp",
       "worldHeight": 9,
       "sheet": {
         "cols": 4,
@@ -167,7 +167,7 @@
       }
     },
     "jungle_plant": {
-      "path": "sprites/jungle_plant.png",
+      "path": "sprites/jungle_plant.webp",
       "worldHeight": 1.6,
       "sheet": {
         "cols": 4,
@@ -193,11 +193,11 @@
       }
     },
     "stone_idol": {
-      "path": "sprites/stone_idol.png",
+      "path": "sprites/stone_idol.webp",
       "worldHeight": 4
     },
     "rubble": {
-      "path": "sprites/rubble.png",
+      "path": "sprites/rubble.webp",
       "worldHeight": 1.2,
       "sheet": {
         "cols": 4,
@@ -223,50 +223,47 @@
       }
     },
     "arena_floor": {
-      "path": "textures/arena_floor.png"
+      "path": "textures/arena_floor.webp"
     },
     "arena_wall": {
-      "path": "textures/arena_wall.png"
+      "path": "textures/arena_wall.webp"
     },
     "wall_top": {
-      "path": "textures/wall_top.png"
+      "path": "textures/wall_top.webp"
     },
     "ground_jungle": {
-      "path": "textures/ground_jungle.png"
+      "path": "textures/ground_jungle.webp"
     },
     "path_dirt": {
-      "path": "textures/path_dirt.png"
+      "path": "textures/path_dirt.webp"
     },
     "jungle_panorama": {
-      "path": "textures/jungle_panorama.png"
+      "path": "textures/jungle_panorama.webp"
     },
     "sky": {
-      "path": "textures/sky.png"
+      "path": "textures/sky.webp"
     },
     "gate_small_frame": {
-      "path": "textures/gate_small_frame.png",
+      "path": "textures/gate_small_frame.webp",
       "opening": 0.461,
       "top": 0.301
     },
     "gate_small_door": {
-      "path": "textures/gate_small_door.png"
+      "path": "textures/gate_small_door.webp"
     },
     "gate_large_frame": {
-      "path": "textures/gate_large_frame.png",
-      "opening": 0.56,
-      "top": 0.22,
-      "fallback": "gate_small_frame",
-      "fallbackOpening": 0.461,
-      "fallbackTop": 0.301
+      "path": "textures/gate_large_frame.webp",
+      "opening": 0.444,
+      "top": 0.285
     },
     "gate_large_door": {
-      "path": "textures/gate_large_door.png"
+      "path": "textures/gate_large_door.webp"
     },
     "energy_lock": {
-      "path": "textures/energy_lock.png"
+      "path": "textures/energy_lock.webp"
     },
     "fx_explosion": {
-      "path": "sprites/fx_explosion.png",
+      "path": "sprites/fx_explosion.webp",
       "worldHeight": 2.8,
       "sheet": {
         "cols": 8,
@@ -282,34 +279,34 @@
       }
     },
     "fx_spark": {
-      "path": "sprites/fx_spark.png"
+      "path": "sprites/fx_spark.webp"
     },
     "fx_glow": {
-      "path": "sprites/fx_glow.png"
+      "path": "sprites/fx_glow.webp"
     },
     "fx_smoke": {
-      "path": "sprites/fx_smoke.png"
+      "path": "sprites/fx_smoke.webp"
     },
     "fx_shockwave": {
-      "path": "sprites/fx_shockwave.png"
+      "path": "sprites/fx_shockwave.webp"
     },
     "fx_laser": {
-      "path": "sprites/fx_laser.png"
+      "path": "sprites/fx_laser.webp"
     },
     "ui_logo": {
-      "path": "ui/logo.png"
+      "path": "ui/logo.webp"
     },
     "ui_parchment": {
-      "path": "ui/parchment.png"
+      "path": "ui/parchment.webp"
     },
     "ui_story_art": {
-      "path": "ui/story_illustration.png"
+      "path": "ui/story_illustration.webp"
     },
     "ui_map_bg": {
-      "path": "ui/map_bg.png"
+      "path": "ui/map_bg.webp"
     },
     "ui_map_node": {
-      "path": "ui/map_node.png",
+      "path": "ui/map_node.webp",
       "sheet": {
         "cols": 4,
         "rows": 1,
@@ -334,13 +331,13 @@
       }
     },
     "ui_map_marker": {
-      "path": "ui/map_marker.png"
+      "path": "ui/map_marker.webp"
     },
     "ui_map_temple": {
-      "path": "ui/map_temple.png"
+      "path": "ui/map_temple.webp"
     },
     "ui_shield": {
-      "path": "ui/shield.png",
+      "path": "ui/shield.webp",
       "sheet": {
         "cols": 2,
         "rows": 1,
@@ -357,7 +354,7 @@
       }
     },
     "ui_icons": {
-      "path": "ui/icons.png",
+      "path": "ui/icons.webp",
       "sheet": {
         "cols": 8,
         "rows": 1,

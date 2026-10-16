@@ -62,8 +62,9 @@ export class Assets {
   async load(name, def = {}) {
     let img = null;
     if (def.path) {
+      const alt = def.path.endsWith('.webp') ? def.path.replace(/\.webp$/, '.png') : def.path.replace(/\.png$/, '.webp');
       try {
-        img = await loadImageEl(ASSET_BASE + def.path);
+        img = await loadImageEl(ASSET_BASE + def.path).catch(() => loadImageEl(ASSET_BASE + alt));
         if (def.chromaKey) img = chromaKey(img, def.chromaKey, def.chromaTolerance ?? 60, def.chromaFeather ?? 40);
         this.status.set(name, 'file');
       } catch { img = null; }

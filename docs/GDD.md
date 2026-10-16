@@ -22,7 +22,7 @@
 
 **Why area maps to the angle (fixed radius).** The breach spans the wall, so the natural "shape" of the blast is the sector of the arena. Keeping r fixed and varying the angle makes the error *visible as angular coverage* — the undercharged beam visibly leaves bots standing at the edges, the overcharged beam visibly spills onto the wall — exactly as panels 10 and 11 of the wireframe show. (Mapping error to radius would hide the mistake behind the enemies.)
 
-**Tolerance.** Correct if |entered − exact| ≤ max(0.5 m², 0.5 %). This accepts 153.86 for 154 (π = 3.14 or 3.1416) without accepting genuine slips. Fractions such as `616/4` are accepted as input.
+**Tolerance.** Decimal answers are correct if |entered − exact| ≤ max(0.5 m², 0.5 %), which accepts 153.86 for 154 (π = 3.14 or 3.1416) without accepting genuine slips. π-form answers (`49π`) compare the coefficient of π exactly (±0.5 %). Fractions such as `616/4` or `98π/2` are accepted as input.
 
 ### Misconception diagnostics
 Wrong answers are matched against the most common procedural errors before a generic message is shown. (Research on fraction games found that feedback improves correctness but not misconceptions unless it is *specific to the error type* — so the game logs and names the error.)
@@ -38,6 +38,7 @@ Wrong answers are matched against the most common procedural errors before a gen
 | `decimal` | 10× or ÷10 | "Check your place value." |
 | `fraction-flipped` | (360/θ)·πr² | "The fraction is upside down. Use θ/360." |
 | `double`, `half` | 2× / ½× | "Exactly double / half…" |
+| `forgot-pi` | (θ/360)·r² | "π is missing. You have (θ/360) × r² — multiply by π." |
 | `pi-as-3` | (θ/360)·3r² | "π was taken as 3. Use 22/7." |
 | `under` / `over` | anything else | "About N % too small / large. Re-check each step…" |
 
@@ -73,20 +74,22 @@ Per-arena starting level (`scaffold` in `levels.js`): arena 1 starts at level 2 
 
 Shields: 3 per arena (reset on every arena). 0 shields → *Game over* → **Retry arena** (restarts at the alert, skipping the approach) or **Back to map**.
 
-## 3. Progression
-Seven arenas placed on the LXD's sketched map (positions traced from the sketch, start bottom-left → destination temple bottom-right). All answers are whole numbers.
+## 3. Progression — the difficulty ladder
+Seven arenas on the LXD's sketched map. Each arena owns **several problem sets ("variants")**: the first is the canonical problem from the brief; every time a cleared arena is replayed the next set is used, so practice always brings new numbers while the arena itself stays familiar. Difficulty rises along five levers: angle friendliness, radius (whole-number vs. π-form answers), scaffolding, time budget, and number of waves.
 
-| # | Arena | r (m) | θ | Area | Guardians | Time to reach cannon | Breach | Scaffold | New |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | The Mossy Gate | 14 | 90° | **154** | 10 | 100 s | NE | formula + values | tutorial pacing |
-| 2 | Fallen Idol | 14 | 180° | **308** | 20 | 90 s | E (half the wall) | formula | semicircle, gates off-axis |
-| 3 | Serpent Court | 21 | 60° | **231** | 10 | 80 s | W | hint-only | new radius, dusk |
-| 4 | Crimson Ruins | 21 | 120° | **462** | 20 | 70 s | NE | hint-only | wide breach, less time |
-| 5 | Twin Breach | 28 | 45° → 135° | **308 → 924** | 10 → 24 | 65 / 60 s | NE then SW | hint-only | two consecutive waves, night |
-| 6 | Thunder Well | 35 | 72° | **770** | 20 | 55 s | E | hint-only | largest ring, fastest |
-| 7 | The Warden's Arena (boss) | 28 | 90° → 135° → 45° | **616 → 924 → 308** | 20 → 24 → 10 | 60 / 55 / 50 s | varies | hint-only | three sector shields |
+| # | Arena | Tier | Radius | Sets (θ → area) | Time | Scaffold | What is new |
+|---|---|---|---|---|---|---|---|
+| 1 | The Mossy Gate | 1 | 14 | 90° → 154 · 45° → 77 · 135° → 231 | 100 s | formula + substitution | tutorial pacing |
+| 2 | Fallen Idol | 1 | 14 / 14 / 21 | 180° → 308 · 270° → 462 · 180° → 693 | 90 s | formula | half and three-quarter breaches; gates move beside the breach |
+| 3 | Serpent Court | 2 | 21 | 60° → 231 · 40° → 154 · 100° → 385 | 80 s | hint only | awkward fractions of 360 |
+| 4 | Crimson Ruins | 2 | 21 / 21 / 28 | 120° → 462 · 160° → 616 · 135° → 924 | 70 s | hint only | wide breach, less time |
+| 5 | Twin Breach | 3 | 28 / 28 / 35 | 45°+135° → 308, 924 · 90°+225° → 616, 1540 · 72°+144° → 770, 1540 | 65 → 55 s | hint only | two consecutive waves, night |
+| 6 | Thunder Well | 4 | 20 / 15 / 18 / 24 | 45° → 50π · 72° → 45π · 100° → 90π · 75° → 120π | 55 s | hint only | **radius not a multiple of 7 — answer in terms of π** |
+| 7 | The Warden's Arena | 5 | 28 / 35 / 30 | 90°,135°,225° → 616, 924, 1540 · 72°,144°,216° → 770, 1540, 2310 · 60°,120°,200° → 150π, 300π, 500π | 60 → 50 s | hint only | boss; each wave tears the same breach wider |
 
-Difficulty levers (all in `src/game/levels.js`): time budget (bot arrival), bot count (≈ one per 2.2 m of breach arc, 4–24), θ variety, radius (changes the whole arena size and camera height), number of waves, scaffold level, environment (day/dusk/night/storm, torches, fog).
+**Answers in terms of π.** From tier 4 the exact area is a multiple of π (e.g. 50π m²). The input accepts `50π`, `50pi`, `50*pi`, `pi*50`, `100π/2`, `(1/8)400π`-style fractions, and the keypad has a π key. Decimal answers are still accepted when they use 22/7, 3.14 or 3.1416 (±0.5 %). For tiers 1–3 the panel keeps the NCERT convention π = 22/7 but a learner may equally type `49π` for 154.
+
+Difficulty levers (all in `src/game/levels.js`): time budget (bot arrival), bot count (≈ one per 2.2 m of breach arc, 4–24), θ variety, radius (changes the whole arena size and camera height), number of waves, scaffold level, environment (day/dusk/night/storm, torches, fog). `validateLevels()` checks every set: whole-number areas (or whole π-coefficients) and no breach overlapping a gate.
 
 Wave timing: guardians spawn in 2–3 rows just outside the breach and lurch toward the centre so that the first arrives after the arena's time budget (retries use 85 % of it). The HUD "Enemy advance" bar is the visible timer.
 
