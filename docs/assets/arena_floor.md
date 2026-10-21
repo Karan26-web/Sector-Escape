@@ -5,7 +5,7 @@
 | **Save as** | `assets/textures/arena_floor.png` |
 | **Type** | Texture (PNG-32 with alpha) |
 | **Canvas size** | 2048 × 2048 px |
-| **World scale** | scaled to each arena's radius (7–35 m) |
+| **World scale** | scaled to each arena's radius (7–21 m) |
 | **Priority** | P0 |
 | **Manifest key** | `arena_floor` |
 
@@ -25,7 +25,7 @@ Output size 2048×2048 px, PNG with transparency.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

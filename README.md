@@ -1,7 +1,7 @@
 # Sector Escape – The Lost Jungle
 
 A 2.5D math adventure that teaches **Area of a Sector of a Circle** — `A = (θ/360) × πr²` (π = 22/7, NCERT convention).
-Trapped in a jungle of circular arenas, you run to the ancient **Sector Cannon**, read the radius and central angle straight off the battlefield, and charge the cannon with the **exact** sector area: too small and guardians survive and pounce, too large and the excess energy reflects off the wall and hits you; exact and every guardian is destroyed and the exit unlocks.
+A stone causeway over water leads Karan into a maze of seven **overlapping circular arenas**. In each ring the far arc is already open but the guardians stand in it; Karan runs to the centre, the **Sector Laser Gun** rises from under a hatch, scans the arc, and the entered sector area sets the width of the blast: too small and the survivors pounce, too large and the excess reflects off the solid wall, exact (**PERFECT SECTOR**) and every guardian falls — Karan runs through the open arc straight into the next ring and the trap seals behind him, until the temple gate.
 
 Built with vanilla ES modules, HTML/CSS UI, fully procedural Web Audio sound and the open-source Three.js rendering library (one vendored, minified file). No game engine, no framework, **no build step**. The whole deployable folder is about 7 MB, 5.3 MB of which is WebP art.
 
@@ -21,21 +21,23 @@ Every asset is optional: anything missing in `assets/` is drawn procedurally, so
 | Enter the answer | type, or the on-screen keypad (digits, `.`, `/`, `π`). Fractions like `616/4` and answers in terms of π like `49π`, `50pi`, `100π/2` are accepted |
 | FIRE | **Enter** or the FIRE button |
 | Hint | 💡 button (reveals formula → substituted values → worked steps) |
+| Keypad | ⌨ button toggles the on-screen keypad (on by default on phones and tablets) |
 | Mute / Pause | **M** / **Esc** or HUD buttons |
-| Skip cutscene | "Tap to skip" pill |
+| Skip the causeway | "Tap to skip" pill |
 
 ## URL parameters (dev / QA)
-`?level=5` jump straight into arena 5 · `?variant=2` pick that arena's third problem set · `?skip=1` skip the approach cutscene · `?auto=1` hero auto-runs to the cannon · `?mute=1` · `?reset=1` wipe saved progress.
+`?level=5` start at arena 5 · `?skip=1` skip the causeway · `?auto=1` hero auto-runs to the cannon · `?mute=1` · `?reset=1` wipe saved progress.
 Console API: `__se.phase`, `__se.fire('154')`, `__se.hint()`, `__se.scene`.
 
 ## Project layout
 ```
 index.html, styles/main.css        shell + theme
 src/main.js                        boot, title → story → map → arenas → ending
-src/game/levels.js                 7 arenas, answer evaluation, misconception diagnosis, hints, scoring
-src/game/arenaScene.js             the arena state machine (approach → alert → run → tactical → input → fire → outcome → exit)
-src/game/arena.js                  circular wall w/ openable breach segments, gates, torches, energy lock, jungle
-src/game/cannon.js                 beacon, scan overlays (θ, r), sector-laser shader, reflections, pulse
+src/game/levels.js                 the LXD's 7-arena table, chain geometry solver (CHAIN), answer evaluation, diagnosis, hints, scoring
+src/game/chain.js                  the whole world: causeway over water, gate, overlapping rings with open arcs, hatches, seals, temple, instanced jungle
+src/game/arenaScene.js             one ring: causeway/entry → sealed in → noticed → run → hatch & gun → tactical → scan → input → fire → through the arc
+src/game/cannon.js                 buried gun that rises, scan overlays (θ, r), sector-laser shader, reflections, pulse
+src/engine/instancedSprites.js     thousands of billboards in one draw call (trees, plants, rocks)
 src/game/bots.js, hero.js, boss.js entities
 src/engine/*                       world/renderer, camera rig, sprites, assets (+chroma key), tweens, labels, fx, audio
 src/placeholders/*                 procedural placeholder art
@@ -43,6 +45,8 @@ src/ui/ui.js                       screens, HUD, cannon panel, map
 assets/manifest.json               every asset + sprite-sheet grid definitions
 docs/                              GDD (with LXD rationale), STYLE_GUIDE, ASSET_INDEX + one spec per asset, SFX_SPEC
 tools/sheet-viewer.html            preview/QA sprite sheets, view all placeholders (#gallery)
+tools/gen_asset_docs.py            regenerates docs/ASSET_INDEX.md + docs/assets/*.md
+tools/optimize_assets.py           PNG → WebP + manifest update
 playtest/*.py                      Playwright playtests (screenshots in playtest/screens/)
 ```
 
@@ -65,13 +69,15 @@ There is no build step; the folder is a static site with `index.html` as the ent
 
 ## Playtesting
 ```bash
-python3 playtest/playtest.py          # full flow: title → map → arena 1 (under / over / perfect) → results
-python3 playtest/playtest_levels.py   # two-wave arena, boss arena, game over + retry, mobile layout
+python3 playtest/smoke_chain.py       # title → overview → causeway → arena 1 (under / over / perfect) → through the arc → arena 2
+python3 playtest/chain_full.py        # arenas 6–7, the Warden, temple finale + results, game over / retry / quit, mobile
 ```
 Requires Python Playwright with Chromium (`pip3 install playwright && python3 -m playwright install chromium`). Screenshots are written to `playtest/screens/`.
 
 ## Design docs
-- `docs/GDD.md` — game design + learning design (LXD) rationale, difficulty ladder with per-arena problem sets, feedback matrix, scoring.
+- `docs/GDD.md` — game design + learning design (LXD) rationale, the chain geometry, level table, feedback matrix, scoring.
+- `docs/NEW_ASSETS.md` — prompts for the optional foliage redesign sheets (canopy masses, distant silhouettes) and the map backdrop.
+- `docs/ANSWER_KEY.md` — answers per arena for testers.
 - `docs/STYLE_GUIDE.md` — art direction, palette, shared prompt block, sprite-sheet rules.
 - `docs/ASSET_INDEX.md` → `docs/assets/*.md` — every asset to produce.
 - `docs/sfx/SFX_SPEC.md` — every sound cue, music modes, how to override.

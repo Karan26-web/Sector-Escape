@@ -5,7 +5,7 @@
 | **Save as** | `assets/textures/ground_jungle.png` |
 | **Type** | Texture (PNG-32 with alpha) |
 | **Canvas size** | 1024 × 1024 px |
-| **World scale** | 10 m × 10 m per tile |
+| **World scale** | 12 m × 12 m per tile |
 | **Priority** | P1 |
 | **Manifest key** | `ground_jungle` |
 
@@ -25,7 +25,7 @@ Output size 1024×1024 px, PNG.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

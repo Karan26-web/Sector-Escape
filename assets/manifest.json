@@ -1,5 +1,5 @@
 {
-  "_readme": "Every image listed here is optional. If the file is missing the game draws a procedural placeholder. Sheets: cols × rows grid; anims map a name to a row, a frame count and fps. chromaKey (e.g. \"#FF00FF\") makes that colour transparent for sheets generated on a flat background. worldHeight = metres the full frame height spans in the 3D arena. Gate frames: \"opening\" = transparent arch width as a fraction of the image width, \"top\" = arch top as a fraction of the height. \"fallback\" names another image to use when this file is missing.",
+  "_readme": "Every image listed here is optional. If the file is missing the game draws a procedural placeholder. Sheets: cols × rows grid; anims map a name to a row, a frame count and fps. chromaKey (e.g. \"#FF00FF\") makes that colour transparent for sheets generated on a flat background. worldHeight = metres the full frame height spans in the 3D arena. Gate frames: \"opening\" = transparent arch width as a fraction of the image width, \"top\" = arch top as a fraction of the height. \"fallback\" names another image to use when this file is missing. \"baseline\" = fraction of the cell height where the feet / trunk base sit (measured); the game anchors sprites there so nothing floats.",
   "images": {
     "hero_front": {
       "path": "sprites/hero_front.webp",
@@ -37,7 +37,8 @@
             "fps": 8
           }
         }
-      }
+      },
+      "baseline": 0.904
     },
     "hero_back": {
       "path": "sprites/hero_back.webp",
@@ -58,7 +59,8 @@
             "fps": 13
           }
         }
-      }
+      },
+      "baseline": 0.91
     },
     "enemy_bot": {
       "path": "sprites/enemy_bot.webp",
@@ -91,7 +93,8 @@
             "loop": false
           }
         }
-      }
+      },
+      "baseline": 0.91
     },
     "boss_warden": {
       "path": "sprites/boss_warden.webp",
@@ -119,7 +122,8 @@
             "loop": false
           }
         }
-      }
+      },
+      "baseline": 0.916
     },
     "torch": {
       "path": "sprites/torch.webp",
@@ -138,7 +142,8 @@
     },
     "cannon": {
       "path": "sprites/cannon.webp",
-      "worldHeight": 3.2
+      "worldHeight": 3.2,
+      "baseline": 0.998
     },
     "jungle_tree": {
       "path": "sprites/jungle_tree.webp",
@@ -164,7 +169,8 @@
             "frames": 1
           }
         }
-      }
+      },
+      "baseline": 0.918
     },
     "jungle_plant": {
       "path": "sprites/jungle_plant.webp",
@@ -190,11 +196,13 @@
             "frames": 1
           }
         }
-      }
+      },
+      "baseline": 0.916
     },
     "stone_idol": {
       "path": "sprites/stone_idol.webp",
-      "worldHeight": 4
+      "worldHeight": 4,
+      "baseline": 0.999
     },
     "rubble": {
       "path": "sprites/rubble.webp",
@@ -220,7 +228,8 @@
             "frames": 1
           }
         }
-      }
+      },
+      "baseline": 0.914
     },
     "arena_floor": {
       "path": "textures/arena_floor.webp"
@@ -393,6 +402,108 @@
           }
         }
       }
+    },
+    "jungle_rocks": {
+      "path": "sprites/jungle_rocks.webp",
+      "worldHeight": 1.8,
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "a": {
+            "col": 0,
+            "frames": 1
+          },
+          "b": {
+            "col": 1,
+            "frames": 1
+          },
+          "c": {
+            "col": 2,
+            "frames": 1
+          },
+          "d": {
+            "col": 3,
+            "frames": 1
+          }
+        }
+      },
+      "baseline": 0.917
+    },
+    "wall_pillar": {
+      "path": "sprites/wall_pillar.webp",
+      "worldHeight": 7.2
+    },
+    "water": {
+      "path": "textures/water.webp"
+    },
+    "causeway_stone": {
+      "path": "textures/causeway_stone.webp"
+    },
+    "causeway_side": {
+      "path": "textures/causeway_side.webp"
+    },
+    "floor_hatch": {
+      "path": "textures/floor_hatch.webp"
+    },
+    "seal_slab": {
+      "path": "textures/seal_slab.webp"
+    },
+    "jungle_canopy": {
+      "path": "sprites/jungle_canopy.webp",
+      "worldHeight": 12,
+      "fallback": "jungle_tree",
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "a": {
+            "col": 0,
+            "frames": 1
+          },
+          "b": {
+            "col": 1,
+            "frames": 1
+          },
+          "c": {
+            "col": 2,
+            "frames": 1
+          },
+          "d": {
+            "col": 3,
+            "frames": 1
+          }
+        }
+      },
+      "baseline": 0.957
+    },
+    "forest_silhouette": {
+      "path": "sprites/forest_silhouette.webp",
+      "worldHeight": 18,
+      "fallback": "jungle_tree",
+      "sheet": {
+        "cols": 4,
+        "rows": 1,
+        "anims": {
+          "a": {
+            "col": 0,
+            "frames": 1
+          },
+          "b": {
+            "col": 1,
+            "frames": 1
+          },
+          "c": {
+            "col": 2,
+            "frames": 1
+          },
+          "d": {
+            "col": 3,
+            "frames": 1
+          }
+        }
+      },
+      "baseline": 0.968
     }
   },
   "sfx": {},

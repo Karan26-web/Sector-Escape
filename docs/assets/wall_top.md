@@ -10,7 +10,7 @@
 | **Manifest key** | `wall_top` |
 
 ## Used for
-The flat top of the arena wall (seen from the tactical view).
+The flat top of the arena walls and pillar caps (seen from the tactical view).
 
 ## Visual description
 Top-down strip of dark grey-green capstones with mortar lines, seamless left↔right.
@@ -25,7 +25,7 @@ Output size 512×128 px, PNG.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

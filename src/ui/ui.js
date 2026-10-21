@@ -1,21 +1,20 @@
 // ---------------------------------------------------------------------------
-// DOM UI: screens, HUD, cannon panel, banners/stamps/captions, map
+// DOM UI: screens, HUD, cannon panel, banners/stamps/captions, overview, toast
 // ---------------------------------------------------------------------------
+import * as THREE from '../../vendor/three.module.js';
 import { assets } from '../engine/assets.js';
 import { audio } from '../engine/audio.js';
-import { FORMULA_HTML, substituted, hintSteps, PI } from '../game/levels.js';
+import { FORMULA_HTML, substituted, hintSteps, PI, CHAIN, MAP_LAYOUT, MAP_LAYOUT_PORTRAIT } from '../game/levels.js';
 
 const $ = (sel) => document.querySelector(sel);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const frameCache = new Map();
 
-/** URL (file or data) for an image asset. */
 export function imgUrl(name) {
   const img = assets.get(name); if (!img) return '';
   if (img instanceof HTMLCanvasElement) { if (!img.__dataUrl) img.__dataUrl = img.toDataURL('image/png'); return img.__dataUrl; }
   return img.src;
 }
-/** Crop one cell of a sheet → data URL. */
 export function frameUrl(name, index) {
   const key = name + ':' + index; if (frameCache.has(key)) return frameCache.get(key);
   const img = assets.get(name), def = assets.frames(name); if (!img) return '';
@@ -27,21 +26,20 @@ export function frameUrl(name, index) {
 const animIndex = (name, anim) => { const d = assets.frames(name).anims[anim]; return d ? (d.col ?? 0) + (d.row ?? 0) * assets.frames(name).cols : 0; };
 
 let game = null;
-let timers = {};
+const timers = {};
 function once(el, ev) { return new Promise((res) => el.addEventListener(ev, res, { once: true })); }
 function waitClick(map) {
-  // map: { 'selector': value } → resolves with value of first clicked
   return new Promise((res) => {
     const handlers = [];
     for (const [sel, val] of Object.entries(map)) { const el = $(sel); if (!el) continue; const h = () => { handlers.forEach(([e, f]) => e.removeEventListener('click', f)); res(val); }; el.addEventListener('click', h); handlers.push([el, h]); }
   });
 }
+const starsHtml = (n, max = 3) => [...Array(max)].map((_, i) => `<img src="${frameUrl('ui_icons', i < n ? 1 : 2)}" alt="">`).join('');
 
 export const ui = {
   init(g) {
     game = g;
-    // global button sfx
-    document.body.addEventListener('pointerenter', (e) => { if (e.target instanceof HTMLButtonElement) audio.play('ui.hover'); }, true);
+    document.body.addEventListener('pointerenter', (e) => { if (e.target instanceof HTMLButtonElement && (e.target.classList.contains('big') || e.target.classList.contains('fire'))) audio.play('ui.hover', { minGap: 0.25 }); }, true);
     document.body.addEventListener('click', (e) => { if (e.target instanceof HTMLButtonElement && !e.target.classList.contains('silent')) audio.play('ui.click'); }, true);
     $('#btn-mute').addEventListener('click', () => this.hud.setMuted(audio.toggleMute()));
     $('#btn-pause-mute').addEventListener('click', () => this.hud.setMuted(audio.toggleMute()));
@@ -57,9 +55,7 @@ export const ui = {
   show(id) { const el = $('#screen-' + id); if (el) el.classList.add('active'); },
   hide(id) { const el = $('#screen-' + id); if (el) el.classList.remove('active'); },
   hideAll() { document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active')); },
-
   loading: { progress(p, text) { $('#progress-fill').style.width = Math.round(p * 100) + '%'; if (text) $('#loading-text').textContent = `Loading ${text}…`; } },
-
   title: {
     async show(hasSave) { $('#btn-continue').style.display = hasSave ? '' : 'none'; ui.hideAll(); ui.show('title'); const c = await waitClick({ '#btn-play': 'play', '#btn-continue': 'continue', '#btn-howto': 'howto' }); return c; },
     hide() { ui.hide('title'); },
@@ -68,7 +64,7 @@ export const ui = {
   story: {
     async show() {
       ui.hideAll(); ui.show('story');
-      const text = 'Karan is trapped in the Lost Jungle! Ancient circular traps seal every path. Break the sector rings, defeat the guardians and reach the lost temple!';
+      const text = 'Karan is trapped in the Lost Jungle! A maze of overlapping stone rings seals every path. Break each sector, cross each open arc and reach the lost temple!';
       const p = $('#story-text'); p.textContent = ''; const btn = $('#btn-start-journey'); btn.style.visibility = 'hidden';
       let done = false; const finish = () => { done = true; p.textContent = text; btn.style.visibility = 'visible'; };
       $('#screen-story').addEventListener('click', (e) => { if (e.target !== btn && !done) finish(); }, { once: true });
@@ -78,107 +74,129 @@ export const ui = {
     },
   },
 
-  /* ---------------------------------------------------------- map */
+  /* ---------------------------------------------------------- map: a designed 2D expedition route (not the 3D level) */
   map: {
-    points: [], pathEl: null, selected: null,
-    show({ levels, saveData, currentId }) {
-      ui.hideAll(); ui.show('map'); this.levels = levels; this.saveData = saveData;
-      const svg = $('#map-svg'); svg.innerHTML = '';
-      const W = 1920, H = 1080, NS = 'http://www.w3.org/2000/svg';
-      const mk = (tag, attrs = {}, parent = svg) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); parent.appendChild(el); return el; };
-      mk('image', { href: imgUrl('ui_map_bg'), width: W, height: H, preserveAspectRatio: 'xMidYMid slice' });
-      const start = { x: 0.07 * W, y: 0.86 * H }, dest = { x: 0.95 * W, y: 0.9 * H };
-      this.points = [start, ...levels.map((l) => ({ x: l.mapNode.x * W, y: l.mapNode.y * H })), dest];
-      const d = catmull(this.points);
-      mk('path', { d, fill: 'none', stroke: '#15111a', 'stroke-width': 13, 'stroke-dasharray': '24 18', 'stroke-linecap': 'round' });
-      mk('path', { d, fill: 'none', stroke: 'rgba(255,255,255,.85)', 'stroke-width': 6, 'stroke-dasharray': '24 18', 'stroke-linecap': 'round' });
-      const clearedCount = levels.filter((l) => saveData.cleared[l.id]).length;
-      if (clearedCount > 0) mk('path', { d: catmull(this.points.slice(0, clearedCount + 1)), fill: 'none', stroke: '#f5c518', 'stroke-width': 6, 'stroke-dasharray': '24 18', 'stroke-linecap': 'round' });
-      this.pathEl = mk('path', { d, fill: 'none', stroke: 'none' });
-      mk('text', { x: start.x, y: start.y - 48, class: 'map-label', 'text-anchor': 'middle' }).textContent = 'START';
-      mk('image', { href: imgUrl('ui_map_temple'), x: dest.x - 90, y: dest.y - 150, width: 180, height: 180 });
-      mk('text', { x: dest.x, y: dest.y + 60, class: 'map-label', 'text-anchor': 'middle' }).textContent = 'DESTINATION';
-      // nodes
-      const unlocked = saveData.unlocked;
-      this.nodes = {};
-      levels.forEach((l, i) => {
-        const p = this.points[i + 1], s = 74 + (l.radius - 14) * 2.2;
-        const state = saveData.cleared[l.id] ? 'cleared' : l.id <= unlocked ? (l.boss ? 'boss' : 'open') : 'locked';
-        const g = mk('g', { class: 'node ' + (state === 'locked' ? 'locked' : ''), transform: `translate(${p.x} ${p.y})` });
-        mk('image', { href: frameUrl('ui_map_node', animIndex('ui_map_node', state)), x: -s / 2, y: -s / 2, width: s, height: s, class: 'ring' }, g);
-        mk('text', { y: 14 }, g).textContent = l.id;
-        if (state !== 'locked') mk('text', { y: s / 2 + 28, class: 'name' }, g).textContent = l.name;
-        g.addEventListener('click', () => { if (state === 'locked') { g.classList.remove('shake'); void g.getBBox(); g.classList.add('shake'); audio.play('ui.error'); return; } this.select(l, saveData); });
-        this.nodes[l.id] = g;
-      });
-      // marker at the furthest unlocked (or current)
-      const cur = levels.find((l) => l.id === (currentId ?? unlocked)) || levels[0];
-      const mp = this.points[levels.indexOf(cur) + 1];
-      this.marker = mk('image', { href: imgUrl('ui_map_marker'), width: 84, height: 84, x: mp.x - 42, y: mp.y - 100 });
-      this.select(cur, saveData);
+    selected: null, saveData: null,
+    show({ saveData, selectedId }) {
+      ui.hideAll(); ui.show('map'); this.saveData = saveData;
+      const first = Math.max(1, Math.min(CHAIN.arenas.length, selectedId || 1));
+      this.selected = saveData.cleared[first] || first <= saveData.unlocked ? first : saveData.unlocked;
+      this.render();
+      this._onResize = () => this.render(); window.addEventListener('resize', this._onResize);
       return new Promise((res) => {
-        const enter = () => { $('#btn-map-back').removeEventListener('click', back); audio.play('ui.confirm'); res(this.selected.id); };
-        const back = () => { $('#btn-enter').removeEventListener('click', enter); res(null); };
-        $('#btn-enter').addEventListener('click', enter, { once: true }); $('#btn-map-back').addEventListener('click', back, { once: true });
+        const enter = () => { cleanup(); audio.play('ui.confirm'); res(this.selected); };
+        const back = () => { cleanup(); res(null); };
+        const cleanup = () => { $('#btn-enter').removeEventListener('click', enter); $('#btn-map-back').removeEventListener('click', back); };
+        $('#btn-enter').addEventListener('click', enter); $('#btn-map-back').addEventListener('click', back);
       });
     },
-    select(l, saveData) {
-      this.selected = l; Object.values(this.nodes).forEach((g) => g.classList.remove('selected')); this.nodes[l.id].classList.add('selected');
-      $('#mc-num').textContent = l.id; $('#mc-name').textContent = l.name; $('#mc-tag').textContent = l.tagline;
-      const stars = saveData.stars[l.id] || 0; $('#mc-stars').innerHTML = [0, 1, 2].map((i) => `<img src="${frameUrl('ui_icons', i < stars ? 1 : 2)}" alt="">`).join('');
-      const clears = (saveData.clears && saveData.clears[l.id]) || 0, vi = clears % l.variants.length;
-      const base = l.boss ? 'Final arena · 3 sector shields' : `${l.waves.length} wave${l.waves.length > 1 ? 's' : ''}`;
-      $('#mc-best').textContent = (saveData.best[l.id] ? `Best score: ${saveData.best[l.id]} · ` : '') + base + (clears ? ` · replay with new numbers (set ${vi + 1}/${l.variants.length})` : l.tier >= 4 ? ' · answers in terms of π' : '');
-      $('#map-card').classList.add('show');
+    render() {
+      const portrait = window.innerWidth < 760 && window.innerHeight > window.innerWidth;
+      const W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080, L = portrait ? MAP_LAYOUT_PORTRAIT : MAP_LAYOUT, sd = this.saveData;
+      const svg = $('#map-svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = '';
+      const NS = 'http://www.w3.org/2000/svg', el = (tag, attrs = {}, parent = svg) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); parent.appendChild(e); return e; };
+      const P = (f) => ({ x: f.x * W, y: f.y * H });
+      const defs = el('defs');
+      defs.innerHTML = `<radialGradient id="vig" cx="${portrait ? 50 : 36}%" cy="${portrait ? 36 : 56}%" r="75%"><stop offset="0.45" stop-color="#050a08" stop-opacity="0"/><stop offset="1" stop-color="#050a08" stop-opacity="0.9"/></radialGradient>
+        <radialGradient id="floor"><stop offset="0" stop-color="#4a463b"/><stop offset="1" stop-color="#2b2923"/></radialGradient>
+        <filter id="drop" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#000" flood-opacity="0.6"/></filter>
+        <filter id="glowA" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>`;
+      el('image', { href: imgUrl('ui_map_bg'), x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' });
+      el('rect', { x: 0, y: 0, width: W, height: H, fill: '#0c1714', opacity: 0.22 });
+      el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#vig)' });
+      const pts = [P(L.start), ...L.arenas.map(P), P(L.temple)];
+      const curve = (arr) => { let d = `M ${arr[0].x} ${arr[0].y}`; for (let i = 0; i < arr.length - 1; i++) { const p0 = arr[i - 1] || arr[i], p1 = arr[i], p2 = arr[i + 1], p3 = arr[i + 2] || p2; d += ` C ${p1.x + (p2.x - p0.x) / 6} ${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6} ${p2.y - (p3.y - p1.y) / 6} ${p2.x} ${p2.y}`; } return d; };
+      const full = curve(pts);
+      el('path', { d: full, fill: 'none', stroke: '#050b09', 'stroke-width': 24, 'stroke-linecap': 'round', opacity: 0.55 });
+      el('path', { d: full, fill: 'none', stroke: '#5d574a', 'stroke-width': 14, 'stroke-linecap': 'round' });
+      el('path', { d: full, fill: 'none', stroke: '#f3ebd8', 'stroke-width': 4, 'stroke-dasharray': '3 16', 'stroke-linecap': 'round', opacity: 0.35 });
+      let clearedTo = 0; while (clearedTo < CHAIN.arenas.length && sd.cleared[CHAIN.arenas[clearedTo].level.id]) clearedTo++;
+      if (clearedTo > 0) el('path', { d: curve(pts.slice(0, clearedTo + 1)), fill: 'none', stroke: '#52ded8', 'stroke-width': 4, 'stroke-dasharray': '3 16', 'stroke-linecap': 'round', opacity: 0.95 });
+      // start + temple
+      const st = pts[0], tp = pts[pts.length - 1], fs = portrait ? 44 : 30;
+      el('rect', { x: st.x - 26, y: st.y - 10, width: 52, height: 20, rx: 4, fill: '#776f60', stroke: '#0c1714', 'stroke-width': 3 });
+      el('text', { x: st.x, y: st.y + 46, class: 'map-label' }).textContent = 'START';
+      const ts = portrait ? 230 : 170;
+      el('circle', { cx: tp.x, cy: tp.y, r: ts * 0.42, fill: '#f4bf55', opacity: 0.22, filter: 'url(#glowA)' });
+      el('image', { href: imgUrl('ui_map_temple'), x: tp.x - ts / 2, y: tp.y - ts / 2 - 10, width: ts, height: ts });
+      el('text', { x: tp.x, y: tp.y + ts / 2 + 18, class: 'map-label' }).textContent = 'THE LOST TEMPLE';
+      // medallions
+      this.medals = {};
+      CHAIN.arenas.forEach((a, i) => {
+        const Lv = a.level, p = pts[i + 1], r = (46 + (a.R - 7) * 2.3) * (portrait ? 1.3 : 1);
+        const state = sd.cleared[Lv.id] ? 'cleared' : Lv.id <= sd.unlocked ? 'open' : 'locked';
+        const g = el('g', { class: `medal ${state}${this.selected === Lv.id ? ' selected' : ''}`, transform: `translate(${p.x} ${p.y})` });
+        el('circle', { r: r + 13, class: 'halo' }, g);
+        el('circle', { r: r + 4, fill: '#0a1311', filter: 'url(#drop)' }, g);
+        el('circle', { r, fill: 'url(#floor)' }, g);
+        if (state !== 'locked') {
+          const a0 = (Lv.exitDeg - a.theta / 2) * Math.PI / 180, a1 = (Lv.exitDeg + a.theta / 2) * Math.PI / 180, rs = r * 0.8;
+          el('path', { class: 'wedge', d: `M 0 0 L ${rs * Math.cos(a0)} ${-rs * Math.sin(a0)} A ${rs} ${rs} 0 ${a.theta > 180 ? 1 : 0} 0 ${rs * Math.cos(a1)} ${-rs * Math.sin(a1)} Z` }, g);
+        }
+        el('circle', { r, class: 'rim' }, g);
+        el('circle', { r: r - 8, fill: 'none', stroke: '#1b1a16', 'stroke-width': 2, opacity: 0.8 }, g);
+        if (state === 'locked') { el('rect', { x: -12, y: -4, width: 24, height: 19, rx: 3, class: 'lock' }, g); el('path', { d: 'M -7 -4 V -10 A 7 7 0 0 1 7 -10 V -4', class: 'lock-arc' }, g); }
+        else el('text', { y: r * 0.18 + 9, class: 'num', 'font-size': Math.round(r * 0.62) }, g).textContent = Lv.id;
+        if (state === 'cleared') { const c = el('g', { transform: `translate(${r * 0.72} ${r * 0.72})` }, g); el('circle', { r: 15, class: 'seal' }, c); el('path', { d: 'M -6 0 L -2 5 L 7 -5', class: 'tick' }, c); }
+        el('text', { y: r + (portrait ? 54 : 36), class: 'medal-name' }, g).textContent = state === 'locked' ? '' : Lv.name;
+        g.addEventListener('click', () => { if (state === 'locked') { g.classList.remove('shake'); void g.getBBox(); g.classList.add('shake'); audio.play('ui.error'); return; } this.select(Lv.id); audio.play('ui.click'); });
+        this.medals[Lv.id] = g;
+      });
+      this.select(this.selected, true);
     },
-    /** Walk the marker from level a to level b (ids; 0 = start). */
-    async travel(fromId, toId) {
-      const pts = this.points, i0 = fromId, i1 = toId; // points[0]=start, points[k]=level k
-      const full = this.pathEl, L = full.getTotalLength();
-      const lenAt = (p) => { let best = 0, bd = 1e9; for (let s = 0; s <= L; s += L / 600) { const q = full.getPointAtLength(s); const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2; if (d < bd) { bd = d; best = s; } } return best; };
-      const s0 = lenAt(pts[i0]), s1 = lenAt(pts[i1]);
-      const dur = 2200, t0 = performance.now(); let lastStep = 0;
-      await new Promise((res) => { const tick = (t) => { const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; const q = full.getPointAtLength(s0 + (s1 - s0) * e); const bob = Math.abs(Math.sin(k * Math.PI * 6)) * 10; this.marker.setAttribute('x', q.x - 42); this.marker.setAttribute('y', q.y - 100 - bob); if (t - lastStep > 300) { lastStep = t; audio.play('step.grass'); } if (k < 1) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
-      audio.play('ui.confirm');
-      const lvl = this.levels[toId - 1]; if (lvl && this.saveData) this.select(lvl, this.saveData);
+    select(id, silent = false) {
+      const a = CHAIN.arenas[id - 1], L = a.level, sd = this.saveData; this.selected = id;
+      Object.entries(this.medals || {}).forEach(([k, g]) => g.classList.toggle('selected', +k === id));
+      $('#mp-num').textContent = L.id; $('#mp-name').textContent = L.name; $('#mp-tag').textContent = L.tagline;
+      $('#mp-r').textContent = `${a.R} m`; $('#mp-t').textContent = `${a.theta}°`; $('#mp-g').textContent = L.speed;
+      $('#mp-stars').innerHTML = starsHtml(sd.stars[L.id] || 0);
+      $('#mp-best').textContent = sd.best[L.id] ? `Best score ${sd.best[L.id]}` : (sd.cleared[L.id] ? '' : 'Not cleared yet');
+      $('#btn-enter').textContent = sd.cleared[L.id] ? 'Replay arena' : (L.id === 1 ? 'Enter the jungle' : 'Enter arena');
+      // mini diagram: the sector this arena asks for
+      const d = $('#mp-diagram'), cx = 100, cy = 104, rr = 74, a0 = (90 - a.theta / 2) * Math.PI / 180, a1 = (90 + a.theta / 2) * Math.PI / 180;
+      d.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${rr}" class="d-ring"/>
+        <path d="M ${cx} ${cy} L ${cx + rr * Math.cos(a0)} ${cy - rr * Math.sin(a0)} A ${rr} ${rr} 0 ${a.theta > 180 ? 1 : 0} 0 ${cx + rr * Math.cos(a1)} ${cy - rr * Math.sin(a1)} Z" class="d-sector"/>
+        <line x1="${cx}" y1="${cy}" x2="${cx + rr * Math.cos(a0)}" y2="${cy - rr * Math.sin(a0)}" class="d-radius"/>
+        <circle cx="${cx}" cy="${cy}" r="4" class="d-hub"/>
+        <text x="${cx}" y="${cy - 26}" class="d-theta">θ = ${a.theta}°</text>
+        <text x="${cx + rr * 0.55 * Math.cos(a0) + 14}" y="${cy - rr * 0.55 * Math.sin(a0) + 14}" class="d-r">r = ${a.R}</text>`;
+      if (!silent) $('#map-panel').classList.remove('flash'), void $('#map-panel').offsetWidth, $('#map-panel').classList.add('flash');
     },
-    hide() { ui.hide('map'); },
+    hide() { ui.hide('map'); if (this._onResize) window.removeEventListener('resize', this._onResize); },
   },
 
-  /* ---------------------------------------------------------- results & misc screens */
+  /* ---------------------------------------------------------- results (final), game over, pause */
   results: {
-    async show({ level, score }) {
+    async show({ perArena, sessionTotal, total, stars }) {
       ui.hud.hide(); ui.show('results'); $('#screen-results').classList.add('dim');
-      $('#res-title').textContent = level.boss ? 'The Warden is defeated!' : `Arena ${level.id} Cleared!`;
-      $('#res-caption').textContent = level.boss ? 'The final jungle exit opens. The lost temple awaits.' : 'The exit gate opens! Continue through the jungle to the next arena.';
-      const rows = $('#res-rows'); rows.innerHTML = ''; const stars = $('#res-stars'); stars.innerHTML = ''; $('#res-total').textContent = '0';
+      const rows = $('#res-rows'); rows.innerHTML = ''; $('#res-total').textContent = '0'; $('#res-stars').innerHTML = '';
       const btn = $('#btn-next'); btn.style.visibility = 'hidden';
       await sleep(400);
-      for (const r of score.rows) { if (r.value === 0 && r.label !== 'Arena cleared') continue; const tr = document.createElement('tr'); tr.innerHTML = `<td>${r.label}</td><td>+${r.value}</td>`; tr.style.opacity = 0; rows.appendChild(tr); await sleep(60); tr.style.transition = 'opacity .3s'; tr.style.opacity = 1; audio.play('ui.count'); await sleep(260); }
-      // count up total
-      const t0 = performance.now(), dur = 700; await new Promise((res) => { const tick = (t) => { const k = Math.min(1, (t - t0) / dur); $('#res-total').textContent = Math.round(score.total * k); if (k < 1) { if (Math.random() < .5) audio.play('ui.count', { minGap: .05 }); requestAnimationFrame(tick); } else res(); }; requestAnimationFrame(tick); });
-      for (let i = 0; i < 3; i++) { const im = document.createElement('img'); im.src = frameUrl('ui_icons', i < score.stars ? 1 : 2); im.className = 'pop'; stars.appendChild(im); if (i < score.stars) audio.play('ui.star'); await sleep(260); }
-      btn.style.visibility = 'visible'; btn.textContent = level.boss ? 'Reach the Temple ›' : 'Next Adventure ›';
+      for (const r of perArena) { const tr = document.createElement('tr'); tr.innerHTML = `<td>Arena ${r.id} · ${r.name}<span class="st">${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}</span></td><td>+${r.score}</td>`; tr.style.opacity = 0; rows.appendChild(tr); await sleep(60); tr.style.transition = 'opacity .3s'; tr.style.opacity = 1; audio.play('ui.count'); await sleep(220); }
+      const t0 = performance.now(), dur = 800; await new Promise((res) => { const tick = (t) => { const k = Math.min(1, (t - t0) / dur); $('#res-total').textContent = Math.round(sessionTotal * k); if (k < 1) { if (Math.random() < 0.5) audio.play('ui.count', { minGap: 0.05 }); requestAnimationFrame(tick); } else res(); }; requestAnimationFrame(tick); });
+      $('#res-stars').innerHTML = `<span style="font-family:var(--font-head);font-weight:800;font-size:28px;letter-spacing:.04em;color:var(--amber)">★ ${stars} / ${CHAIN.arenas.length * 3} · lifetime ${total}</span>`; audio.play('ui.star');
+      btn.style.visibility = 'visible';
       await once(btn, 'click'); ui.hide('results');
     },
   },
   gameover: { async show() { ui.hud.hide(); ui.panel.close(); ui.show('gameover'); $('#screen-gameover').classList.add('dim'); const c = await waitClick({ '#btn-retry': 'retry', '#btn-go-map': 'map' }); ui.hide('gameover'); return c; } },
-  ending: { async show({ total, stars }) { ui.hideAll(); ui.show('ending'); $('#screen-ending').classList.add('dim'); $('#end-total').textContent = total; $('#end-stars').innerHTML = `<span style="font-family:var(--font-display);font-size:34px;color:var(--gold)">★ ${stars} / ${game.levels.length * 3}</span>`; const c = await waitClick({ '#btn-end-map': 'map', '#btn-end-reset': 'reset' }); ui.hide('ending'); return c; } },
   pause: { async show() { ui.show('pause'); $('#screen-pause').classList.add('dim'); const c = await waitClick({ '#btn-resume': 'resume', '#btn-pause-map': 'map' }); ui.hide('pause'); return c; }, hide() { ui.hide('pause'); } },
 
   /* ---------------------------------------------------------- HUD */
   hud: {
     show() { $('#hud').classList.add('show'); }, hide() { $('#hud').classList.remove('show'); this.setThreat(0, false); ui.objective(null); },
-    setArena(level) { $('#hud-arena .hud-num').textContent = level.id; $('#hud-arena .hud-title').textContent = level.name; },
-    setWave(i, n) { $('#hud-wave').textContent = n > 1 ? `Wave ${i} / ${n}` : `Radius ${game.scene ? game.scene.level.radius : ''} m`; },
+    setArena(level, arena, index = 0) {
+      $('#hud-num').textContent = level.id; $('#hud-title').textContent = level.name;
+      $('#hud-dots').innerHTML = CHAIN.arenas.map((a, i) => `<i class="${i < index ? 'done' : i === index ? 'now' : ''}"></i>`).join('');
+    },
     setShields(n, max = 3) {
       const box = $('#hud-shields'); const prev = box.children.length;
-      if (prev !== max) { box.innerHTML = ''; for (let i = 0; i < max; i++) { const im = document.createElement('img'); box.appendChild(im); } }
+      if (prev !== max) { box.innerHTML = ''; for (let i = 0; i < max; i++) box.appendChild(document.createElement('img')); }
       [...box.children].forEach((im, i) => { const full = i < n; const was = im.dataset.full === '1'; im.src = frameUrl('ui_shield', full ? 0 : 1); im.dataset.full = full ? '1' : '0'; if (was && !full) { im.classList.remove('lost'); void im.offsetWidth; im.classList.add('lost'); } });
     },
-    setScore(v) { $('#hud-score-val').textContent = v; },
+    setScore() {},
     setThreat(v, show = true) { const t = $('#threat'); t.classList.toggle('show', show); $('#threat-fill').style.width = Math.round(v * 100) + '%'; t.classList.toggle('hot', v > 0.75); },
-    setMuted(m) { const idx = animIndex('ui_icons', m ? 'sound_off' : 'sound_on'); $('#btn-mute').style.backgroundImage = `url(${frameUrl('ui_icons', idx)})`; $('#btn-pause').style.backgroundImage = `url(${frameUrl('ui_icons', animIndex('ui_icons', 'pause'))})`; },
+    setMuted(m) { $('#btn-mute').style.backgroundImage = `url(${frameUrl('ui_icons', animIndex('ui_icons', m ? 'sound_off' : 'sound_on'))})`; $('#btn-pause').style.backgroundImage = `url(${frameUrl('ui_icons', animIndex('ui_icons', 'pause'))})`; },
   },
   objective(text) { const el = $('#objective'); if (!text) { el.classList.remove('show'); return; } el.textContent = text; el.classList.add('show'); },
   banner(text, style = 'info', duration = 2.2) {
@@ -193,12 +211,16 @@ export const ui = {
     const el = $('#stamp'); el.className = kind; el.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`; void el.offsetWidth; el.classList.add('show'); audio.play('ui.stamp');
     clearTimeout(timers.stamp); return new Promise((res) => { timers.stamp = setTimeout(() => { el.classList.remove('show'); setTimeout(res, 200); }, duration * 1000); });
   },
+  toast({ title, stars, points }, duration = 4) {
+    const el = $('#toast'); el.querySelector('.t-title').textContent = title; el.querySelector('.t-stars').innerHTML = starsHtml(stars); el.querySelector('.t-points').textContent = `+${points} points`;
+    el.classList.add('show'); audio.play('ui.star'); clearTimeout(timers.toast); timers.toast = setTimeout(() => el.classList.remove('show'), duration * 1000);
+  },
   damage() { const el = $('#damage'); el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); },
   skip: { show(cb) { const el = $('#skip'); el.classList.add('show'); el.onclick = () => { el.classList.remove('show'); cb(); }; }, hide() { const el = $('#skip'); el.classList.remove('show'); el.onclick = null; } },
 
   /* ---------------------------------------------------------- cannon panel */
   panel: {
-    cfg: null, hintLevel: 0,
+    cfg: null, hintLevel: 0, locked: false,
     init() {
       const keys = ['7', '8', '9', '⌫', '4', '5', '6', '/', '1', '2', '3', '.', '0', 'π', 'C'];
       const pad = $('#keypad'); pad.innerHTML = '';
@@ -208,10 +230,10 @@ export const ui = {
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.fire(); } });
       $('#btn-fire').addEventListener('click', () => this.fire());
       $('#btn-hint').addEventListener('click', () => this.hint());
-      // on-screen keypad: shown by default on touch devices, toggle elsewhere
       const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
       let pref = null; try { pref = localStorage.getItem('se_keypad'); } catch {}
       $('#cannon-panel').classList.toggle('show-keypad', pref === null ? coarse : pref === '1');
+      if (coarse) { $('#answer').setAttribute('inputmode', 'none'); $('#answer').setAttribute('readonly', ''); }
       $('#btn-keypad').addEventListener('click', () => { const on = $('#cannon-panel').classList.toggle('show-keypad'); try { localStorage.setItem('se_keypad', on ? '1' : '0'); } catch {} });
     },
     key(k) {
@@ -223,21 +245,22 @@ export const ui = {
     open(cfg) {
       this.cfg = cfg; this.hintLevel = cfg.hintLevel ?? 0; this.locked = false;
       $('#cannon-panel').classList.add('open'); $('#cannon-panel').classList.remove('locked'); audio.play('ui.panel');
-      $('#values').innerHTML = `<li>r = <b>${cfg.r} m</b></li><li class="theta">θ = <b>${cfg.theta}°</b></li>` + (cfg.piFriendly === false ? `<li class="pi">answer in π, e.g. <b>50π</b> (or use 22/7)</li>` : `<li>π = <b>${PI.label}</b> <span class="muted-small">or type …π</span></li>`);
+      $('#values').innerHTML = `<li>r = <b>${cfg.r} m</b></li><li class="theta">θ = <b>${cfg.theta}°</b></li><li>π = <b>${PI.label}</b> <span class="muted-small">or type …π</span></li>`;
       $('#answer').value = ''; $('#btn-fire').disabled = false; this.setFeedback(null); this.setAttempts(cfg.attempts > 1 ? `Attempt ${cfg.attempts}` : '');
-      this.renderFormula(); this.refresh(); setTimeout(() => $('#answer').focus({ preventScroll: true }), 350);
+      this.renderFormula(); this.refresh();
+      if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 350);
     },
     close() { $('#cannon-panel').classList.remove('open'); $('#answer').blur(); },
     effectiveLevel() { const s = this.cfg?.scaffold; return Math.max(this.hintLevel, s === 'full' ? 2 : s === 'formula' ? 1 : 0); },
     renderFormula() {
-      const lvl = this.effectiveLevel(), box = $('#formula-box'), c = this.cfg;
+      const lvl = this.effectiveLevel(), box = $('#formula-box'), c = this.cfg; if (!c) return;
       if (lvl === 0) box.innerHTML = `<span class="hidden-f">Formula hidden — press 💡 Hint if you need it</span>`;
       else box.innerHTML = `<div>${FORMULA_HTML}</div>${lvl >= 2 ? `<div class="sub">${substituted(c.r, c.theta)}</div>` : ''}`;
       if (lvl >= 3) { const steps = hintSteps(c.r, c.theta); this.setFeedback({ type: 'hint', title: 'Step by step', html: `<ol>${steps.slice(0, 3).map((s) => `<li><b>${s.label}:</b> ${s.text}</li>`).join('')}<li><b>${steps[3].label}:</b> ${steps[3].text}</li></ol>` }); }
       else { const e = $('#feedback'); e.className = 'feedback'; e.innerHTML = ''; }
       $('#btn-hint').style.visibility = lvl >= 3 ? 'hidden' : 'visible';
     },
-    hint() { this.hintLevel = Math.min(3, this.effectiveLevel() + 1); this.cfg.onHint && this.cfg.onHint(this.hintLevel); this.renderFormula(); audio.play('ui.confirm'); },
+    hint() { if (!this.cfg) return; this.hintLevel = Math.min(3, this.effectiveLevel() + 1); this.cfg.onHint && this.cfg.onHint(this.hintLevel); this.renderFormula(); audio.play('ui.confirm'); },
     setFeedback(fb) {
       if (!fb) { for (const id of ['#feedback', '#diagnosis']) { const e = $(id); e.className = 'feedback'; e.innerHTML = ''; } return; }
       const el = $(fb.type === 'bad' ? '#diagnosis' : '#feedback');
@@ -246,19 +269,8 @@ export const ui = {
     },
     setAttempts(t) { $('#attempts').textContent = t; },
     lock() { this.locked = true; $('#cannon-panel').classList.add('locked'); $('#btn-fire').disabled = true; $('#btn-fire').classList.remove('ready'); },
-    unlock() { this.locked = false; $('#cannon-panel').classList.remove('locked'); $('#btn-fire').disabled = false; $('#answer').value = ''; this.refresh(); setTimeout(() => $('#answer').focus({ preventScroll: true }), 50); },
+    unlock() { this.locked = false; $('#cannon-panel').classList.remove('locked'); $('#btn-fire').disabled = false; $('#answer').value = ''; this.refresh(); if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 50); },
     setValue(v) { $('#answer').value = String(v); this.refresh(); },
     fire() { if (this.locked || !this.cfg) return; const v = $('#answer').value.trim(); if (!v) { audio.play('ui.error'); $('#answer').focus(); return; } audio.play('ui.confirm'); this.cfg.onFire && this.cfg.onFire(v); },
   },
 };
-
-function catmull(pts) {
-  if (pts.length < 2) return '';
-  let d = `M ${pts[0].x} ${pts[0].y}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
-    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 }, c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
-    d += ` C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${p2.x} ${p2.y}`;
-  }
-  return d;
-}

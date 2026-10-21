@@ -22,8 +22,9 @@ export class Hero {
     this.speed = 6.5;
     this.control = false;        // player control enabled
     this.target = null;          // click-to-move target
-    this.boundsRadius = null;    // keep inside arena
-    this.keepOutRadius = null;   // stay off the cannon pedestal
+    this.boundsRadius = null;    // keep inside the current arena (around boundsCenter)
+    this.keepOutRadius = null;   // stay off the gun pedestal
+    this.boundsCenter = new THREE.Vector3();
     this.special = null;         // name of a non-locomotion anim currently playing
     this.stepTimer = 0; this.surface = 'stone';
     this.onArrive = null;
@@ -41,6 +42,9 @@ export class Hero {
     this.target = point.clone(); this.target.y = 0; this.runSpeed = speed; this.control = false;
     return new Promise((res) => { this.onArrive = res; });
   }
+  /** Run through several points in order. */
+  async runPath(points, speed = this.speed) { for (const p of points) await this.runTo(p, speed); }
+  distTo(p) { return Math.hypot(this.pos.x - p.x, this.pos.z - p.z); }
   stop() { this.target = null; this.vel.set(0, 0, 0); }
 
   /** Play a one-shot animation on the visible sheet; resolves when done. */
@@ -64,6 +68,7 @@ export class Hero {
     const w = this.world, cam = w.camera;
     // ---- movement
     let move = this._tmp.set(0, 0, 0); let moving = false;
+    if (this.control && this.target && w.input.axis().active) { this.target = null; this.onArrive = null; } // player takes over from auto-run
     if (this.target) {
       move.copy(this.target).sub(this.pos).setY(0);
       const d = move.length();
@@ -73,7 +78,7 @@ export class Hero {
       const ax = w.input.axis();
       if (ax.active) {
         const fwd = this._tmp2.set(0, 0, -1).applyQuaternion(cam.quaternion).setY(0).normalize();
-        const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+        const right = (this._right ||= new THREE.Vector3()).set(-fwd.z, 0, fwd.x);
         move.copy(fwd).multiplyScalar(ax.y).addScaledVector(right, ax.x).normalize(); moving = true;
       }
       const tap = w.input.consumeTap();
@@ -83,8 +88,9 @@ export class Hero {
     if (moving) { this.vel.lerp(move.multiplyScalar(spd), 1 - Math.exp(-12 * dt)); this.face(this.vel); }
     else this.vel.multiplyScalar(Math.exp(-14 * dt));
     this.pos.addScaledVector(this.vel, dt);
-    if (this.boundsRadius) { const l = Math.hypot(this.pos.x, this.pos.z); if (l > this.boundsRadius) { this.pos.x *= this.boundsRadius / l; this.pos.z *= this.boundsRadius / l; } }
-    if (this.keepOutRadius) { const l = Math.hypot(this.pos.x, this.pos.z); if (l < this.keepOutRadius && l > 1e-4) { this.pos.x *= this.keepOutRadius / l; this.pos.z *= this.keepOutRadius / l; } }
+    const bc = this.boundsCenter, dx = this.pos.x - bc.x, dz = this.pos.z - bc.z, l = Math.hypot(dx, dz);
+    if (this.boundsRadius && l > this.boundsRadius) { this.pos.x = bc.x + dx * this.boundsRadius / l; this.pos.z = bc.z + dz * this.boundsRadius / l; }
+    if (this.keepOutRadius && l < this.keepOutRadius && l > 1e-4) { this.pos.x = bc.x + dx * this.keepOutRadius / l; this.pos.z = bc.z + dz * this.keepOutRadius / l; }
     const speedNow = this.vel.length();
     // ---- footsteps
     if (speedNow > 1.5) { this.stepTimer -= dt * (speedNow / 6); if (this.stepTimer <= 0) { this.stepTimer = 0.3; audio.play(this.surface === 'grass' ? 'step.grass' : 'step.stone', { minGap: 0.12 }); if (this.fx) this.fx.dust(this.pos); } }
@@ -97,8 +103,9 @@ export class Hero {
       const s = this.visibleSprite;
       s.play(speedNow > 0.8 ? 'run' : 'idle', { speed: speedNow > 0.8 ? clamp(speedNow / 6, 0.7, 1.4) : 1 });
       // mirror when moving to the camera's left
-      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();
-      s.setFlip(this.facing.dot(right) < -0.3);
+      const right = this._tmp.set(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();
+      const lat = this.facing.dot(right); if (lat < -0.45) this._flip = true; else if (lat > 0.45) this._flip = false;
+      s.setFlip(!!this._flip);
     }
     this.front.update(dt); this.back.update(dt);
   }

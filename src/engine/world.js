@@ -11,15 +11,16 @@ import { assets } from './assets.js';
 export class World {
   constructor(canvasHost, labelHost) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.maxPR = Math.min(window.devicePixelRatio || 1, 1.5); this.pr = this.maxPR; this._ft = 1 / 60; this._prTimer = 0;
+    this.renderer.setPixelRatio(this.pr);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     canvasHost.appendChild(this.renderer.domElement);
     assets.setRenderer(this.renderer);
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 600);
+    this.camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.5, 900);
     this.rig = new CameraRig(this.camera);
-    this.labels = new LabelLayer(labelHost, this.camera);
+    this.labels = new LabelLayer(labelHost, this.camera); this.labelLayers = [this.labels];
     this.input = new Input(this.renderer.domElement);
     this.updatables = new Set();
     this.clock = new THREE.Clock();
@@ -43,18 +44,23 @@ export class World {
     const loop = () => {
       if (!this.running) return;
       requestAnimationFrame(loop);
-      let dt = Math.min(0.05, this.clock.getDelta()) * this.timeScale;
+      const raw = this.clock.getDelta();
+      // adaptive resolution: drop the pixel ratio when frames are slow, restore when they are fast
+      this._ft += (Math.min(raw, 0.1) - this._ft) * 0.05; this._prTimer += raw;
+      if (this._prTimer > 2) { this._prTimer = 0; if (this._ft > 0.028 && this.pr > 0.75) { this.pr = Math.max(0.75, this.pr - 0.25); this.renderer.setPixelRatio(this.pr); } else if (this._ft < 0.013 && this.pr < this.maxPR) { this.pr = Math.min(this.maxPR, this.pr + 0.25); this.renderer.setPixelRatio(this.pr); } }
+      let dt = Math.min(0.05, raw) * this.timeScale;
       if (this.paused) dt = 0;
       this.elapsed += dt;
       tweens.update(dt);
       for (const u of this.updatables) u.update(dt, this.elapsed);
       this.rig.update(dt);
       if (this.onFrame) this.onFrame(dt);
-      this.labels.update();
+      for (const l of this.labelLayers) l.update();
       this.renderer.render(this.scene, this.camera);
     };
     requestAnimationFrame(loop);
   }
+  addLabelLayer(container) { const l = new LabelLayer(container, this.camera); this.labelLayers.push(l); return l; }
   /** Raycast NDC point against the y=0 floor plane. */
   floorPoint(ndcX, ndcY, out = new THREE.Vector3()) {
     const ray = new THREE.Raycaster(); ray.setFromCamera({ x: ndcX, y: ndcY }, this.camera);

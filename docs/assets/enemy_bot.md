@@ -11,7 +11,7 @@
 | **Manifest key** | `enemy_bot` |
 
 ## Used for
-Every enemy robot: pours through the breach, marches toward the cannon, lunges at the hero, explodes when hit by the laser.
+Every guardian: stands in the open arc, notices Karan, marches toward the gun, lunges at him, explodes when hit by the laser.
 
 ## Visual description
 Three-quarter FRONT view of a Sector Sentinel: sinister humanoid robot about 2 m tall, gunmetal-silver skull-like faceplate with a heavy brow ridge, two angular glowing RED eye slits, a rectangular dark mouth vent with three vertical slats, segmented steel neck, bulky shoulder pads, dark olive-GREEN riveted armour plates on torso/arms/legs, a round glowing WHITE-cyan power core in the centre of the chest, grey steel hands and boots. Menacing, military, slightly battered; original design (not a licensed character).
@@ -25,7 +25,7 @@ Three-quarter FRONT view of a Sector Sentinel: sinister humanoid robot about 2 m
 | 2 | `lunge` | 6 | 12 | once | crouch (2 frames) → leap with arms thrust forward (2) → extended flying pounce (2) |
 | 3 | `death` | 8 | 14 | once | white flash → shake → armour cracks and plates fly off → bright explosion → smoke puff fading out |
 
-Rows are read top to bottom; frames left to right starting at column 0. Unused cells in a row stay empty (transparent). The grid is defined in `assets/manifest.json` under `images.enemy_bot.sheet` – if your generated sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
+Rows are read top to bottom; frames left to right starting at column 0. Unused cells stay transparent. The grid is defined in `assets/manifest.json` under `images.enemy_bot.sheet` – if your sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
 
 ## GPT image prompt (copy–paste)
 
@@ -39,19 +39,19 @@ Output size 2048×1024 px, PNG with transparency.
 ```
 
 ### If the grid comes out wrong
-Image models often miscount cells. Reliable fallback: generate **one row at a time** (one animation per image, `1 × N` cells, same cell size), then stack the rows into the full sheet with any sprite packer or an image editor. Alternatively generate single poses and assemble. Always check the result in `tools/sheet-viewer.html` (choose the preset for this asset) – the feet must sit on the same baseline in every frame or the character will bounce.
+Image models often miscount cells. Reliable fallback: generate **one row at a time** (one animation per image, `1 × N` cells, same cell size), then stack the rows into the full sheet. Always check the result in `tools/sheet-viewer.html` – the feet must sit on the same baseline in every frame.
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; cells aligned to the grid, no borders.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
 
 ## Current manifest entry
 ```json
 {
   "enemy_bot": {
-    "path": "sprites/enemy_bot.png",
+    "path": "sprites/enemy_bot.webp",
     "worldHeight": 2.1,
     "chromaKey": null,
     "sheet": {
@@ -81,7 +81,8 @@ Image models often miscount cells. Reliable fallback: generate **one row at a ti
           "loop": false
         }
       }
-    }
+    },
+    "baseline": 0.91
   }
 }
 ```

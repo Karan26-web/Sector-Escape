@@ -229,3 +229,81 @@ export function cannonSprite(size = 1024) {
 export function rubbleSheet(fw = 256, fh = 256) {
   return sheet(4, 1, fw, fh, (g, c) => { for (let i = 0; i < 6 + c; i++) { const x = fw * 0.2 + hash(c, i) * fw * 0.6, y = fh * 0.55 + hash(c, i + 9) * fh * 0.35, r = 14 + hash(c, i + 19) * 30; poly(g, [[x - r, y + r * 0.6], [x - r * 0.6, y - r], [x + r * 0.5, y - r * 0.8], [x + r, y + r * 0.5]]); g.fillStyle = i % 2 ? '#7e8a74' : '#5e675a'; g.fill(); g.lineWidth = 6; g.strokeStyle = OUT; g.stroke(); } });
 }
+
+/* ---------------------------------------------------------------- chain world additions */
+/** Four jungle boulders (sheet 4×1). */
+export function rockSheet(fw = 512, fh = 512) {
+  return sheet(4, 1, fw, fh, (g, c) => {
+    const cx = fw / 2, base = fh - 30, n = 7 + c;
+    const pts = []; for (let i = 0; i < n; i++) { const a = -Math.PI + (i / n) * Math.PI, r = fw * (0.3 + hash(c, i) * 0.14); pts.push([cx + Math.cos(a) * r, base + Math.sin(a) * r * (0.55 + c * 0.08)]); }
+    poly(g, pts); g.fillStyle = c % 2 ? '#6f7a7a' : '#7d8780'; g.fill(); g.lineWidth = 12; g.strokeStyle = OUT; g.stroke();
+    g.save(); poly(g, pts); g.clip(); g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(cx + fw * 0.1, 0, fw, fh); g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(0, 0, cx - fw * 0.15, base - fh * 0.3); g.restore();
+    g.strokeStyle = 'rgba(25,20,15,0.55)'; g.lineWidth = 6; for (let k = 0; k < 4; k++) { g.beginPath(); let x = cx + (hash(c, k + 20) - 0.5) * fw * 0.4, y = base - hash(c, k + 30) * fh * 0.3; g.moveTo(x, y); for (let s = 0; s < 3; s++) { x += (hash(c, k * 7 + s) - 0.5) * 60; y += 30 + hash(c, k * 9 + s) * 30; g.lineTo(x, y); } g.stroke(); }
+    for (let i = 0; i < 8; i++) glow(g, cx + (hash(c, i + 40) - 0.5) * fw * 0.5, base - hash(c, i + 50) * fh * 0.2, 20 + hash(c, i + 60) * 40, 'rgba(70,120,50,ALPHA)', 0.55);
+  });
+}
+/** Tileable cartoon jungle water. */
+export function waterTex(size = 512) {
+  const c = canvas(size, size), g = c.getContext('2d'); const img = g.createImageData(size, size), d = img.data;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const u = x / size, v = y / size;
+    const n = (fbm(u * 6, v * 6, 91, 3) + fbm((u + 1) * 6, v * 6, 91, 3) + fbm(u * 6, (v + 1) * 6, 91, 3) + fbm((u + 1) * 6, (v + 1) * 6, 91, 3)) / 4;
+    const k = (fbm(u * 14, v * 14, 93, 2) + fbm((u + 1) * 14, (v + 1) * 14, 93, 2)) / 2;
+    const caustic = Math.pow(Math.max(0, 1 - Math.abs(k - 0.5) * 6), 2);
+    const i = (y * size + x) * 4;
+    d[i] = 30 + n * 40 + caustic * 120; d[i + 1] = 120 + n * 50 + caustic * 100; d[i + 2] = 130 + n * 40 + caustic * 80; d[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0); return c;
+}
+/** Top-down worn stone causeway, tiles vertically (path runs top→bottom). */
+export function causewayStone(w = 512, h = 1024) {
+  const c = canvas(w, h), g = c.getContext('2d'); g.fillStyle = '#4a4238'; g.fillRect(0, 0, w, h);
+  const rows = 8, rh = h / rows;
+  for (let r = 0; r < rows; r++) { const cols = 3 + (r % 2), cw = w / cols; for (let i = 0; i < cols; i++) { const x = i * cw + (r % 2 ? cw * 0.5 : 0); for (const xx of [x, x - w]) { const k = 0.85 + hash(i, r) * 0.3; g.fillStyle = `rgb(${Math.round(150 * k)},${Math.round(142 * k)},${Math.round(118 * k)})`; rrect(g, xx + 7, r * rh + 7, cw - 14, rh - 14, 18); g.fill(); g.lineWidth = 6; g.strokeStyle = 'rgba(25,20,15,0.7)'; g.stroke(); g.fillStyle = 'rgba(255,255,230,0.14)'; g.fillRect(xx + 14, r * rh + 12, cw - 28, 10); } } }
+  for (let i = 0; i < 70; i++) glow(g, hash(i, 1) * w, hash(i, 2) * h, 10 + hash(i, 3) * 30, 'rgba(70,120,50,ALPHA)', 0.45);
+  for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(0,0,0,${hash(i, 9) * 0.12})`; g.fillRect(hash(i, 5) * w, hash(i, 6) * h, 3, 3); }
+  return c;
+}
+/** Low stone parapet along the causeway, tiles horizontally. */
+export function causewaySide(w = 1024, h = 256) {
+  const c = canvas(w, h), g = c.getContext('2d'); g.fillStyle = '#6f7a6a'; g.fillRect(0, 0, w, h);
+  const rows = 2, rh = h / rows; for (let r = 0; r < rows; r++) { const n = 6, bw = w / n; for (let i = -1; i <= n; i++) { const x = i * bw + (r % 2) * bw * 0.5, k = 0.85 + hash(i + 3, r) * 0.3; g.fillStyle = `rgb(${Math.round(125 * k)},${Math.round(136 * k)},${Math.round(115 * k)})`; rrect(g, x + 6, r * rh + 6, bw - 12, rh - 12, 10); g.fill(); g.lineWidth = 6; g.strokeStyle = 'rgba(20,20,15,0.75)'; g.stroke(); } }
+  g.fillStyle = 'rgba(255,255,240,0.12)'; g.fillRect(0, 0, w, 14);
+  for (let i = 0; i < 60; i++) glow(g, hash(i, 1) * w, h - hash(i, 2) * h * 0.5, 10 + hash(i, 3) * 30, 'rgba(70,120,50,ALPHA)', 0.5);
+  return c;
+}
+/** Round stone hatch covering the buried gun (two halves split on the vertical seam). */
+export function floorHatch(size = 512) {
+  const c = canvas(size, size), g = c.getContext('2d'), cx = size / 2, R = size / 2 - 6;
+  circle(g, cx, cx, R); g.fillStyle = '#6d6a5c'; g.fill(); g.lineWidth = 12; g.strokeStyle = OUT; g.stroke();
+  circle(g, cx, cx, R * 0.78); g.lineWidth = 8; g.strokeStyle = 'rgba(20,15,10,0.7)'; g.stroke();
+  g.strokeStyle = 'rgba(120,230,255,0.9)'; g.lineWidth = 7; circle(g, cx, cx, R * 0.62); g.stroke();
+  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * R * 0.62, cx + Math.sin(a) * R * 0.62); g.lineTo(cx + Math.cos(a) * R * 0.72, cx + Math.sin(a) * R * 0.72); g.stroke(); }
+  g.beginPath(); g.moveTo(cx, cx); g.arc(cx, cx, R * 0.4, -Math.PI / 2 - 0.7, -Math.PI / 2 + 0.7); g.closePath(); g.fillStyle = 'rgba(120,230,255,0.35)'; g.fill(); g.lineWidth = 5; g.stroke();
+  g.strokeStyle = OUT; g.lineWidth = 10; g.beginPath(); g.moveTo(cx, cx - R); g.lineTo(cx, cx + R); g.stroke(); // the seam
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + 0.2; circle(g, cx + Math.cos(a) * R * 0.9, cx + Math.sin(a) * R * 0.9, 9); g.fillStyle = '#8d939c'; g.fill(); g.lineWidth = 4; g.stroke(); }
+  for (let i = 0; i < 10; i++) glow(g, cx + (hash(i, 1) - 0.5) * R * 1.5, cx + (hash(i, 2) - 0.5) * R * 1.5, 14 + hash(i, 3) * 30, 'rgba(70,120,50,ALPHA)', 0.4);
+  return c;
+}
+/** Stone slab that seals the waist between two arenas. */
+export function sealSlab(w = 1024, h = 1024) {
+  const c = canvas(w, h), g = c.getContext('2d'); g.fillStyle = '#5c655a'; g.fillRect(0, 0, w, h);
+  for (let r = 0; r < 5; r++) for (let i = 0; i < 4; i++) { const x = i * (w / 4) + (r % 2) * (w / 8), y = r * (h / 5), k = 0.85 + hash(i, r + 7) * 0.3; g.fillStyle = `rgb(${Math.round(110 * k)},${Math.round(120 * k)},${Math.round(105 * k)})`; rrect(g, x + 8, y + 8, w / 4 - 16, h / 5 - 16, 14); g.fill(); g.lineWidth = 8; g.strokeStyle = 'rgba(20,20,15,0.75)'; g.stroke(); }
+  glow(g, w / 2, h / 2, 260, 'rgba(255,80,60,ALPHA)', 0.5);
+  g.strokeStyle = '#ff5a4a'; g.lineWidth = 14; circle(g, w / 2, h / 2, 190); g.stroke(); circle(g, w / 2, h / 2, 130); g.lineWidth = 8; g.stroke();
+  g.beginPath(); g.moveTo(w / 2, h / 2); g.arc(w / 2, h / 2, 110, -Math.PI / 2 - 0.9, -Math.PI / 2 + 0.9); g.closePath(); g.fillStyle = 'rgba(255,120,100,0.8)'; g.fill();
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; g.beginPath(); g.moveTo(w / 2 + Math.cos(a) * 190, h / 2 + Math.sin(a) * 190); g.lineTo(w / 2 + Math.cos(a) * 250, h / 2 + Math.sin(a) * 250); g.lineWidth = 10; g.stroke(); }
+  g.lineWidth = 18; g.strokeStyle = OUT; g.strokeRect(9, 9, w - 18, h - 18);
+  return c;
+}
+/** Stone column standing where two arena walls meet. */
+export function wallPillar(w = 256, h = 1024) {
+  const c = canvas(w, h), g = c.getContext('2d'), cx = w / 2;
+  g.fillStyle = '#7a8575'; rrect(g, cx - 70, 60, 140, h - 120, 20); g.fill(); g.lineWidth = 10; g.strokeStyle = OUT; g.stroke();
+  g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(cx + 20, 70, 50, h - 140); g.fillStyle = 'rgba(255,255,240,0.14)'; g.fillRect(cx - 60, 70, 22, h - 140);
+  for (const y of [40, h - 90]) { g.fillStyle = '#8a9684'; rrect(g, cx - 100, y, 200, 60, 12); g.fill(); g.stroke(); }
+  g.strokeStyle = 'rgba(30,30,25,0.6)'; g.lineWidth = 5; for (let i = 0; i < 7; i++) { const y = 160 + i * 110; g.beginPath(); g.moveTo(cx - 40, y); g.lineTo(cx, y + 24); g.lineTo(cx + 40, y); g.stroke(); }
+  glow(g, cx, h * 0.3, 40, 'rgba(120,230,255,ALPHA)', 0.5); circle(g, cx, h * 0.3, 14); g.fillStyle = '#7fe6ff'; g.fill(); g.lineWidth = 5; g.strokeStyle = OUT; g.stroke();
+  for (let i = 0; i < 12; i++) glow(g, cx + (hash(i, 1) - 0.5) * 140, h - hash(i, 2) * 300, 16 + hash(i, 3) * 30, 'rgba(70,120,50,ALPHA)', 0.5);
+  return c;
+}

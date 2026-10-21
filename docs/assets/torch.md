@@ -11,7 +11,7 @@
 | **Manifest key** | `torch` |
 
 ## Used for
-Torches mounted around the inner arena wall (animated flame).
+Torches on the arena walls and on posts along the causeway (animated flame).
 
 ## Visual description
 A wrought-iron wall bracket holding a wooden torch with a bright cartoon flame (orange outer, yellow middle, pale core) and a soft warm glow halo.
@@ -22,7 +22,7 @@ A wrought-iron wall bracket holding a wooden torch with a bright cartoon flame (
 |---|---|---|---|---|---|
 | 0 | `idle` | 4 | 9 | loop | flame flickers and sways left/right, slightly different height per frame |
 
-Rows are read top to bottom; frames left to right starting at column 0. Unused cells in a row stay empty (transparent). The grid is defined in `assets/manifest.json` under `images.torch.sheet` – if your generated sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
+Rows are read top to bottom; frames left to right starting at column 0. Unused cells stay transparent. The grid is defined in `assets/manifest.json` under `images.torch.sheet` – if your sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
 
 ## GPT image prompt (copy–paste)
 
@@ -36,19 +36,19 @@ Output size 512×256 px, PNG with transparency.
 ```
 
 ### If the grid comes out wrong
-Image models often miscount cells. Reliable fallback: generate **one row at a time** (one animation per image, `1 × N` cells, same cell size), then stack the rows into the full sheet with any sprite packer or an image editor. Alternatively generate single poses and assemble. Always check the result in `tools/sheet-viewer.html` (choose the preset for this asset) – the feet must sit on the same baseline in every frame or the character will bounce.
+Image models often miscount cells. Reliable fallback: generate **one row at a time** (one animation per image, `1 × N` cells, same cell size), then stack the rows into the full sheet. Always check the result in `tools/sheet-viewer.html` – the feet must sit on the same baseline in every frame.
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; cells aligned to the grid, no borders.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
 
 ## Current manifest entry
 ```json
 {
   "torch": {
-    "path": "sprites/torch.png",
+    "path": "sprites/torch.webp",
     "worldHeight": 1.5,
     "sheet": {
       "cols": 4,

@@ -7,7 +7,15 @@ Every sound below is **synthesised at runtime** (Web Audio, `src/engine/audio.js
 ```
 Files are decoded on load and take precedence over the synth version with the same name. Music and ambience are generative; a produced loop can be added the same way under `"music"` (hook: `audio.loadFiles`).
 
-Mixing: master limiter → buses `sfx` (0.9), `music` (0.32), `ambient` (0.45). Mute: HUD button or **M**; persisted in `localStorage`.
+Mixing: master limiter → buses `sfx` (0.85), `music` (0.26), `ambient` (0.4). Mute: HUD button or **M**; persisted in `localStorage`.
+
+Anti-fatigue rules (tuned 2026-10-19 after playtest feedback about sounds "here and there"):
+- Sentinel footsteps share one global cooldown (max ~2 per second, quiet), instead of one per bot.
+- Simultaneous explosions are volume-scaled by 1/√(count/3), so a 24-bot perfect shot does not clip.
+- Hover blips only on the big action buttons (Play, Enter, FIRE…), never on keypad keys.
+- Insect bed and torch crackles are kept very low; arena mode drops them further.
+- Music pad notes stop only after their release (no click at every bar), the tension arpeggio is a soft triangle, and the sequencer skips missed notes after the tab was hidden instead of replaying them in a burst.
+- Charge, gate-grind and beam-hum sounds use low filter resonance to avoid whine.
 
 ## SFX cue list
 | Name | Moment | Character (what it should sound like) | Length | Generation prompt (for an SFX model) |
@@ -27,6 +35,11 @@ Mixing: master limiter → buses `sfx` (0.9), `music` (0.32), `ambient` (0.45). 
 | `bot.step` | sentinel stomp (closest bots only) | metallic clank + sub thump | 120 ms | "heavy robot footstep, metallic clank with low thump" |
 | `gate.open` | entrance opens, breach seals | stone grinding rumble, final clunk | 1.6 s | "massive stone door sliding open, grinding rumble, ends with a heavy clunk" |
 | `gate.close` | entrance locks behind the player | grind then deep slam | 1.1 s | "stone door sliding shut and slamming, deep impact, dust" |
+| `gate.slam` | the entrance gate shuts behind Karan | short grind then a very heavy slam, settling rumble | 1.3 s | "heavy wooden gate slamming shut in a stone arch, deep thud, rumble" |
+| `seal.slam` | the stone slab seals the waist behind Karan | rising rumble → massive slam → falling debris | 1.6 s | "massive stone slab rising and locking into place, deep boom, falling pebbles" |
+| `hatch.open` | the floor hatch splits open | click, stone grind with hiss, clunk | 1.3 s | "stone hatch sliding open, grinding, hydraulic hiss, clunk" |
+| `gun.rise` | the Sector Laser Gun rises from the floor | rising mechanical rumble, lock clunk, chime | 1.8 s | "ancient machine rising from the ground, rumble, metal lock, crystalline chime" |
+| `bots.notice` | the guardians notice Karan | three rising blips + low growl swell | 0.9 s | "robots powering up to alert, three rising beeps, low electric growl" |
 | `gate.unlock` | exit lock disengages | ascending 4-note chime + shimmer | 1.3 s | "ancient mechanism unlocking, ascending magical chime with shimmer" |
 | `breach.open` | wall section collapses | long rumble + cracking stones | 2.2 s | "stone wall collapsing into the ground, rumble, cracking rocks, debris" |
 | `alarm` | ENEMIES INCOMING | two-tone klaxon ×4 | 0.8 s | "retro two-tone alarm klaxon, four pulses, cartoon" |
@@ -72,6 +85,7 @@ D-minor pentatonic jungle-adventure loop at 96–118 BPM made of layers that fad
 Produced-music guidance if you replace it: 2–3 stems (bed / percussion / tension arp) at the same tempo so the game can still crossfade by intensity.
 
 ## Ambience (`AmbientPlayer`)
+- **causeway**: jungle bed plus gentle water lapping (low-passed noise with a slow swell).
 - **jungle**: wind (filtered noise with slow LFO), insects (narrow band-pass chirr), random bird calls panned left/right every few seconds.
 - **arena**: same bed, quieter, plus a low stone-chamber drone and torch crackles.
 - **boss**: louder drone.

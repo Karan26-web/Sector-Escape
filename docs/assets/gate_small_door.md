@@ -10,7 +10,7 @@
 | **Manifest key** | `gate_small_door` |
 
 ## Used for
-The wooden door that slides down into the ground when the entrance opens.
+The wooden door that slides down into the ground when Karan approaches and slams back up behind him.
 
 ## Visual description
 Front view of a heavy wooden plank door with three dark iron bands and rivets, worn and scratched, slightly rounded top corners. Fills the whole image.
@@ -25,7 +25,7 @@ Output size 512×1024 px, PNG.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

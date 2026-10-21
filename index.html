@@ -12,7 +12,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='29' fill='%230c1820' stroke='%2315111a' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='23' fill='none' stroke='%237fe6ff' stroke-width='4'/%3E%3Cpath d='M32 32 L32 9 A23 23 0 0 1 55 32 Z' fill='%237fe6ff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
@@ -22,8 +22,8 @@
   <!-- HUD -->
   <div id="hud" class="layer">
     <div class="hud-left">
-      <div id="hud-arena" class="hud-card"><span class="hud-num">1</span><div><div class="hud-title">The Mossy Gate</div><div id="hud-wave" class="hud-sub">Wave 1 / 1</div></div></div>
-      <div id="hud-score" class="hud-card score"><span class="lbl">SCORE</span><span id="hud-score-val">0</span></div>
+      <div id="hud-arena" class="hud-card"><div class="hud-kicker">Arena <span id="hud-num">1</span> / 7</div><div class="hud-title" id="hud-title">The Mossy Gate</div><div class="hud-dots" id="hud-dots"></div></div>
+      <div id="threat" class="threat"><span class="lbl">Guardians</span><div class="bar"><div id="threat-fill"></div></div></div>
     </div>
     <div class="hud-right">
       <div id="hud-shields" class="shields"></div>
@@ -32,7 +32,6 @@
         <button id="btn-pause" class="icon-btn" title="Pause (Esc)"></button>
       </div>
     </div>
-    <div id="threat" class="threat"><span class="lbl">ENEMY ADVANCE</span><div class="bar"><div id="threat-fill"></div></div></div>
   </div>
   <div id="objective" class="pill"></div>
   <div id="banner"></div>
@@ -40,18 +39,19 @@
   <div id="stamp"></div>
   <div id="damage"></div>
   <div id="skip" class="pill small">Tap to skip ›</div>
+  <div id="toast"><div class="t-title"></div><div class="t-stars stars"></div><div class="t-points"></div></div>
 
   <!-- Sector Cannon input panel -->
   <section id="cannon-panel" class="panel">
-    <header><div class="icon"></div><div><h2>SECTOR CANNON</h2><p>Set the required blast area.</p></div></header>
+    <header><div class="icon"></div><div><h2>Sector Cannon</h2><p>Charge it with the exact area of the shaded sector.</p></div></header>
     <div id="formula-box" class="formula"></div>
     <div id="diagnosis" class="feedback"></div>
     <div id="feedback" class="feedback"></div>
     <ul id="values" class="values"></ul>
-    <label class="input-row"><span>Energy Area:</span><input id="answer" type="text" inputmode="decimal" autocomplete="off" placeholder="?"><span class="unit">m²</span></label>
+    <label class="input-row"><span>Area</span><input id="answer" type="text" inputmode="decimal" autocomplete="off" placeholder="?"><span class="unit">m²</span></label>
     <div id="keypad" class="keypad"></div>
     <button id="btn-fire" class="fire">FIRE</button>
-    <div class="panel-foot"><button id="btn-hint" class="ghost">💡 Hint</button><button id="btn-keypad" class="ghost" title="Show / hide the on-screen keypad">⌨ Keypad</button><span id="attempts"></span></div>
+    <div class="panel-foot"><button id="btn-hint" class="btn ghost small">Hint</button><button id="btn-keypad" class="btn ghost small" title="Show / hide the on-screen keypad">Keypad</button><span id="attempts"></span></div>
   </section>
 
   <!-- Screens -->
@@ -61,11 +61,11 @@
     <div class="title-wrap">
       <img id="title-logo" class="logo" alt="Sector Escape – The Lost Jungle">
       <div class="title-btns">
-        <button id="btn-play" class="big green">Play</button>
-        <button id="btn-continue" class="big teal">Continue</button>
-        <button id="btn-howto" class="ghost">How to play</button>
+        <button id="btn-play" class="btn primary">Play</button>
+        <button id="btn-continue" class="btn secondary">Continue</button>
+        <button id="btn-howto" class="btn link">How to play</button>
       </div>
-      <div class="title-foot">Skill: Area of a Sector of a Circle · A = (θ/360) × πr²</div>
+      <div class="title-foot">A maths adventure · Area of a sector</div>
     </div>
   </section>
 
@@ -73,30 +73,33 @@
     <div class="parchment">
       <p id="story-text"></p>
       <img id="story-art" class="polaroid" alt="">
-      <button id="btn-start-journey" class="big green">Start Journey</button>
+      <button id="btn-start-journey" class="btn primary">Start Journey</button>
     </div>
   </section>
 
   <section id="screen-map" class="screen">
-    <svg id="map-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice"></svg>
-    <div class="map-hint">Clear each circular arena to reach the temple.</div>
-    <div id="map-card" class="map-card">
-      <div class="mc-head"><span id="mc-num">1</span><div><h3 id="mc-name">The Mossy Gate</h3><p id="mc-tag"></p></div></div>
-      <div id="mc-stars" class="stars"></div>
-      <div id="mc-best" class="mc-best"></div>
-      <button id="btn-enter" class="big green">Enter Arena ›</button>
-    </div>
-    <button id="btn-map-back" class="ghost corner">‹ Title</button>
+    <svg id="map-svg" preserveAspectRatio="xMidYMid slice"></svg>
+    <aside id="map-panel" class="map-panel">
+      <div class="mp-kicker">Arena <span id="mp-num">1</span> of 7</div>
+      <h2 id="mp-name">The Mossy Gate</h2>
+      <p id="mp-tag" class="mp-tag"></p>
+      <svg id="mp-diagram" viewBox="0 0 200 200" aria-hidden="true"></svg>
+      <div class="mp-facts"><div><span>Radius</span><b id="mp-r">7 m</b></div><div><span>Angle</span><b id="mp-t">90°</b></div><div><span>Guardians</span><b id="mp-g">Slow</b></div></div>
+      <div id="mp-stars" class="stars"></div>
+      <div id="mp-best" class="mp-best"></div>
+      <button id="btn-enter" class="btn primary">Enter arena</button>
+      <button id="btn-map-back" class="btn link">Back to title</button>
+    </aside>
   </section>
 
   <section id="screen-results" class="screen">
     <div class="card results">
-      <h2 id="res-title">Arena 1 Cleared!</h2>
-      <div id="res-stars" class="stars big"></div>
+      <h2 id="res-title">You escaped the jungle!</h2>
+      <p class="muted">Every ring is broken. The lost temple is yours.</p>
       <table id="res-rows"></table>
-      <div class="total"><span>Total</span><span id="res-total">0</span></div>
-      <button id="btn-next" class="big green">Next Adventure ›</button>
-      <p id="res-caption" class="muted">The exit gate opens! Continue through the jungle to the next arena.</p>
+      <div class="total"><span>This run</span><span id="res-total">0</span></div>
+      <div id="res-stars" class="stars big"></div>
+      <button id="btn-next" class="btn primary">Back to the jungle ›</button>
     </div>
   </section>
 
@@ -104,17 +107,7 @@
     <div class="card gameover">
       <h2>The guardians overwhelmed you…</h2>
       <p id="go-text" class="muted">Remember: A = (θ/360) × πr². Use the exact area — not more, not less.</p>
-      <div class="row"><button id="btn-retry" class="big orange">Retry Arena</button><button id="btn-go-map" class="ghost">Back to Map</button></div>
-    </div>
-  </section>
-
-  <section id="screen-ending" class="screen">
-    <div class="card ending">
-      <h2>You reached the Lost Temple!</h2>
-      <p class="muted">Every sector ring is broken. The jungle is open again.</p>
-      <div class="total"><span>Total score</span><span id="end-total">0</span></div>
-      <div id="end-stars" class="stars big"></div>
-      <div class="row"><button id="btn-end-map" class="big green">Back to Map</button><button id="btn-end-reset" class="ghost">Reset progress</button></div>
+      <div class="row"><button id="btn-retry" class="btn primary">Retry arena</button><button id="btn-go-map" class="btn secondary">Map</button></div>
     </div>
   </section>
 
@@ -122,20 +115,20 @@
     <div class="card howto">
       <h2>How to play</h2>
       <ol>
-        <li><b>Enter the arena.</b> The gate locks behind you and guardians pour through a breach in the wall.</li>
-        <li><b>Run to the Sector Cannon</b> at the centre (WASD / arrows, or tap the floor).</li>
-        <li><b>Read the battlefield.</b> The cannon scans the breach: the radius <b>r</b> and central angle <b>θ</b> appear.</li>
+        <li><b>Enter the arena.</b> The gate seals behind you. The arc on the far side is already open — and the guardians are standing in it.</li>
+        <li><b>Run to the platform at the centre</b> (WASD / arrows, or tap the floor). The Sector Laser Gun rises from under it.</li>
+        <li><b>Read the battlefield.</b> The gun scans the open arc: the radius <b>r</b> and central angle <b>θ</b> appear.</li>
         <li><b>Calculate the sector area</b> with <b>A = (θ/360) × πr²</b>, using π = 22/7.</li>
-        <li><b>Enter the exact area and FIRE.</b> Too small → some guardians survive and attack. Too large → the excess energy reflects off the wall and hits you. Exact → every guardian destroyed and the exit unlocks.</li>
+        <li><b>Enter the exact area and FIRE.</b> Too small → some guardians survive and attack. Too large → the excess hits the solid wall and reflects back at you. Exact → every guardian destroyed; run through the open arc into the next ring.</li>
       </ol>
-      <button id="btn-howto-close" class="big teal">Got it</button>
+      <button id="btn-howto-close" class="btn primary">Got it</button>
     </div>
   </section>
 
   <section id="screen-pause" class="screen">
     <div class="card pause">
       <h2>Paused</h2>
-      <div class="col"><button id="btn-resume" class="big green">Resume</button><button id="btn-pause-mute" class="ghost">Toggle sound</button><button id="btn-pause-map" class="ghost">Quit to map</button></div>
+      <div class="col"><button id="btn-resume" class="btn primary">Resume</button><button id="btn-pause-mute" class="btn secondary">Toggle sound</button><button id="btn-pause-map" class="btn secondary">Quit to map</button></div>
     </div>
   </section>
 </div>

@@ -11,7 +11,7 @@
 | **Manifest key** | `boss_warden` |
 
 ## Used for
-Final arena boss standing in front of the exit gate behind three energy shields.
+Final-arena guardian standing behind the last squad in the open arc; destroyed by the perfect blast.
 
 ## Visual description
 Three-quarter FRONT view of the Sector Warden: a 6.5 m tall elite version of the Sector Sentinel — same skull faceplate but with two swept-back steel horns, deep PURPLE-violet armour with gold trim instead of green, a large AMBER-gold chest core, tattered dark cape, crackling violet energy between the shoulder plates; regal, ancient, terrifying.
@@ -24,7 +24,7 @@ Three-quarter FRONT view of the Sector Warden: a 6.5 m tall elite version of the
 | 1 | `hurt` | 4 | 8 | once | staggers back, violet sparks, armour flash |
 | 2 | `defeat` | 8 | 7 | once | shaking → core overloads (growing glow) → chain explosions → dissolves into smoke and embers |
 
-Rows are read top to bottom; frames left to right starting at column 0. Unused cells in a row stay empty (transparent). The grid is defined in `assets/manifest.json` under `images.boss_warden.sheet` – if your generated sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
+Rows are read top to bottom; frames left to right starting at column 0. Unused cells stay transparent. The grid is defined in `assets/manifest.json` under `images.boss_warden.sheet` – if your sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
 
 ## GPT image prompt (copy–paste)
 
@@ -38,19 +38,19 @@ Output size 4096×1536 px, PNG with transparency.
 ```
 
 ### If the grid comes out wrong
-Image models often miscount cells. Reliable fallback: generate **one row at a time** (one animation per image, `1 × N` cells, same cell size), then stack the rows into the full sheet with any sprite packer or an image editor. Alternatively generate single poses and assemble. Always check the result in `tools/sheet-viewer.html` (choose the preset for this asset) – the feet must sit on the same baseline in every frame or the character will bounce.
+Image models often miscount cells. Reliable fallback: generate **one row at a time** (one animation per image, `1 × N` cells, same cell size), then stack the rows into the full sheet. Always check the result in `tools/sheet-viewer.html` – the feet must sit on the same baseline in every frame.
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; cells aligned to the grid, no borders.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
 
 ## Current manifest entry
 ```json
 {
   "boss_warden": {
-    "path": "sprites/boss_warden.png",
+    "path": "sprites/boss_warden.webp",
     "worldHeight": 6.5,
     "chromaKey": null,
     "sheet": {
@@ -75,7 +75,8 @@ Image models often miscount cells. Reliable fallback: generate **one row at a ti
           "loop": false
         }
       }
-    }
+    },
+    "baseline": 0.916
   }
 }
 ```

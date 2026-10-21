@@ -12,6 +12,8 @@ export class FX {
     this.world = world; this.group = new THREE.Group(); world.add(this.group);
     this.particles = []; this.anims = [];
     this._sparkMat = null; this._smokeMat = null;
+    // warm-up: invisible instances of every material type used later (shaders compile on the first frame instead of mid-fight)
+    for (const [name, additive] of [['fx_explosion', false], ['fx_glow', true], ['fx_smoke', false], ['fx_spark', true]]) { const sp = new THREE.Sprite(this._mat(name, additive)); sp.material.opacity = 0; sp.scale.setScalar(0.01); sp.position.y = -5; this.group.add(sp); }
   }
   _mat(name, additive = true, color = 0xffffff) {
     return new THREE.SpriteMaterial({ map: assets.texture(name, { wrap: false }), transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, color });
@@ -29,6 +31,7 @@ export class FX {
   }
   /** Burst of small additive sparks with gravity. */
   sparks(pos, n = 12, color = 0xffffff, speed = 4, life = 0.7, size = 0.35) {
+    n = Math.min(n, Math.max(0, 160 - this.particles.length));
     for (let i = 0; i < n; i++) {
       const sp = new THREE.Sprite(this._mat('fx_spark', true, color)); sp.scale.setScalar(size * (0.6 + Math.random() * 0.8));
       sp.position.copy(pos); sp.position.y += 0.6; this.group.add(sp);
@@ -38,6 +41,7 @@ export class FX {
   }
   /** Soft smoke/dust puff. */
   dust(pos, n = 1, color = 0xd8d0b8, size = 0.6) {
+    if (this.particles.length > 120) return;
     for (let i = 0; i < n; i++) {
       const sp = new THREE.Sprite(this._mat('fx_smoke', false, color)); sp.material.opacity = 0.35; sp.scale.setScalar(size);
       sp.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.15, (Math.random() - 0.5) * 0.5)); this.group.add(sp);
@@ -45,6 +49,7 @@ export class FX {
     }
   }
   smoke(pos, n = 6, color = 0x555555, size = 1.4) {
+    n = Math.min(n, Math.max(0, 160 - this.particles.length));
     for (let i = 0; i < n; i++) {
       const sp = new THREE.Sprite(this._mat('fx_smoke', false, color)); sp.material.opacity = 0.5; sp.scale.setScalar(size * (0.7 + Math.random() * 0.6));
       sp.position.copy(pos).add(new THREE.Vector3((Math.random() - 0.5), 0.5 + Math.random(), (Math.random() - 0.5))); this.group.add(sp);

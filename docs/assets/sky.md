@@ -10,7 +10,7 @@
 | **Manifest key** | `sky` |
 
 ## Used for
-Optional sky dome texture (the game tints it for day/dusk/night/storm).
+Sky dome texture (tinted for day/dusk/night/storm as Karan moves through the chain).
 
 ## Visual description
 Soft blue sky gradient (deep blue top → pale horizon) with a few cartoon cumulus clouds, flat painted style.
@@ -25,7 +25,7 @@ Output size 1024×512 px, PNG.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

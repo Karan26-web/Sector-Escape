@@ -10,7 +10,7 @@
 | **Manifest key** | `stone_idol` |
 
 ## Used for
-Two idols flank each arena entrance outside the wall.
+Decorative idols (currently unused by the chain layout; kept for set dressing).
 
 ## Visual description
 A tall weathered jungle temple idol: a carved stone head/face with closed eyes and glowing cyan inlays, geometric Maya/Khmer-inspired patterns, cracks, moss and vines, standing on a square plinth.
@@ -25,7 +25,7 @@ Output size 512×1024 px, PNG with transparency.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

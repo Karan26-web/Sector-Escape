@@ -22,7 +22,7 @@ Chunky white glyph icons with thick black outlines (star is golden, empty star d
 |---|---|---|---|---|---|
 | 0 | `timer, star, star-empty, hint-bulb, sound-on, sound-off, pause, play` | 8 | — | static | one icon per cell in that exact order |
 
-Rows are read top to bottom; frames left to right starting at column 0. Unused cells in a row stay empty (transparent). The grid is defined in `assets/manifest.json` under `images.ui_icons.sheet` – if your generated sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
+Rows are read top to bottom; frames left to right starting at column 0. Unused cells stay transparent. The grid is defined in `assets/manifest.json` under `images.ui_icons.sheet` – if your sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
 
 ## GPT image prompt (copy–paste)
 
@@ -35,16 +35,16 @@ Output size 1024×128 px, PNG with transparency.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; cells aligned to the grid, no borders.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
 
 ## Current manifest entry
 ```json
 {
   "ui_icons": {
-    "path": "ui/icons.png",
+    "path": "ui/icons.webp",
     "sheet": {
       "cols": 8,
       "rows": 1,

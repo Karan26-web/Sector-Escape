@@ -5,12 +5,12 @@
 | **Save as** | `assets/textures/arena_wall.png` |
 | **Type** | Texture (PNG-32 with alpha) |
 | **Canvas size** | 1024 × 1024 px |
-| **World scale** | 7 m × 7 m per tile |
+| **World scale** | 6.5 m × 6.5 m per tile |
 | **Priority** | P0 |
 | **Manifest key** | `arena_wall` |
 
 ## Used for
-Inner and outer faces of the circular arena wall; one tile spans the full wall height (≈7 m) and repeats horizontally.
+Inner and outer faces of the circular arena walls and the junction pillars; one tile spans the wall height (6.5 m) and repeats horizontally.
 
 ## Visual description
 Front-facing ancient jungle temple wall: large fitted stone blocks in 6 rows with offset joints, a carved glyph band at 1/3 height, deep ink mortar lines, moss creeping up from the bottom third, a few hanging vines, slight darkening toward the bottom. MUST tile seamlessly left↔right.
@@ -25,7 +25,7 @@ Output size 1024×1024 px, PNG.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

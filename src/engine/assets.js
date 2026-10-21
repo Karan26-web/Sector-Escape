@@ -88,7 +88,7 @@ export class Assets {
     const def = this.def(name) || {}, img = this.get(name);
     const sheet = def.sheet || { cols: 1, rows: 1, anims: { idle: { row: 0, frames: 1, fps: 1 } } };
     const w = img ? (img.width || img.naturalWidth) : 256, h = img ? (img.height || img.naturalHeight) : 256;
-    return { cols: sheet.cols, rows: sheet.rows, frameW: w / sheet.cols, frameH: h / sheet.rows, anims: sheet.anims, worldHeight: def.worldHeight ?? 1.8, anchor: def.anchor ?? [0.5, 1] };
+    return { cols: sheet.cols, rows: sheet.rows, frameW: w / sheet.cols, frameH: h / sheet.rows, anims: sheet.anims, worldHeight: def.worldHeight ?? 1.8, anchor: def.anchor ?? [0.5, 1], baseline: def.baseline ?? 1 };
   }
 
   /** THREE texture for an image (cached). opts: repeat [x,y], wrap, nearest, srgb */

@@ -18,7 +18,7 @@ export class AnimatedSprite {
     this.tex.repeat.set(1 / this.def.cols, 1 / this.def.rows);
     this.material = new THREE.SpriteMaterial({ map: this.tex, transparent: true, alphaTest: 0.02, depthWrite: false, depthTest: true, color: o.tint ?? 0xffffff });
     this.sprite = new THREE.Sprite(this.material);
-    const c = o.center ?? [0.5, 0];
+    const c = o.center ?? [0.5, 1 - (this.def.baseline ?? 1)];   // anchor at the measured feet line, not the cell edge
     this.sprite.center.set(c[0], c[1]);
     this.worldHeight = o.worldHeight ?? this.def.worldHeight;
     this.aspect = this.def.frameW / this.def.frameH;
@@ -86,7 +86,7 @@ export function makeBillboard(name, worldHeight, o = {}) {
     tex.repeat.set(1 / def.cols, 1 / def.rows); tex.offset.set(col / def.cols, 1 - (row + 1) / def.rows);
   }
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: o.alphaTest ?? 0.05, depthWrite: o.depthWrite ?? false, color: o.tint ?? 0xffffff, fog: o.fog ?? true, blending: o.additive ? THREE.AdditiveBlending : THREE.NormalBlending, opacity: o.opacity ?? 1 });
-  const s = new THREE.Sprite(mat); s.center.set(0.5, o.centerY ?? 0);
+  const s = new THREE.Sprite(mat); s.center.set(0.5, o.centerY ?? 1 - (def.baseline ?? 1));
   s.scale.set(worldHeight * (def.frameW / def.frameH), worldHeight, 1);
   return s;
 }

@@ -10,7 +10,7 @@
 | **Manifest key** | `fx_glow` |
 
 ## Used for
-Cannon crystal glow, flashes, beam heads.
+Gun crystal glow, flashes, beam heads, temple light.
 
 ## Visual description
 Soft round white radial gradient glow, fully transparent at the edges.
@@ -25,7 +25,7 @@ Output size 256×256 px, PNG with transparency.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; subject fills the frame as described.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically.

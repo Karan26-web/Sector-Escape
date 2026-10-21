@@ -6,12 +6,12 @@
 | **Type** | Sprite sheet (PNG-32 with alpha) |
 | **Canvas size** | 2048 × 512 px |
 | **Grid** | 4 columns × 1 rows · each cell 512 × 512 px |
-| **World scale** | 1.2–2.4 m tall |
+| **World scale** | 1.2–2.3 m tall |
 | **Priority** | P1 |
 | **Manifest key** | `jungle_plant` |
 
 ## Used for
-Ferns and bushes along the paths and around arena walls.
+Ferns and bushes at the foot of the walls and along the causeway banks.
 
 ## Visual description
 Cartoon jungle undergrowth: big fronds and leaves in layered greens with bold outlines, one variant with bright pink/orange flowers.
@@ -22,7 +22,7 @@ Cartoon jungle undergrowth: big fronds and leaves in layered greens with bold ou
 |---|---|---|---|---|---|
 | 0 | `variants a–d` | 4 | — | static | fern, broad-leaf plant, flowering bush, grass tuft |
 
-Rows are read top to bottom; frames left to right starting at column 0. Unused cells in a row stay empty (transparent). The grid is defined in `assets/manifest.json` under `images.jungle_plant.sheet` – if your generated sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
+Rows are read top to bottom; frames left to right starting at column 0. Unused cells stay transparent. The grid is defined in `assets/manifest.json` under `images.jungle_plant.sheet` – if your sheet ends up with a different grid, edit `cols` / `rows` / `frames` there instead of redrawing.
 
 ## GPT image prompt (copy–paste)
 
@@ -35,16 +35,16 @@ Output size 2048×512 px, PNG with transparency.
 ```
 
 ## Checklist before dropping it in
-- [ ] Transparent background (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
+- [ ] Transparent background where the spec says so (or flat `#FF00FF` → set `"chromaKey": "#FF00FF"` for this entry in `assets/manifest.json`).
 - [ ] Exact canvas size; cells aligned to the grid, no borders.
 - [ ] Outlines are crisp black ink, colours flat (no photoreal shading).
-- [ ] Reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
+- [ ] Run `python3 tools/optimize_assets.py`, reload the game → the placeholder is replaced automatically. Use `tools/sheet-viewer.html` to preview the animation.
 
 ## Current manifest entry
 ```json
 {
   "jungle_plant": {
-    "path": "sprites/jungle_plant.png",
+    "path": "sprites/jungle_plant.webp",
     "worldHeight": 1.6,
     "sheet": {
       "cols": 4,
@@ -67,7 +67,8 @@ Output size 2048×512 px, PNG with transparency.
           "frames": 1
         }
       }
-    }
+    },
+    "baseline": 0.916
   }
 }
 ```

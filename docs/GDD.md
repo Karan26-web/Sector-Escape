@@ -54,60 +54,66 @@ Every feedback card also states the geometric consequence: *"You entered 100 m²
 
 Per-arena starting level (`scaffold` in `levels.js`): arena 1 starts at level 2 (`full`), arena 2 at level 1 (`formula`), arenas 3+ at level 0 (`hint`). Each failed attempt raises the level by one automatically. Hints are always free; using one forfeits the small "No hints" bonus so fluent learners still have something to chase.
 
-## 2. Core loop (as implemented)
-| # | Beat | Camera / view | Audio |
+## 2. Core loop — seven beats per ring (redesign 2026-10-21)
+Each game state has **one** focal point; jungle and architecture are atmosphere, the maths is unmistakable.
+
+| Beat | What happens | Camera | Focus |
 |---|---|---|---|
-| 1 | **Approach** — hero auto-runs along the jungle path to the small gate (skippable) | behind-the-shoulder follow | jungle ambience, explore music, grass footsteps |
-| 2 | **Enter** — gate opens, hero walks in, gate slams shut | follow → pull-back reveal of the arena and the locked exit (caption "You are trapped!") | stone grind, slam, stone footsteps |
-| 3 | **Alert** — "ENEMIES INCOMING!"; a curved wall section sinks into the ground; guardians pour in | quick swing to the breach | klaxon, collapse rumble, bot stomps |
-| 4 | **Run to the cannon** — player-controlled (WASD / tap); beacon marks the centre; auto-assist after 9 s idle | follow | music → arena |
-| 5 | **Activate** — hero slams the crystal; shockwave | close-up | power-up hum |
-| 6 | **Tactical view** — camera sweeps up to a 64° top view with the breach at the top of the screen; the arena sits left of the panel | 1.7 s cinematic move | whoosh, music → tension |
-| 7 | **Scan** — radar sweep → two low-opacity radial lines to the breach ends → angle arc with "θ = 90°" counting up → radius line with ticks and "r = 14 m" | tactical | sweep, pings, label pops |
-| 8 | **Input** — Sector Cannon panel (formula per scaffold, values, keypad, FIRE, hint). Enemy-advance bar shows the time pressure | tactical | keypad ticks |
-| 9 | **FIRE** — 1.35 s charge, then the sector laser expands from the centre | shake, flash | charge, blast, beam hum |
-| 10a | **Perfect** — beam fills the breach; all guardians explode (staggered by distance); wall impact arc; energy lock shatters; "PERFECT SHOT!" | tactical | explosions, lock break, perfect stinger |
-| 10b | **Undercharged** — narrower beam; edge guardians survive, leap at the hero (arc jump), −1 shield; emergency pulse clears them; wave re-enters | tactical | fail stinger, lunge, hit, pulse |
-| 10c | **Overcharged** — wider beam; magenta excess hits the wall, red beams travel back to the centre, −1 shield; wave re-enters | tactical | fail stinger, ricochet zap, hit |
-| 11 | **Exit** — camera returns behind the hero, exit doors slide apart, hero runs out through the gate | follow | unlock chime, music → explore |
-| 12 | **Results** — Time bonus / No damage / Perfect shot / No hints, stars, total; map marker walks to the next arena | 2D | fanfare, counters, stars |
+| 1 Anticipation | Pick the ring on the 2D expedition map: route, sector preview, r, θ, guardian speed | — (2D) | the selected medallion |
+| 2 Threat | Ring 1: run the causeway over the lake, the small gate opens and slams shut. Later rings: Karan arrives through the open arc and the ring closes behind him (the seal rises). A 2 s establishing shot, then a beat of calm, then **GUARDIANS AWAKEN** | elevated shot from behind Karan; the near walls, gate and their torches cut away, so the whole ring reads with Karan low-centre and the guarded arc at the top | the guarded arc |
+| 3 Discovery | A pulsing cyan ring marks the buried hatch; one short objective ("Reach the glowing hatch") | chase cam, locked heading, clamped inside the ring | the hatch |
+| 4 Understanding | The hatch splits, a stone drum with a bronze rim rises out of the dark shaft carrying the Sector Cannon (full cinematic the first time, brisk afterwards). Then the dedicated puzzle mode: 0.85 s move to an 85° top-down camera, the world dims and desaturates outside the ring, tall trees sink away, the sector is drawn (radial lines, cyan arc, θ near the centre, r along a radius) and the panel slides in | puzzle camera | the sector + panel |
+| 5 Power | FIRE: charge, then the sector laser sweeps exactly the entered area | puzzle camera | the beam |
+| 6 Reward | PERFECT SECTOR → a held beat → an amber light path runs from Karan through the arc while the camera rises to frame the next ring; toast with stars and points | rising reveal | the next ring |
+| 7 Progression | Overhead chase through the arc into the next ring; the missing arc of that ring rises as a seal behind him | overhead chase | Karan |
 
-Shields: 3 per arena (reset on every arena). 0 shields → *Game over* → **Retry arena** (restarts at the alert, skipping the approach) or **Back to map**.
+Wrong answers keep the LXD's consequences (UNDERCHARGED: survivors pounce; OVERCHARGED: the excess reflects off the wall) and always show a targeted diagnosis + the next hint step. Shields: 3 per ring; 0 → game over → retry the same ring or return to the map.
 
-## 3. Progression — the difficulty ladder
-Seven arenas on the LXD's sketched map. Each arena owns **several problem sets ("variants")**: the first is the canonical problem from the brief; every time a cleared arena is replayed the next set is used, so practice always brings new numbers while the arena itself stays familiar. Difficulty rises along five levers: angle friendliness, radius (whole-number vs. π-form answers), scaffolding, time budget, and number of waves.
+## 3. Progression — the LXD's final table
+Seven arenas with fixed dimensions (π = 22/7, every answer a clean number). Enemy speed is derived from the time budget, so larger rings get faster guardians, exactly as the brief asks. Exit directions zig-zag (right / lower-right / upper-right); where the suggested direction would have made the open arc overlap the entrance arc the turn was softened.
 
-| # | Arena | Tier | Radius | Sets (θ → area) | Time | Scaffold | What is new |
-|---|---|---|---|---|---|---|---|
-| 1 | The Mossy Gate | 1 | 14 | 90° → 154 · 45° → 77 · 135° → 231 | 100 s | formula + substitution | tutorial pacing |
-| 2 | Fallen Idol | 1 | 14 / 14 / 21 | 180° → 308 · 270° → 462 · 180° → 693 | 90 s | formula | half and three-quarter breaches; gates move beside the breach |
-| 3 | Serpent Court | 2 | 21 | 60° → 231 · 40° → 154 · 100° → 385 | 80 s | hint only | awkward fractions of 360 |
-| 4 | Crimson Ruins | 2 | 21 / 21 / 28 | 120° → 462 · 160° → 616 · 135° → 924 | 70 s | hint only | wide breach, less time |
-| 5 | Twin Breach | 3 | 28 / 28 / 35 | 45°+135° → 308, 924 · 90°+225° → 616, 1540 · 72°+144° → 770, 1540 | 65 → 55 s | hint only | two consecutive waves, night |
-| 6 | Thunder Well | 4 | 20 / 15 / 18 / 24 | 45° → 50π · 72° → 45π · 100° → 90π · 75° → 120π | 55 s | hint only | **radius not a multiple of 7 — answer in terms of π** |
-| 7 | The Warden's Arena | 5 | 28 / 35 / 30 | 90°,135°,225° → 616, 924, 1540 · 72°,144°,216° → 770, 1540, 2310 · 60°,120°,200° → 150π, 300π, 500π | 60 → 50 s | hint only | boss; each wave tears the same breach wider |
+| # | Arena | r (m) | θ | Area | Guardians | Time to the gun | Exit faces | Sky | Scaffold |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | The Mossy Gate | 7 | 90° | **38.5** | 5 | 60 s | upper-right (45°) | day | formula + substitution |
+| 2 | Fallen Idol | 10.5 | 120° | **115.5** | 10 | 54 s | right (0°) | day | formula |
+| 3 | Serpent Court | 14 | 90° | **154** | 10 | 50 s | lower-right (320°) | dusk | hint only |
+| 4 | Crimson Ruins | 14 | 135° | **231** | 15 | 46 s | right (0°) | dusk | hint only |
+| 5 | Twin Falls | 17.5 | 72° | **192.5** | 10 | 42 s | lower-right (315°) | night | hint only |
+| 6 | Thunder Well | 21 | 60° | **231** | 10 | 38 s | upper-right (45°) | night | hint only |
+| 7 | The Warden's Court | 21 | 120° | **462** | 20 + the Warden | 34 s | right (0°) → temple | storm | hint only |
 
-**Answers in terms of π.** From tier 4 the exact area is a multiple of π (e.g. 50π m²). The input accepts `50π`, `50pi`, `50*pi`, `pi*50`, `100π/2`, `(1/8)400π`-style fractions, and the keypad has a π key. Decimal answers are still accepted when they use 22/7, 3.14 or 3.1416 (±0.5 %). For tiers 1–3 the panel keeps the NCERT convention π = 22/7 but a learner may equally type `49π` for 154.
-
-Difficulty levers (all in `src/game/levels.js`): time budget (bot arrival), bot count (≈ one per 2.2 m of breach arc, 4–24), θ variety, radius (changes the whole arena size and camera height), number of waves, scaffold level, environment (day/dusk/night/storm, torches, fog). `validateLevels()` checks every set: whole-number areas (or whole π-coefficients) and no breach overlapping a gate.
-
-Wave timing: guardians spawn in 2–3 rows just outside the breach and lurch toward the centre so that the first arrives after the arena's time budget (retries use 85 % of it). The HUD "Enemy advance" bar is the visible timer.
+### Chain geometry (how the overlap is computed)
+- **Lens (the passage).** Ring i's wall is open over θ_i. The passage into ring i+1 is the lens of the two circles, with its angle capped at **64°** (θ ≤ 72° uses θ itself). For equal radii that gives a lens depth of ~15 % of a diameter (12–17 % across the chain), so rings touch without merging. Half-chord c = R·sin(φ/2); the next centre sits h + √(R′² − c²) along the exit direction.
+- **Breach bay.** When θ is wider than the lens (arenas 1–4 and 7), an annular-sector bay (R → R + D, D = 3.6–5.5 m) continues the open arc outward. Its two side walls are the sector's radial lines extended, so the danger zone literally continues the sector; the guardians stand in it and in the lens.
+- **Walls, pillars, seals from one boolean.** Every wall piece is "ring circle minus explicit openings minus every other disk minus every bay" (sampled at 0.5° and bisection-refined), bay walls are "bay outline minus the next disk", and a pillar stands at every wall end. The seal is the part of ring i+1's own circle that opens toward ring i: it rises out of the floor after Karan passes, so every ring becomes a complete circle again behind him (the seventh seal closes the temple court).
+- `validateChain()` checks clean answers, lens depth ≤ 20 % of the smaller diameter, single-piece seals, guardian room at every arc edge, and ≥ 1.5 m between non-neighbouring rings.
 
 ## 4. Scoring
 `Arena cleared 500` + `Time bonus 0–300` (linear on time spent in the input phase vs. budget) + `No damage 300` + `Perfect shot 200 × waves` (first try on every wave) + `No hints 100`.
 Stars: ★★★ perfect first try & no damage · ★★ ≤ 1 shield lost · ★ cleared. Best score and stars per arena are saved (`localStorage`), the map shows them, and the total appears at the temple.
 
-## 5. The boss — The Sector Warden
-A 6.5 m elite guardian stands in front of the exit behind three rotating violet energy shields. Each wave is a different breach (θ = 90°, 135°, 45° with r = 28). A perfect blast destroys the wave *and* shatters one shield (the wave's bots are its power source). After the third, the Warden overloads and explodes, the lock breaks and the final gate opens. Wrong answers cost shields exactly as in other arenas, so the boss is a mastery check of three sectors in a row.
+## 5. The Warden (arena 7)
+The Sector Warden stands behind the last squad in the open arc of the seventh ring and roars when Karan is noticed. There are no shields any more (the brief's final table has none): a perfect sector destroys the squad and the Warden together; an undercharged shot leaves it standing. It is the "final arena" flavour, not a separate mechanic.
 
-## 6. Dynamic camera (the "move to the top view")
-| Pose | Position | Used |
-|---|---|---|
-| Follow (behind) | 6.5 m behind the hero, 3.2 m up, looking 6 m ahead, FOV 56 | approach, run, exit |
-| Reveal | just behind the hero, 4.2 m up, looking at the far gate, FOV 62 | "You are trapped!" |
-| Alert | over the hero's shoulder toward the breach | breach opening |
-| **Tactical** | 2.5 R from the centre at 64° pitch, on the side opposite the breach so the breach is **up**; aim point shifted 0.3 R to the right so the arena sits left of the panel (shifted toward the camera on phones, where the panel is a bottom sheet), FOV 50 | scan, input, fire, results of the shot |
-All moves are eased (`inOutCubic`, 0.6–1.7 s); impacts add screen shake.
+## 6. Presentation modes & cameras
+| Mode | Composition |
+|---|---|
+| **Title** | Locked cinematic shot from the lake, down the causeway to the gate of ring 1 at twilight; the logo and one primary button (Play) in a dark left column; Continue appears only with a save; fireflies and torches are the only motion. No orbit, so no foliage popping |
+| **Map** | A designed 2D layer (not the 3D level): darkened painted backdrop, a stone stepping-stone route snaking through seven medallions, START and the temple. Each medallion shows its own sector wedge. States: locked (muted stone), available, selected (amber tracing + slow halo, the only animated element), cleared (cyan seal). A docked right-hand panel holds the name, a mini sector diagram, r / θ / guardian speed, stars and the single Enter button. Phones: vertical route + bottom sheet |
+| **Establishing / arena** | Elevated shot from behind Karan (distance 0.55 R + 3, pitch ~55° to Karan). **Camera rule:** whenever the camera is outside the current ring, its wall pieces, gate and torches within ±72° of the camera bearing fade to 8 % (smoothly), so nothing stands between the camera and the player. The run itself uses a behind-the-shoulder chase with a locked heading, clamped inside the ring; pillars that brush the camera fade |
+| **Puzzle** | 85° near top-down, FOV 32°, arc pointing up. Distance is solved so the wall **tops** (which project outward) fit: the ring fills the left ~68 % beside the panel (top 58 % on phones). The spotlight darkens (×0.28) and desaturates the world beyond R + 1.6 m (fully by R + 7.5 m); billboards taller than 4 m near the ring sink away; overlay line widths scale with R so they stay crisp |
+| **Reward / exit** | The camera rises over the cleared ring to frame the next one while an amber path lights up; then an overhead chase (9 m up) keeps the seal in frame as it rises behind Karan |
+
+All moves are eased; impacts add screen shake.
+
+### Design system
+Palette: deep jungle `#142925`, ancient stone `#776F60`, muted moss `#446549`, **temple cyan `#52DED8`** (maths, machinery, completed seals), **active amber `#F4BF55`** (selection, actions, the next objective), warm ivory `#F3EBD8` (text), **threat red `#DC6657`** (guardians, damage, errors). Type: Barlow Condensed for headings and buttons, Poppins for body; the expressive logo is the only comic lettering. One primary (amber) button per screen.
+
+### Jungle (three layers)
+1. **Distant forest:** a wide ellipse of tall, dark, low-detail clumps (or `forest_silhouette` sprites).
+2. **Canopy masses:** hand-placed clusters of 3–6 trees (or one `jungle_canopy` sprite) on two bands around each ring and behind the lake banks, with deliberate gaps of open ground.
+3. **Foreground accents:** sparse rocks and large ferns at the foot of the walls and along the shoreline.
+No random scatter; placement is seeded and deterministic. The lake has an irregular shoreline cut into the ground with a mud bank, instead of a hard rectangle edge.
 
 ## 7. Audio
 Fully procedural (see `docs/sfx/SFX_SPEC.md`): 45 cues, generative music with six modes (title / explore / arena / tension / boss / calm) and a jungle ambience bed with birds and torch crackle. Every learner-facing event has a sound (UI, footsteps, gates, alarm, scan, charge, beam, explosions, ricochet, hurt, stingers). Mute with **M**.
@@ -123,9 +129,13 @@ Fully procedural (see `docs/sfx/SFX_SPEC.md`): 45 cues, generative music with si
 Log per attempt: arena, wave, r, θ, entered value, `status`, `diagnosis.code`, time-to-fire, hint level, shields. This produces the error-type distribution the LXD needs to tune scaffolds and spot systematic misconceptions (e.g. many `full-circle` codes → strengthen the "fraction of the circle" scan animation).
 
 ## 10. Tech summary
+World: one Three.js scene holds the causeway, all seven rings, the temple court and ~2,000 jungle billboards (trees, plants, rocks) drawn in three instanced draw calls with a vertex-shader billboard, alpha-to-coverage edges and near-camera fading for the top views. Walls are segmented cylinders with openings cut per arc; floors are alpha-tested circles with polygon offset so overlapping lenses never z-fight.
+Performance budget: pixel ratio capped at 1.5 and adapted at runtime (drops to 0.75 on slow GPUs, climbs back when frames are fast); at most 4 dynamic torch lights per arena; particle budget of 160 sprites; laser and FX shaders are compiled during arena load so the first shot does not hitch; no per-frame allocations in the hero controller. The floor is an alpha-tested opaque surface, so characters can never sort underneath it.
+
 Three.js r170 (vendored), ES modules, no bundler. Billboard sprite sheets for characters (front/back sheets for the hero), segmented cylinder walls so any arc can sink into the ground (overlapping breaches supported), shader-drawn sector laser (`progress` front, bright edges, stripes), HTML/CSS UI, Web Audio synthesis, Playwright playtests (`playtest/`). All art falls back to procedural canvases so the build is always playable.
 
 ## 11. Open questions for the LXD
-1. Should the over-charge also *open* the gate (all enemies die) at the cost of a shield, or stay locked as now (exact answer required to progress)? Current: locked — it keeps "exact" as the goal.
+1. An overcharged shot kills every guardian but still costs a shield and does not clear the arena (the exact area is required to move on). Keep?
+4. The waist seals behind Karan with a rising stone slab (the "entrance gate closes and never reopens" beat). It is one flag in `levels.js` if you prefer the waist to stay open.
 2. Decimal radii (e.g. 3.5 m) and radian mode for senior classes — trivial to add to `levels.js`.
 3. Arc-length variant: the same arena with "energy fence length" instead of area would reuse everything.
