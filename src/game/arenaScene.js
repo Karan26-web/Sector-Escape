@@ -41,7 +41,12 @@ export class ArenaScene {
   dirDeg(deg) { const p = polar(deg, 1); return new THREE.Vector3(p.x, 0, p.z); }
   behindPose(pos, dir, dist = 6.5, height = 3.2, fov = 56, clamp = null) {
     const p = { pos: pos.clone().addScaledVector(dir, -dist).add(new THREE.Vector3(0, height, 0)), target: pos.clone().addScaledVector(dir, 6).add(new THREE.Vector3(0, 1.0, 0)), fov };
-    if (clamp) this.clampInside(p.pos, clamp);
+    if (clamp) {
+      const before = p.pos.clone(); this.clampInside(p.pos, clamp);
+      const pulled = Math.hypot(before.x - p.pos.x, before.z - p.pos.z);
+      // the wall pulled the camera in close (and up): aim back toward Karan in proportion, or he drops out of the frame
+      if (pulled > 0.01) p.target.lerp(pos.clone().add(new THREE.Vector3(0, 0.9, 0)), Math.min(1, pulled / dist) * 0.9);
+    }
     return p;
   }
   /** Keep a camera position inside the ring (small arenas): pull it in radially and lift it to keep the view. */
@@ -229,6 +234,10 @@ export class ArenaScene {
     // ---- tactical view + scan
     this.setPhase('tactical'); audio.play('ui.whoosh'); ui.objective(null);
     this.bots.freeze(true);   // top-down = thinking time: the guardians lock in stasis until the cannon fires
+    // Karan backs off to the hatch's edge while the camera rises: from above, a standing sprite lies toward the centre,
+    // so from the 2.5 m stand his head would vanish under the cannon top (r 1.6). At ~3.9 m all of him stays clear
+    // (runTo stops 0.35 m short of its target).
+    this.hero.keepOutRadius = null; this.hero.runTo(this.W(A.exitDeg + 180, 4.25), 2.8, { face: this.C });
     this.chain.setFocus(this.index, true, 0.85, { cull: true });
     await this.rig.moveTo(this.tacticalPose(), 0.85, Ease.inOutCubic);
     await delay(0.15);

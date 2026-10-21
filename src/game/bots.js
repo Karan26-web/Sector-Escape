@@ -5,7 +5,7 @@
 // All polar coordinates are relative to the current arena centre `C`.
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
-import { AnimatedSprite, makeShadow } from '../engine/sprites.js';
+import { AnimatedSprite, makeShadow, topDownLift } from '../engine/sprites.js';
 import { audio } from '../engine/audio.js';
 import { polar, degDiff, clamp, Ease } from '../engine/util.js';
 import { tweens } from '../engine/tween.js';
@@ -48,7 +48,7 @@ export class BotManager {
       this.place(bot); this.bots.push(bot);
     }
   }
-  place(b) { const p = polar(b.deg, b.r); b.g.position.set(this.C.x + p.x, 0, this.C.z + p.z); b.spr.sprite.position.y = b.y; }
+  place(b) { const p = polar(b.deg, b.r); b.g.position.set(this.C.x + p.x, 0, this.C.z + p.z); b.spr.sprite.position.y = b.y + (this.lift || 0); }
   /** The guardians notice Karan: eyes flash, then they advance. */
   alert() {
     this.active = true;
@@ -116,8 +116,10 @@ export class BotManager {
   update(dt) {
     if (this.active) this.waveTime += dt;
     if (this.stepCooldown > 0) this.stepCooldown -= dt;
+    this.lift = topDownLift(this.world.camera);   // keep floor-level sprites visible from the puzzle camera
     for (const b of this.bots) {
       const standing = b.state === 'walking' || b.state === 'holding';
+      if (b.state !== 'lunging') b.spr.sprite.position.y = b.y + this.lift;
       if (this.frozen && standing) continue;                     // stasis: pose, frame and position all hold
       b.spr.update(dt);
       if (b.state !== 'walking') continue;

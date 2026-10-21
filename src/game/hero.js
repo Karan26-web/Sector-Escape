@@ -2,7 +2,7 @@
 // Hero: billboard character with front/back sheets, movement & footsteps
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
-import { AnimatedSprite, makeShadow } from '../engine/sprites.js';
+import { AnimatedSprite, makeShadow, topDownLift } from '../engine/sprites.js';
 import { audio } from '../engine/audio.js';
 import { tweens } from '../engine/tween.js';
 import { clamp } from '../engine/util.js';
@@ -37,15 +37,15 @@ export class Hero {
   face(dir) { if (dir.lengthSq() > 1e-6) { this.facing.copy(dir).setY(0).normalize(); } }
   faceTo(point) { this.face(this._tmp.copy(point).sub(this.pos)); }
 
-  /** Run to a point (cutscene). Resolves when within 0.35 m. */
-  runTo(point, speed = this.speed) {
-    this.target = point.clone(); this.target.y = 0; this.runSpeed = speed; this.control = false;
+  /** Run to a point (cutscene). Resolves when within 0.35 m. face: keep looking at this point while moving (a backstep). */
+  runTo(point, speed = this.speed, { face = null } = {}) {
+    this.target = point.clone(); this.target.y = 0; this.runSpeed = speed; this.control = false; this.lookAt = face ? face.clone() : null;
     return new Promise((res) => { this.onArrive = res; });
   }
   /** Run through several points in order. */
   async runPath(points, speed = this.speed) { for (const p of points) await this.runTo(p, speed); }
   distTo(p) { return Math.hypot(this.pos.x - p.x, this.pos.z - p.z); }
-  stop() { this.target = null; this.vel.set(0, 0, 0); }
+  stop() { this.target = null; this.lookAt = null; this.vel.set(0, 0, 0); }
 
   /** Play a one-shot animation on the visible sheet; resolves when done. */
   playSpecial(name, { hold = 0 } = {}) {
@@ -66,13 +66,14 @@ export class Hero {
 
   update(dt) {
     const w = this.world, cam = w.camera;
+    const lift = topDownLift(cam); this.front.sprite.position.y = lift; this.back.sprite.position.y = lift;   // visible from the puzzle camera
     // ---- movement
     let move = this._tmp.set(0, 0, 0); let moving = false;
     if (this.control && this.target && w.input.axis().active) { this.target = null; this.onArrive = null; } // player takes over from auto-run
     if (this.target) {
       move.copy(this.target).sub(this.pos).setY(0);
       const d = move.length();
-      if (d < 0.35) { this.target = null; this.vel.set(0, 0, 0); const cb = this.onArrive; this.onArrive = null; if (cb) cb(); }
+      if (d < 0.35) { this.target = null; this.vel.set(0, 0, 0); if (this.lookAt) { this.faceTo(this.lookAt); this.lookAt = null; } const cb = this.onArrive; this.onArrive = null; if (cb) cb(); }
       else { move.normalize(); moving = true; }
     } else if (this.control) {
       const ax = w.input.axis();
@@ -85,7 +86,7 @@ export class Hero {
       if (tap) { const p = w.floorPoint(tap.x, tap.y); if (p) { if (this.boundsRadius && p.length() > this.boundsRadius) p.setLength(this.boundsRadius); this.target = p.clone(); this.fx && this.fx.marker(p); } }
     }
     const spd = this.target && !this.control ? (this.runSpeed || this.speed) : this.speed;
-    if (moving) { this.vel.lerp(move.multiplyScalar(spd), 1 - Math.exp(-12 * dt)); this.face(this.vel); }
+    if (moving) { this.vel.lerp(move.multiplyScalar(spd), 1 - Math.exp(-12 * dt)); this.face(this.lookAt ? this._tmp2.copy(this.lookAt).sub(this.pos) : this.vel); }
     else this.vel.multiplyScalar(Math.exp(-14 * dt));
     this.pos.addScaledVector(this.vel, dt);
     const bc = this.boundsCenter, dx = this.pos.x - bc.x, dz = this.pos.z - bc.z, l = Math.hypot(dx, dz);
@@ -96,7 +97,9 @@ export class Hero {
     if (speedNow > 1.5) { this.stepTimer -= dt * (speedNow / 6); if (this.stepTimer <= 0) { this.stepTimer = 0.3; audio.play(this.surface === 'grass' ? 'step.grass' : 'step.stone', { minGap: 0.12 }); if (this.fx) this.fx.dust(this.pos); } }
     // ---- choose sheet: back when facing away from camera
     if (!this.special) {
-      const toCam = this._tmp2.copy(cam.position).sub(this.pos).setY(0).normalize();
+      // the camera's viewing direction (not its position): sprites face the camera plane, and from the near-vertical puzzle
+      // camera (shifted sideways for the panel) the hero→camera vector is almost sideways and picked the wrong sheet
+      const toCam = this._tmp2.set(0, 0, 1).applyQuaternion(cam.quaternion).setY(0).normalize();
       const facingCam = this.facing.dot(toCam);
       const showBack = facingCam < -0.15 ? true : facingCam > 0.15 ? false : this.back.sprite.visible;
       this.showFront(!showBack);

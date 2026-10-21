@@ -71,6 +71,17 @@ function shadowTexture() {
   _shadowTex = new THREE.CanvasTexture(c); return _shadowTex;
 }
 /** Soft blob shadow lying on the floor. */
+/** How far to raise standing character sprites off the floor for the current camera (metres).
+ *  A camera-facing sprite seen from a near-vertical camera lies almost flat, a few cm above the floor, where the ring
+ *  floors' depth offsets (they keep overlapping rings from flickering) win the depth test and hide it. Lifting it
+ *  0.35 m in steep views fixes that; the parallax at 85° is ~3 cm, so nothing visibly moves. 0 below 55° pitch. */
+const _fwd = new THREE.Vector3();
+export function topDownLift(camera) {
+  _fwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  const pitch = Math.asin(Math.min(1, Math.max(-1, -_fwd.y))) * 57.2958;
+  return Math.min(1, Math.max(0, (pitch - 55) / 25)) * 0.35;
+}
+
 export function makeShadow(radius = 0.5, opacity = 1) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false, opacity }));
   m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.renderOrder = -1; return m;
