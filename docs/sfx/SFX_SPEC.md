@@ -40,6 +40,7 @@ Anti-fatigue rules (tuned 2026-10-19 after playtest feedback about sounds "here 
 | `hatch.open` | the floor hatch splits open | click, stone grind with hiss, clunk | 1.3 s | "stone hatch sliding open, grinding, hydraulic hiss, clunk" |
 | `gun.rise` | the Sector Laser Gun rises from the floor | rising mechanical rumble, lock clunk, chime | 1.8 s | "ancient machine rising from the ground, rumble, metal lock, crystalline chime" |
 | `bots.notice` | the guardians notice Karan | three rising blips + low growl swell | 0.9 s | "robots powering up to alert, three rising beeps, low electric growl" |
+| `bots.stasis` | the camera goes top-down and the guardians lock in stasis (also the retry squad shimmering in) | falling filtered shimmer + descending sine + two glassy notes | 0.6 s | "sci-fi freeze field locking, icy crystalline shimmer, short and soft" |
 | `gate.unlock` | exit lock disengages | ascending 4-note chime + shimmer | 1.3 s | "ancient mechanism unlocking, ascending magical chime with shimmer" |
 | `breach.open` | wall section collapses | long rumble + cracking stones | 2.2 s | "stone wall collapsing into the ground, rumble, cracking rocks, debris" |
 | `alarm` | ENEMIES INCOMING | two-tone klaxon ×4 | 0.8 s | "retro two-tone alarm klaxon, four pulses, cartoon" |

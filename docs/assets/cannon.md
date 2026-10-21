@@ -5,7 +5,7 @@
 | **Save as** | `assets/sprites/cannon.png` |
 | **Type** | Single image (PNG-32 with alpha) |
 | **Canvas size** | 336 × 305 px |
-| **World scale** | 4 m tall (pedestal ≈ 4.4 m wide, matching the drum) |
+| **World scale** | 2.5 m tall (≈ 2.7 m wide; the pedestal sits on a 3 m stone drum) |
 | **Priority** | P0 |
 | **Manifest key** | `cannon` |
 

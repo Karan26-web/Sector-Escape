@@ -314,8 +314,10 @@ export class ChainWorld {
     const top = new THREE.Mesh(deckGeo, new THREE.MeshLambertMaterial({ map: assets.texture('causeway_stone', { repeat: [1, L / 8] }), color: 0xffffff })); top.position.y = 0.005; g.add(top);
     const sideTex = assets.texture('causeway_side', { repeat: [L / 6, 1] });
     const under = new THREE.Mesh(new THREE.BoxGeometry(L, 1.6, w + 1.0), new THREE.MeshLambertMaterial({ map: sideTex, color: 0x9aa094 })); under.position.y = -0.82; g.add(under);
+    // parapets stop inside ring 1's wall thickness (they used to poke through into the ring beside the gate)
+    const a0 = CHAIN.arenas[0], lat = w / 2 + 0.25, pEnd = L / 2 - 1 - (Math.sqrt((a0.R + T) ** 2 - lat * lat) - 0.08 - a0.R), pLen = pEnd + L / 2;
     for (const s of [-1, 1]) {
-      const par = new THREE.Mesh(new THREE.BoxGeometry(L, 0.9, 0.5), new THREE.MeshLambertMaterial({ map: sideTex, color: 0xb8bcae })); par.position.set(0, 0.45, s * (w / 2 + 0.25)); g.add(par);
+      const par = new THREE.Mesh(new THREE.BoxGeometry(pLen, 0.9, 0.5), new THREE.MeshLambertMaterial({ map: sideTex, color: 0xb8bcae })); par.position.set((pEnd - L / 2) / 2, 0.45, s * lat); g.add(par);
       for (let x = -L / 2 + 9; x < L / 2 - 4; x += 9) {
         const post = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.2, 0.34), new THREE.MeshLambertMaterial({ color: 0x4a4f55 })); post.position.set(x, 1.4, s * (w / 2 + 0.25)); g.add(post);
         const spr = new AnimatedSprite('torch', { worldHeight: 1.5, center: [0.5, 0.2] }); spr.time = this.rnd(0, 10); spr.sprite.position.set(x, 1.9, s * (w / 2 + 0.25)); g.add(spr.sprite); this.animTorches.push({ spr, ring: -1, k: 1 });

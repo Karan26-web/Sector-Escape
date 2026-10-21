@@ -133,10 +133,12 @@ export class Cannon {
     tweens.to(this.fill.material.uniforms.opacity, { value: 0.16 }, { duration: 0.8 });
     const arcEdge = new THREE.Mesh(new THREE.RingGeometry(R - 0.16 * lw, R - 0.02, Math.max(12, Math.round(theta / 2)), 1, a0 * DEG, theta * DEG), new THREE.MeshBasicMaterial({ color: 0x9ff7f2, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     arcEdge.rotation.x = -Math.PI / 2; arcEdge.position.y = 0.1; this.overlays.add(arcEdge); tweens.to(arcEdge.material, { opacity: 0.7 }, { duration: 0.6 });
-    // central angle: arc near the centre + label
-    const ar = Math.max(3.6, R * 0.24);
+    // central angle: a small arc at the vertex (just outside the gun) + its label OUTSIDE the sector beside the arc's end,
+    // mirroring the r label on the other edge, so no label ever sits on top of the guardians standing inside the arc
+    const ar = Math.max(2.6, R * 0.2);
     let arc = null; const mkArc = (len) => { if (arc) { this.overlays.remove(arc); arc.geometry.dispose(); } arc = new THREE.Mesh(new THREE.RingGeometry(ar, ar + 0.16 * lw, Math.max(8, Math.round(len / 3)), 1, a0 * DEG, Math.max(0.01, len) * DEG), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); arc.rotation.x = -Math.PI / 2; arc.position.y = 0.1; this.overlays.add(arc); };
-    W.labels.add('theta', 'θ = 0°', { className: 'measure theta', worldPos: this.worldPos(breachDeg, ar + 1.6, 0.4) });
+    const tp = polar(a1, ar + 0.3), toff = polar(a1 + 90, Math.max(1.6, R * 0.09) + 0.6);
+    W.labels.add('theta', 'θ = 0°', { className: 'measure theta', worldPos: new THREE.Vector3(this.C.x + tp.x + toff.x, 0.4, this.C.z + tp.z + toff.z) });
     audio.play('label.pop');
     await tweenValue(0, theta, 0.55, (v) => { mkArc(v); W.labels.set('theta', `θ = ${Math.round(v)}°`); }, { ease: Ease.outCubic });
     // radius along the first radial line

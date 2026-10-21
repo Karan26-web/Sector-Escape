@@ -23,7 +23,10 @@ export class BotManager {
   constructor(world, fx) {
     this.world = world; this.fx = fx; this.group = new THREE.Group(); world.add(this.group);
     this.bots = []; this.onReach = null; this.active = false; this.frozen = false; this.waveTime = 0; this.budget = 1; this.speedMul = 1; this.stepCooldown = 0;
-    this.C = new THREE.Vector3(); this.R = 14; this.scale = 1;
+    this.C = new THREE.Vector3(); this.R = 14; this.scale = 1; this.time = 0;
+    // stasis field: a pulsing cyan ring under every frozen guardian (reads clearly from the top-down camera)
+    this.stasisGeo = new THREE.RingGeometry(0.6, 0.8, 32); this.stasisGeo.rotateX(-Math.PI / 2); this.stasisK = 0;
+    this.stasisMat = new THREE.MeshBasicMaterial({ color: 0x8ff0ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   }
   get alive() { return this.bots.filter((b) => b.state !== 'dead' && b.state !== 'dying'); }
   get nearestR() { const a = this.alive; return a.length ? Math.min(...a.map((b) => b.r)) : Infinity; }
@@ -41,9 +44,10 @@ export class BotManager {
       const spr = new AnimatedSprite('enemy_bot', { worldHeight: 2.1, anim: 'idle', tint });
       spr.setScale(scale);
       const shadow = makeShadow(0.7, 0.8);
-      const g = new THREE.Group(); g.add(spr.sprite, shadow); this.group.add(g);
+      const ring = new THREE.Mesh(this.stasisGeo, this.stasisMat); ring.position.y = 0.07; ring.renderOrder = 10; ring.visible = false; ring.scale.setScalar(scale);
+      const g = new THREE.Group(); g.add(spr.sprite, shadow, ring); this.group.add(g);
       const rHalt = Math.min(rArc - 0.5, halt + (i % 2) * RANK_GAP);   // alternate ranks so the squad never blobs together
-      const bot = { g, spr, shadow, deg, r: rArc, r0: rArc, rHalt, speed: v0 * (0.92 + Math.random() * 0.16), state: 'walking', phase: Math.random() * Math.PI * 2, delay: Math.random() * 0.35, y: 0 };
+      const bot = { g, spr, shadow, ring, deg, r: rArc, r0: rArc, rHalt, speed: v0 * (0.92 + Math.random() * 0.16), state: 'walking', phase: Math.random() * Math.PI * 2, delay: Math.random() * 0.35, y: 0 };
       spr.time = Math.random() * 3;
       this.place(bot); this.bots.push(bot);
     }
@@ -59,7 +63,9 @@ export class BotManager {
    *  instant = no tween (a squad spawned straight into stasis). */
   freeze(on, instant = false) {
     if (this.frozen === on) return; this.frozen = on;
+    if (instant) this.stasisK = on ? 1 : 0; else tweens.to(this, { stasisK: on ? 1 : 0 }, { duration: 0.35 });
     for (const b of this.alive) {
+      b.ring.visible = true;
       const c = b.spr.material.color, from = c.clone(), to = on ? STASIS : WHITE;
       if (instant) c.copy(to); else tweens.add({ duration: 0.3, delay: on ? Math.random() * 0.12 : 0, onUpdate: (e) => c.lerpColors(from, to, e) });
     }
@@ -83,7 +89,7 @@ export class BotManager {
     if (b.state === 'dying' || b.state === 'dead') return; b.state = 'dying';
     tweens.delay(delayS).promise.then(() => {
       if (!this.bots.includes(b)) return;
-      b.spr.material.color.copy(WHITE);   // the stasis shell shatters with it
+      b.spr.material.color.copy(WHITE); b.ring.visible = false;   // the stasis shell shatters with it
       b.spr.play('death', { restart: true, onComplete: () => { b.state = 'dead'; this.group.remove(b.g); b.spr.dispose(); } });
       const p = b.g.position.clone(); p.y = 0.9;
       this.fx.explosion(p, 2.6); this.fx.smoke(p, 3);
@@ -101,7 +107,7 @@ export class BotManager {
     return new Promise((res) => {
       let hit = false;
       bots.forEach((b, i) => {
-        b.state = 'lunging';
+        b.state = 'lunging'; b.ring.visible = false;
         const from = b.g.position.clone(), to = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.4, 0, (Math.random() - 0.5) * 1.4));
         const rel = to.clone().sub(this.C); if (rel.length() < PEDESTAL_R) { rel.setLength(PEDESTAL_R); to.copy(this.C).add(rel); }
         const d = from.distanceTo(to), dur = clamp(d / 14, 0.45, 1.3), dl = i * 0.12;
@@ -115,6 +121,7 @@ export class BotManager {
 
   update(dt) {
     if (this.active) this.waveTime += dt;
+    this.time += dt; this.stasisMat.opacity = this.stasisK * (0.5 + 0.18 * Math.sin(this.time * 5));
     if (this.stepCooldown > 0) this.stepCooldown -= dt;
     for (const b of this.bots) {
       const standing = b.state === 'walking' || b.state === 'holding';
