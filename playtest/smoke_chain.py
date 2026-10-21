@@ -5,12 +5,15 @@ BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8321/"
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screens") + "/"; os.makedirs(OUT, exist_ok=True)
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 async def phase(pg): return await pg.evaluate("window.__se ? window.__se.phase : null")
-async def wait_phase(pg, want, timeout=150):
+ORDER = ['causeway', 'gate', 'inside', 'alert', 'run', 'rise', 'tactical', 'scan', 'input']
+async def wait_phase(pg, want, timeout=150, or_later=False):
+    """Wait for a phase; with or_later, also accept any later phase of the same arena intro (screenshots can be slow)."""
     t0 = time.time(); last = None
     while time.time() - t0 < timeout:
         p = await phase(pg)
         if p != last: print(f"   phase → {p}"); last = p
         if p == want: return True
+        if or_later and want in ORDER and p in ORDER and ORDER.index(p) > ORDER.index(want): return True
         await pg.wait_for_timeout(150)
     print(f"!! timeout waiting for {want} (at {last})"); return False
 async def main():
@@ -29,10 +32,10 @@ async def main():
             await wait_phase(pg, "causeway", 40); await pg.wait_for_timeout(2600); await shot("03_causeway")
             await wait_phase(pg, "gate", 60); await pg.wait_for_timeout(1200); await shot("04_gate_opening")
             await wait_phase(pg, "inside", 60); await pg.wait_for_timeout(3200); await shot("05_inside_reveal")
-            await wait_phase(pg, "alert", 30); await pg.wait_for_timeout(1000); await shot("06_alert")
-            await wait_phase(pg, "run", 30); await pg.wait_for_timeout(1500); await shot("07_run")
-            await pg.keyboard.down("KeyW"); await wait_phase(pg, "rise", 60); await pg.keyboard.up("KeyW"); await pg.wait_for_timeout(1600); await shot("08_rise")
-            await wait_phase(pg, "scan", 40); await pg.wait_for_timeout(2600); await shot("09_scan")
+            await wait_phase(pg, "alert", 30, or_later=True); await pg.wait_for_timeout(1000); await shot("06_alert")
+            await wait_phase(pg, "run", 30, or_later=True); await pg.wait_for_timeout(1500); await shot("07_run")
+            await pg.keyboard.down("KeyW"); await wait_phase(pg, "rise", 60, or_later=True); await pg.keyboard.up("KeyW"); await pg.wait_for_timeout(1600); await shot("08_rise")
+            await wait_phase(pg, "scan", 40, or_later=True); await pg.wait_for_timeout(2600); await shot("09_scan")
             await wait_phase(pg, "input", 40); await pg.wait_for_timeout(1200); await shot("10_input")
             await pg.evaluate("__se.fire('30')"); await pg.wait_for_timeout(2300); await shot("11_under_fire")
             await wait_phase(pg, "result", 40); await pg.wait_for_timeout(2500); await shot("12_under_lunge")

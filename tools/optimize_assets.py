@@ -1,5 +1,5 @@
 """
-Convert every PNG under assets/ to WebP (lossy colour, lossless alpha), update
+Convert the PNGs listed in assets/manifest.json to WebP (lossy colour, lossless alpha), update
 assets/manifest.json paths and delete the PNGs. Re-run it whenever new art lands.
     python3 tools/optimize_assets.py            # convert + report
     python3 tools/optimize_assets.py --dry-run  # report only
@@ -15,10 +15,19 @@ def quality(path, im):
     if '/ui/' in path and im.width * im.height >= 1920 * 1080: return 84
     return 90
 before = after = 0; converted = []
+# SAFETY: only convert images the game actually loads (listed in assets/manifest.json). Loose files dropped into
+# assets/ (source sheets, previews, zips) are reported and left untouched.
+_m = json.load(open(MANIFEST)); wanted = set()
+for d in _m['images'].values():
+    p = d.get('path', '')
+    if p: wanted.add(os.path.normpath(os.path.join(ASSETS, p[:-5] + '.png' if p.endswith('.webp') else p)))
+loose = []
 for root, _, files in os.walk(ASSETS):
     for f in sorted(files):
         if not f.lower().endswith('.png'): continue
-        src = os.path.join(root, f); dst = src[:-4] + '.webp'
+        src = os.path.join(root, f)
+        if os.path.normpath(src) not in wanted: loose.append(os.path.relpath(src, ASSETS)); continue
+        dst = src[:-4] + '.webp'
         im = Image.open(src); q = quality(src.replace(os.sep, '/'), im)
         b = os.path.getsize(src); before += b
         if not DRY:
@@ -26,6 +35,7 @@ for root, _, files in os.walk(ASSETS):
             os.remove(src)
         a = os.path.getsize(dst) if os.path.exists(dst) else 0; after += a
         converted.append((os.path.relpath(src, ASSETS), b, a, q))
+if loose: print('left untouched (not in manifest):', ', '.join(loose))
 m = json.load(open(MANIFEST))
 for k, d in m['images'].items():
     if d.get('path', '').endswith('.png'):

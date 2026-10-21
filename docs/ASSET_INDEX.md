@@ -14,48 +14,51 @@ Shared rules for every prompt are in [STYLE_GUIDE.md](STYLE_GUIDE.md). Verify sp
 | 2 | Hero – Back sprite sheet | `assets/sprites/hero_back.png` | 2048×512 | 8×2 (256×256) | P0 | [hero_back.md](assets/hero_back.md) |
 | 3 | Enemy – Sector Sentinel sprite sheet | `assets/sprites/enemy_bot.png` | 2048×1024 | 8×4 (256×256) | P0 | [enemy_bot.md](assets/enemy_bot.md) |
 | 4 | Boss – The Sector Warden sprite sheet | `assets/sprites/boss_warden.png` | 4096×1536 | 8×3 (512×512) | P1 | [boss_warden.md](assets/boss_warden.md) |
-| 5 | Sector Laser Gun (pedestal) | `assets/sprites/cannon.png` | 1024×1024 | — | P0 | [cannon.md](assets/cannon.md) |
-| 6 | Wall torch – flame flicker sheet | `assets/sprites/torch.png` | 512×256 | 4×1 (128×256) | P0 | [torch.md](assets/torch.md) |
-| 7 | Jungle trees – 4 variants | `assets/sprites/jungle_tree.png` | 2048×1024 | 4×1 (512×1024) | P0 | [jungle_tree.md](assets/jungle_tree.md) |
-| 8 | Jungle plants – 4 variants | `assets/sprites/jungle_plant.png` | 2048×512 | 4×1 (512×512) | P1 | [jungle_plant.md](assets/jungle_plant.md) |
-| 9 | Stone idol statue | `assets/sprites/stone_idol.png` | 512×1024 | — | P1 | [stone_idol.md](assets/stone_idol.md) |
-| 10 | Rubble – 4 piles | `assets/sprites/rubble.png` | 1024×256 | 4×1 (256×256) | P2 | [rubble.md](assets/rubble.md) |
-| 11 | Canopy masses – 4 clustered tree groups (redesigned foliage) | `assets/sprites/jungle_canopy.png` | 2048×1024 | 4×1 (512×1024) | P1 | [jungle_canopy.md](assets/jungle_canopy.md) |
-| 12 | Distant forest silhouettes – 4 variants (redesigned foliage) | `assets/sprites/forest_silhouette.png` | 2048×1024 | 4×1 (512×1024) | P2 | [forest_silhouette.md](assets/forest_silhouette.md) |
-| 13 | Jungle boulders – 4 variants | `assets/sprites/jungle_rocks.png` | 2048×512 | 4×1 (512×512) | P0 | [jungle_rocks.md](assets/jungle_rocks.md) |
-| 14 | Stone pillar (wall junction) | `assets/sprites/wall_pillar.png` | 256×1024 | — | P2 | [wall_pillar.md](assets/wall_pillar.md) |
-| 15 | Arena floor (top-down circle) | `assets/textures/arena_floor.png` | 2048×2048 | — | P0 | [arena_floor.md](assets/arena_floor.md) |
-| 16 | Arena wall – tileable stone | `assets/textures/arena_wall.png` | 1024×1024 | — | P0 | [arena_wall.md](assets/arena_wall.md) |
-| 17 | Wall top rim – tileable | `assets/textures/wall_top.png` | 512×128 | — | P2 | [wall_top.md](assets/wall_top.md) |
-| 18 | Jungle ground – tileable | `assets/textures/ground_jungle.png` | 1024×1024 | — | P1 | [ground_jungle.md](assets/ground_jungle.md) |
-| 19 | Dirt path – tileable strip | `assets/textures/path_dirt.png` | 512×1024 | — | P2 | [path_dirt.md](assets/path_dirt.md) |
-| 20 | Jungle backdrop – 360° panorama | `assets/textures/jungle_panorama.png` | 4096×1024 | — | P0 | [jungle_panorama.md](assets/jungle_panorama.md) |
-| 21 | Sky gradient with clouds | `assets/textures/sky.png` | 1024×512 | — | P2 | [sky.md](assets/sky.md) |
-| 22 | Jungle water – tileable | `assets/textures/water.png` | 512×512 | — | P0 | [water.md](assets/water.md) |
-| 23 | Stone causeway deck – tileable strip | `assets/textures/causeway_stone.png` | 512×1024 | — | P0 | [causeway_stone.md](assets/causeway_stone.md) |
-| 24 | Causeway parapet – tileable | `assets/textures/causeway_side.png` | 1024×256 | — | P1 | [causeway_side.md](assets/causeway_side.md) |
-| 25 | Floor hatch (buried gun cap) | `assets/textures/floor_hatch.png` | 512×512 | — | P0 | [floor_hatch.md](assets/floor_hatch.md) |
-| 26 | Seal slab (trap closes behind Karan) | `assets/textures/seal_slab.png` | 1024×1024 | — | P1 | [seal_slab.md](assets/seal_slab.md) |
-| 27 | Entrance gate – stone frame | `assets/textures/gate_small_frame.png` | 1024×1024 | — | P0 | [gate_small_frame.md](assets/gate_small_frame.md) |
-| 28 | Entrance gate – door leaf | `assets/textures/gate_small_door.png` | 512×1024 | — | P0 | [gate_small_door.md](assets/gate_small_door.md) |
-| 29 | Temple gate – ornate stone frame | `assets/textures/gate_large_frame.png` | 2048×2048 | — | P0 | [gate_large_frame.md](assets/gate_large_frame.md) |
-| 30 | [RETIRED] Exit gate – metal door leaf | `assets/textures/gate_large_door.png` | 1024×2048 | — | P2 | [gate_large_door.md](assets/gate_large_door.md) |
-| 31 | [RETIRED] Energy lock glyph | `assets/textures/energy_lock.png` | 512×512 | — | P2 | [energy_lock.md](assets/energy_lock.md) |
-| 32 | Explosion sprite sheet | `assets/sprites/fx_explosion.png` | 2048×256 | 8×1 (256×256) | P0 | [fx_explosion.md](assets/fx_explosion.md) |
-| 33 | Spark particle | `assets/sprites/fx_spark.png` | 128×128 | — | P2 | [fx_spark.md](assets/fx_spark.md) |
-| 34 | Glow sprite | `assets/sprites/fx_glow.png` | 256×256 | — | P2 | [fx_glow.md](assets/fx_glow.md) |
-| 35 | Smoke puff | `assets/sprites/fx_smoke.png` | 256×256 | — | P2 | [fx_smoke.md](assets/fx_smoke.md) |
-| 36 | Shockwave ring | `assets/sprites/fx_shockwave.png` | 512×512 | — | P2 | [fx_shockwave.md](assets/fx_shockwave.md) |
-| 37 | Laser gradient | `assets/sprites/fx_laser.png` | 256×64 | — | P2 | [fx_laser.md](assets/fx_laser.md) |
-| 38 | Game logo | `assets/ui/logo.png` | 1600×900 | — | P0 | [ui_logo.md](assets/ui_logo.md) |
-| 39 | Story parchment panel | `assets/ui/parchment.png` | 1024×768 | — | P1 | [ui_parchment.md](assets/ui_parchment.md) |
-| 40 | Story illustration (polaroid) | `assets/ui/story_illustration.png` | 800×600 | — | P1 | [ui_story_art.md](assets/ui_story_art.md) |
-| 41 | Map backdrop – painted jungle | `assets/ui/map_bg.png` | 1920×1080 | — | P1 | [ui_map_bg.md](assets/ui_map_bg.md) |
-| 42 | Overview arena badges – 4 states | `assets/ui/map_node.png` | 1024×256 | 4×1 (256×256) | P1 | [ui_map_node.md](assets/ui_map_node.md) |
-| 43 | Overview player marker | `assets/ui/map_marker.png` | 256×256 | — | P2 | [ui_map_marker.md](assets/ui_map_marker.md) |
-| 44 | Temple icon | `assets/ui/map_temple.png` | 512×512 | — | P2 | [ui_map_temple.md](assets/ui_map_temple.md) |
-| 45 | HUD shields – full / empty | `assets/ui/shield.png` | 256×128 | 2×1 (128×128) | P1 | [ui_shield.md](assets/ui_shield.md) |
-| 46 | HUD icon set | `assets/ui/icons.png` | 1024×128 | 8×1 (128×128) | P1 | [ui_icons.md](assets/ui_icons.md) |
+| 5 | Sector Cannon – 3/4 view (arena shots) | `assets/sprites/cannon.png` | 336×305 | — | P0 | [cannon.md](assets/cannon.md) |
+| 6 | Sector Cannon – top-down view (puzzle mode) | `assets/sprites/cannon_top.png` | 512×512 | — | P0 | [cannon_top.md](assets/cannon_top.md) |
+| 7 | Sector Cannon – top-down charge sequence (5 frames) | `assets/sprites/cannon_top_charge.png` | 1280×256 | 5×1 (256×256) | P1 | [cannon_top_charge.md](assets/cannon_top_charge.md) |
+| 8 | Cannon charge orbs (4 frames) | `assets/sprites/cannon_orbs.png` | 768×192 | 4×1 (192×192) | P2 | [cannon_orbs.md](assets/cannon_orbs.md) |
+| 9 | Wall torch – flame flicker sheet | `assets/sprites/torch.png` | 512×256 | 4×1 (128×256) | P0 | [torch.md](assets/torch.md) |
+| 10 | Jungle trees – 4 variants | `assets/sprites/jungle_tree.png` | 2048×1024 | 4×1 (512×1024) | P0 | [jungle_tree.md](assets/jungle_tree.md) |
+| 11 | Jungle plants – 4 variants | `assets/sprites/jungle_plant.png` | 2048×512 | 4×1 (512×512) | P1 | [jungle_plant.md](assets/jungle_plant.md) |
+| 12 | Stone idol statue | `assets/sprites/stone_idol.png` | 512×1024 | — | P1 | [stone_idol.md](assets/stone_idol.md) |
+| 13 | Rubble – 4 piles | `assets/sprites/rubble.png` | 1024×256 | 4×1 (256×256) | P2 | [rubble.md](assets/rubble.md) |
+| 14 | Canopy masses – 4 clustered tree groups (redesigned foliage) | `assets/sprites/jungle_canopy.png` | 2048×1024 | 4×1 (512×1024) | P1 | [jungle_canopy.md](assets/jungle_canopy.md) |
+| 15 | Distant forest silhouettes – 4 variants (redesigned foliage) | `assets/sprites/forest_silhouette.png` | 2048×1024 | 4×1 (512×1024) | P2 | [forest_silhouette.md](assets/forest_silhouette.md) |
+| 16 | Jungle boulders – 4 variants | `assets/sprites/jungle_rocks.png` | 2048×512 | 4×1 (512×512) | P0 | [jungle_rocks.md](assets/jungle_rocks.md) |
+| 17 | Stone pillar (wall junction) | `assets/sprites/wall_pillar.png` | 256×1024 | — | P2 | [wall_pillar.md](assets/wall_pillar.md) |
+| 18 | Arena floor (top-down circle) | `assets/textures/arena_floor.png` | 2048×2048 | — | P0 | [arena_floor.md](assets/arena_floor.md) |
+| 19 | Arena wall – tileable stone | `assets/textures/arena_wall.png` | 1024×1024 | — | P0 | [arena_wall.md](assets/arena_wall.md) |
+| 20 | Wall top rim – tileable | `assets/textures/wall_top.png` | 512×128 | — | P2 | [wall_top.md](assets/wall_top.md) |
+| 21 | Jungle ground – tileable | `assets/textures/ground_jungle.png` | 1024×1024 | — | P1 | [ground_jungle.md](assets/ground_jungle.md) |
+| 22 | Dirt path – tileable strip | `assets/textures/path_dirt.png` | 512×1024 | — | P2 | [path_dirt.md](assets/path_dirt.md) |
+| 23 | Jungle backdrop – 360° panorama | `assets/textures/jungle_panorama.png` | 4096×1024 | — | P0 | [jungle_panorama.md](assets/jungle_panorama.md) |
+| 24 | Sky gradient with clouds | `assets/textures/sky.png` | 1024×512 | — | P2 | [sky.md](assets/sky.md) |
+| 25 | Jungle water – tileable | `assets/textures/water.png` | 512×512 | — | P0 | [water.md](assets/water.md) |
+| 26 | Stone causeway deck – tileable strip | `assets/textures/causeway_stone.png` | 512×1024 | — | P0 | [causeway_stone.md](assets/causeway_stone.md) |
+| 27 | Causeway parapet – tileable | `assets/textures/causeway_side.png` | 1024×256 | — | P1 | [causeway_side.md](assets/causeway_side.md) |
+| 28 | Floor hatch (buried gun cap) | `assets/textures/floor_hatch.png` | 512×512 | — | P0 | [floor_hatch.md](assets/floor_hatch.md) |
+| 29 | Seal slab (trap closes behind Karan) | `assets/textures/seal_slab.png` | 1024×1024 | — | P1 | [seal_slab.md](assets/seal_slab.md) |
+| 30 | Entrance gate – stone frame | `assets/textures/gate_small_frame.png` | 1024×1024 | — | P0 | [gate_small_frame.md](assets/gate_small_frame.md) |
+| 31 | Entrance gate – door leaf | `assets/textures/gate_small_door.png` | 512×1024 | — | P0 | [gate_small_door.md](assets/gate_small_door.md) |
+| 32 | Temple gate – ornate stone frame | `assets/textures/gate_large_frame.png` | 2048×2048 | — | P0 | [gate_large_frame.md](assets/gate_large_frame.md) |
+| 33 | [RETIRED] Exit gate – metal door leaf | `assets/textures/gate_large_door.png` | 1024×2048 | — | P2 | [gate_large_door.md](assets/gate_large_door.md) |
+| 34 | [RETIRED] Energy lock glyph | `assets/textures/energy_lock.png` | 512×512 | — | P2 | [energy_lock.md](assets/energy_lock.md) |
+| 35 | Explosion sprite sheet | `assets/sprites/fx_explosion.png` | 2048×256 | 8×1 (256×256) | P0 | [fx_explosion.md](assets/fx_explosion.md) |
+| 36 | Spark particle | `assets/sprites/fx_spark.png` | 128×128 | — | P2 | [fx_spark.md](assets/fx_spark.md) |
+| 37 | Glow sprite | `assets/sprites/fx_glow.png` | 256×256 | — | P2 | [fx_glow.md](assets/fx_glow.md) |
+| 38 | Smoke puff | `assets/sprites/fx_smoke.png` | 256×256 | — | P2 | [fx_smoke.md](assets/fx_smoke.md) |
+| 39 | Shockwave ring | `assets/sprites/fx_shockwave.png` | 512×512 | — | P2 | [fx_shockwave.md](assets/fx_shockwave.md) |
+| 40 | Laser gradient | `assets/sprites/fx_laser.png` | 256×64 | — | P2 | [fx_laser.md](assets/fx_laser.md) |
+| 41 | Game logo | `assets/ui/logo.png` | 1600×900 | — | P0 | [ui_logo.md](assets/ui_logo.md) |
+| 42 | Story parchment panel | `assets/ui/parchment.png` | 1024×768 | — | P1 | [ui_parchment.md](assets/ui_parchment.md) |
+| 43 | Story illustration (polaroid) | `assets/ui/story_illustration.png` | 800×600 | — | P1 | [ui_story_art.md](assets/ui_story_art.md) |
+| 44 | Map backdrop – painted jungle | `assets/ui/map_bg.png` | 1920×1080 | — | P1 | [ui_map_bg.md](assets/ui_map_bg.md) |
+| 45 | Overview arena badges – 4 states | `assets/ui/map_node.png` | 1024×256 | 4×1 (256×256) | P1 | [ui_map_node.md](assets/ui_map_node.md) |
+| 46 | Overview player marker | `assets/ui/map_marker.png` | 256×256 | — | P2 | [ui_map_marker.md](assets/ui_map_marker.md) |
+| 47 | Temple icon | `assets/ui/map_temple.png` | 512×512 | — | P2 | [ui_map_temple.md](assets/ui_map_temple.md) |
+| 48 | HUD shields – full / empty | `assets/ui/shield.png` | 256×128 | 2×1 (128×128) | P1 | [ui_shield.md](assets/ui_shield.md) |
+| 49 | HUD icon set | `assets/ui/icons.png` | 1024×128 | 8×1 (128×128) | P1 | [ui_icons.md](assets/ui_icons.md) |
 
 ## Where each asset shows up
 
@@ -63,7 +66,10 @@ Shared rules for every prompt are in [STYLE_GUIDE.md](STYLE_GUIDE.md). Verify sp
 - **Hero – Back sprite sheet** — The player character seen from behind: running along the causeway, into the arena, to the gun and through the open arcs.
 - **Enemy – Sector Sentinel sprite sheet** — Every guardian: stands in the open arc, notices Karan, marches toward the gun, lunges at him, explodes when hit by the laser.
 - **Boss – The Sector Warden sprite sheet** — Final-arena guardian standing behind the last squad in the open arc; destroyed by the perfect blast.
-- **Sector Laser Gun (pedestal)** — The ancient gun that rises from under the floor hatch at the centre of every arena. A billboard, so it must read well from any horizontal angle and from above.
+- **Sector Cannon – 3/4 view (arena shots)** — The cannon rising out of the floor hatch and being activated (low 3/4 camera). The game crossfades to cannon_top when the camera goes top-down.
+- **Sector Cannon – top-down view (puzzle mode)** — Lies flat on the risen drum in the top-down puzzle view, rotated so the barrel points at the open arc. Barrel must point DOWN in the image.
+- **Sector Cannon – top-down charge sequence (5 frames)** — Plays on the top-down cannon during the 1.35 s charge, then holds the last frame while the sector laser fires.
+- **Cannon charge orbs (4 frames)** — Additive glow that grows at the muzzle during the charge (spark → full charge ring).
 - **Wall torch – flame flicker sheet** — Torches on the arena walls and on posts along the causeway (animated flame).
 - **Jungle trees – 4 variants** — Hundreds of billboard trees ringing every arena and crowding both banks of the causeway (instanced).
 - **Jungle plants – 4 variants** — Ferns and bushes at the foot of the walls and along the causeway banks.

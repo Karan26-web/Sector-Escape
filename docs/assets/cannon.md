@@ -1,27 +1,27 @@
-# Sector Laser Gun (pedestal)
+# Sector Cannon – 3/4 view (arena shots)
 
 | | |
 |---|---|
 | **Save as** | `assets/sprites/cannon.png` |
 | **Type** | Single image (PNG-32 with alpha) |
-| **Canvas size** | 1024 × 1024 px |
-| **World scale** | 3.2 m tall |
+| **Canvas size** | 336 × 305 px |
+| **World scale** | 4 m tall (pedestal ≈ 4.4 m wide, matching the drum) |
 | **Priority** | P0 |
 | **Manifest key** | `cannon` |
 
 ## Used for
-The ancient gun that rises from under the floor hatch at the centre of every arena. A billboard, so it must read well from any horizontal angle and from above.
+The cannon rising out of the floor hatch and being activated (low 3/4 camera). The game crossfades to cannon_top when the camera goes top-down.
 
 ## Visual description
-An ancient stone-and-bronze pedestal: a round stepped stone base carved with a ring of glowing cyan glyphs, a dark metal column with two bronze prongs holding a large floating hexagonal CYAN crystal that emits light. Moss on the base. Radially symmetric. The crystal is the focal point.
+The upright ancient Sector Cannon on its round stone-and-bronze pedestal: tall hexagonal cyan crystal crown, two curved bronze wing plates, a glowing cyan core column, a cyan light ring set into the pedestal, a cyan gem plate on the front step, moss on the stones. Seen from the front, camera ~30° above horizon.
 
 ## GPT image prompt (copy–paste)
 
 ```text
-An ancient stone-and-bronze pedestal: a round stepped stone base carved with a ring of glowing cyan glyphs, a dark metal column with two bronze prongs holding a large floating hexagonal CYAN crystal that emits light. Moss on the base. Radially symmetric. The crystal is the focal point.
-Single object, centred, slight high three-quarter view (camera ~25° above horizon), bottom of the base touching the bottom edge, transparent background.
+The upright ancient Sector Cannon on its round stone-and-bronze pedestal: tall hexagonal cyan crystal crown, two curved bronze wing plates, a glowing cyan core column, a cyan light ring set into the pedestal, a cyan gem plate on the front step, moss on the stones. Seen from the front, camera ~30° above horizon.
+Single object, centred, pedestal base touching the bottom edge, transparent background. (Current file was cut from the newCanon2 asset sheet.)
 Art style: 2010s American TV superhero-cartoon look — clean, bold black ink outlines with varied line weight, flat cel-shaded colours with ONE hard-edged shadow tone and ONE small highlight per surface, slightly angular stylised shapes, saturated but grounded palette. No gradients except glows, no photorealism, no 3D render look, no text, no watermark, no signature.
-Output size 1024×1024 px, PNG with transparency.
+Output size 336×305 px, PNG with transparency.
 ```
 
 ## Checklist before dropping it in

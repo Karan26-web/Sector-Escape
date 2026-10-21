@@ -82,7 +82,8 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 
 /* ---------- map: designed 2D route + docked panel ---------- */
 #screen-map { background: var(--jungle-2); }
-#map-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#map-canvas.hovering { cursor: pointer; }
 #map-svg .map-label { font-family: var(--font-head); font-weight: 800; font-size: 30px; letter-spacing: 0.14em; fill: var(--ivory); text-anchor: middle; paint-order: stroke; stroke: rgba(5, 11, 9, 0.85); stroke-width: 6px; }
 .medal { cursor: pointer; transition: opacity 0.2s; }
 .medal .halo { fill: none; stroke: none; }

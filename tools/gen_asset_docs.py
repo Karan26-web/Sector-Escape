@@ -51,10 +51,20 @@ asset("boss_warden", title="Boss – The Sector Warden sprite sheet", path="asse
       desc=f"Three-quarter FRONT view of {BOSS}.", prompt_extra="Three-quarter FRONT view, imposing low-angle feel.", world="6.5 m tall")
 
 # ------------------------------------------------------------------ props
-asset("cannon", title="Sector Laser Gun (pedestal)", path="assets/sprites/cannon.png", prio="P0", kind="single", size=(1024, 1024),
-      used="The ancient gun that rises from under the floor hatch at the centre of every arena. A billboard, so it must read well from any horizontal angle and from above.",
-      desc="An ancient stone-and-bronze pedestal: a round stepped stone base carved with a ring of glowing cyan glyphs, a dark metal column with two bronze prongs holding a large floating hexagonal CYAN crystal that emits light. Moss on the base. Radially symmetric. The crystal is the focal point.",
-      prompt_extra="Single object, centred, slight high three-quarter view (camera ~25° above horizon), bottom of the base touching the bottom edge, transparent background.", world="3.2 m tall")
+asset("cannon", title="Sector Cannon – 3/4 view (arena shots)", path="assets/sprites/cannon.png", prio="P0", kind="single", size=(336, 305),
+      used="The cannon rising out of the floor hatch and being activated (low 3/4 camera). The game crossfades to cannon_top when the camera goes top-down.",
+      desc="The upright ancient Sector Cannon on its round stone-and-bronze pedestal: tall hexagonal cyan crystal crown, two curved bronze wing plates, a glowing cyan core column, a cyan light ring set into the pedestal, a cyan gem plate on the front step, moss on the stones. Seen from the front, camera ~30° above horizon.", prompt_extra="Single object, centred, pedestal base touching the bottom edge, transparent background. (Current file was cut from the newCanon2 asset sheet.)", world="4 m tall (pedestal ≈ 4.4 m wide, matching the drum)")
+asset("cannon_top", title="Sector Cannon – top-down view (puzzle mode)", path="assets/sprites/cannon_top.png", prio="P0", kind="single", size=(512, 512),
+      used="Lies flat on the risen drum in the top-down puzzle view, rotated so the barrel points at the open arc. Barrel must point DOWN in the image.",
+      desc="Perfectly top-down view of the Sector Cannon on its circular pedestal: crystal crown at the top, barrel running down the middle ending in a glowing cyan muzzle near the bottom, bronze ring with four cyan gem blocks, cyan light arcs, moss.", prompt_extra="Top-down orthographic, circle centred and touching all edges, barrel pointing straight down, transparent background.", world="5.3 m")
+asset("cannon_top_charge", title="Sector Cannon – top-down charge sequence (5 frames)", path="assets/sprites/cannon_top_charge.png", prio="P1", kind="sheet", size=(1280, 256), grid=(5, 1), cell=(256, 256),
+      used="Plays on the top-down cannon during the 1.35 s charge, then holds the last frame while the sector laser fires.",
+      anims=[("0", "charge", 5, 4, "once", "core dark → core glowing → bright muzzle → short beam → full beam stub, barrel pointing down")],
+      desc="Top-down Sector Cannon on its pedestal, same design and framing in every cell, the muzzle charging up and a cyan beam starting to fire downward.", prompt_extra="Five cells, identical framing (pedestal circle fills each cell), barrel pointing down.", world="5.3 m")
+asset("cannon_orbs", title="Cannon charge orbs (4 frames)", path="assets/sprites/cannon_orbs.png", prio="P2", kind="sheet", size=(768, 192), grid=(4, 1), cell=(192, 192),
+      used="Additive glow that grows at the muzzle during the charge (spark → full charge ring).",
+      anims=[("0", "grow", 4, 3, "once", "small spark, larger orb, bright orb with rays, orb inside a dashed energy ring")],
+      desc="Cyan energy orbs with white-hot cores and soft halos, each larger and more energised than the last.", prompt_extra="Four orbs, one per cell, centred, transparent background.", world="0.9–3 m")
 asset("torch", title="Wall torch – flame flicker sheet", path="assets/sprites/torch.png", prio="P0", kind="sheet", size=(512, 256), grid=(4, 1), cell=(128, 256),
       used="Torches on the arena walls and on posts along the causeway (animated flame).",
       anims=[("0", "idle", 4, 9, "loop", "flame flickers and sways left/right, slightly different height per frame")],

@@ -4,7 +4,8 @@
 import * as THREE from '../../vendor/three.module.js';
 import { assets } from '../engine/assets.js';
 import { audio } from '../engine/audio.js';
-import { FORMULA_HTML, substituted, hintSteps, PI, CHAIN, MAP_LAYOUT, MAP_LAYOUT_PORTRAIT } from '../game/levels.js';
+import { FORMULA_HTML, substituted, hintSteps, PI, CHAIN } from '../game/levels.js';
+import { MapArt } from './mapArt.js';
 
 const $ = (sel) => document.querySelector(sel);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -74,15 +75,30 @@ export const ui = {
     },
   },
 
-  /* ---------------------------------------------------------- map: a designed 2D expedition route (not the 3D level) */
+  /* ---------------------------------------------------------- map: painted isometric miniature of the real chain */
   map: {
-    selected: null, saveData: null,
-    show({ saveData, selectedId }) {
+    selected: null, saveData: null, art: null, raf: 0,
+    async show({ saveData, selectedId }) {
       ui.hideAll(); ui.show('map'); this.saveData = saveData;
       const first = Math.max(1, Math.min(CHAIN.arenas.length, selectedId || 1));
       this.selected = saveData.cleared[first] || first <= saveData.unlocked ? first : saveData.unlocked;
-      this.render();
-      this._onResize = () => this.render(); window.addEventListener('resize', this._onResize);
+      const cv = $('#map-canvas');
+      if (!this.art) {
+        this.art = new MapArt(cv);
+        cv.addEventListener('pointermove', (e) => { const id = this.art.hit(e.clientX, e.clientY); this.art.hover = id; cv.classList.toggle('hovering', id > 0); });
+        cv.addEventListener('pointerleave', () => { this.art.hover = -1; cv.classList.remove('hovering'); });
+        cv.addEventListener('click', (e) => {
+          const id = this.art.hit(e.clientX, e.clientY); if (id < 0) return;
+          if (!(this.saveData.cleared[id] || id <= this.saveData.unlocked)) { audio.play('ui.error'); return; }
+          audio.play('ui.click'); this.select(id);
+        });
+      }
+      try { await document.fonts.load('800 32px "Barlow Condensed"'); } catch {}
+      this.art.save = saveData; this.art.build(); this.select(this.selected, true);
+      this._onResize = () => { this.art.build(); }; window.addEventListener('resize', this._onResize);
+      let last = performance.now();
+      const loop = (now) => { this.raf = requestAnimationFrame(loop); this.art.frame(Math.min(0.05, (now - last) / 1000)); last = now; };
+      cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(loop);
       return new Promise((res) => {
         const enter = () => { cleanup(); audio.play('ui.confirm'); res(this.selected); };
         const back = () => { cleanup(); res(null); };
@@ -90,69 +106,13 @@ export const ui = {
         $('#btn-enter').addEventListener('click', enter); $('#btn-map-back').addEventListener('click', back);
       });
     },
-    render() {
-      const portrait = window.innerWidth < 760 && window.innerHeight > window.innerWidth;
-      const W = portrait ? 1080 : 1920, H = portrait ? 1920 : 1080, L = portrait ? MAP_LAYOUT_PORTRAIT : MAP_LAYOUT, sd = this.saveData;
-      const svg = $('#map-svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = '';
-      const NS = 'http://www.w3.org/2000/svg', el = (tag, attrs = {}, parent = svg) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); parent.appendChild(e); return e; };
-      const P = (f) => ({ x: f.x * W, y: f.y * H });
-      const defs = el('defs');
-      defs.innerHTML = `<radialGradient id="vig" cx="${portrait ? 50 : 36}%" cy="${portrait ? 36 : 56}%" r="75%"><stop offset="0.45" stop-color="#050a08" stop-opacity="0"/><stop offset="1" stop-color="#050a08" stop-opacity="0.9"/></radialGradient>
-        <radialGradient id="floor"><stop offset="0" stop-color="#4a463b"/><stop offset="1" stop-color="#2b2923"/></radialGradient>
-        <filter id="drop" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#000" flood-opacity="0.6"/></filter>
-        <filter id="glowA" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>`;
-      el('image', { href: imgUrl('ui_map_bg'), x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'xMidYMid slice' });
-      el('rect', { x: 0, y: 0, width: W, height: H, fill: '#0c1714', opacity: 0.22 });
-      el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#vig)' });
-      const pts = [P(L.start), ...L.arenas.map(P), P(L.temple)];
-      const curve = (arr) => { let d = `M ${arr[0].x} ${arr[0].y}`; for (let i = 0; i < arr.length - 1; i++) { const p0 = arr[i - 1] || arr[i], p1 = arr[i], p2 = arr[i + 1], p3 = arr[i + 2] || p2; d += ` C ${p1.x + (p2.x - p0.x) / 6} ${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6} ${p2.y - (p3.y - p1.y) / 6} ${p2.x} ${p2.y}`; } return d; };
-      const full = curve(pts);
-      el('path', { d: full, fill: 'none', stroke: '#050b09', 'stroke-width': 24, 'stroke-linecap': 'round', opacity: 0.55 });
-      el('path', { d: full, fill: 'none', stroke: '#5d574a', 'stroke-width': 14, 'stroke-linecap': 'round' });
-      el('path', { d: full, fill: 'none', stroke: '#f3ebd8', 'stroke-width': 4, 'stroke-dasharray': '3 16', 'stroke-linecap': 'round', opacity: 0.35 });
-      let clearedTo = 0; while (clearedTo < CHAIN.arenas.length && sd.cleared[CHAIN.arenas[clearedTo].level.id]) clearedTo++;
-      if (clearedTo > 0) el('path', { d: curve(pts.slice(0, clearedTo + 1)), fill: 'none', stroke: '#52ded8', 'stroke-width': 4, 'stroke-dasharray': '3 16', 'stroke-linecap': 'round', opacity: 0.95 });
-      // start + temple
-      const st = pts[0], tp = pts[pts.length - 1], fs = portrait ? 44 : 30;
-      el('rect', { x: st.x - 26, y: st.y - 10, width: 52, height: 20, rx: 4, fill: '#776f60', stroke: '#0c1714', 'stroke-width': 3 });
-      el('text', { x: st.x, y: st.y + 46, class: 'map-label' }).textContent = 'START';
-      const ts = portrait ? 230 : 170;
-      el('circle', { cx: tp.x, cy: tp.y, r: ts * 0.42, fill: '#f4bf55', opacity: 0.22, filter: 'url(#glowA)' });
-      el('image', { href: imgUrl('ui_map_temple'), x: tp.x - ts / 2, y: tp.y - ts / 2 - 10, width: ts, height: ts });
-      el('text', { x: tp.x, y: tp.y + ts / 2 + 18, class: 'map-label' }).textContent = 'THE LOST TEMPLE';
-      // medallions
-      this.medals = {};
-      CHAIN.arenas.forEach((a, i) => {
-        const Lv = a.level, p = pts[i + 1], r = (46 + (a.R - 7) * 2.3) * (portrait ? 1.3 : 1);
-        const state = sd.cleared[Lv.id] ? 'cleared' : Lv.id <= sd.unlocked ? 'open' : 'locked';
-        const g = el('g', { class: `medal ${state}${this.selected === Lv.id ? ' selected' : ''}`, transform: `translate(${p.x} ${p.y})` });
-        el('circle', { r: r + 13, class: 'halo' }, g);
-        el('circle', { r: r + 4, fill: '#0a1311', filter: 'url(#drop)' }, g);
-        el('circle', { r, fill: 'url(#floor)' }, g);
-        if (state !== 'locked') {
-          const a0 = (Lv.exitDeg - a.theta / 2) * Math.PI / 180, a1 = (Lv.exitDeg + a.theta / 2) * Math.PI / 180, rs = r * 0.8;
-          el('path', { class: 'wedge', d: `M 0 0 L ${rs * Math.cos(a0)} ${-rs * Math.sin(a0)} A ${rs} ${rs} 0 ${a.theta > 180 ? 1 : 0} 0 ${rs * Math.cos(a1)} ${-rs * Math.sin(a1)} Z` }, g);
-        }
-        el('circle', { r, class: 'rim' }, g);
-        el('circle', { r: r - 8, fill: 'none', stroke: '#1b1a16', 'stroke-width': 2, opacity: 0.8 }, g);
-        if (state === 'locked') { el('rect', { x: -12, y: -4, width: 24, height: 19, rx: 3, class: 'lock' }, g); el('path', { d: 'M -7 -4 V -10 A 7 7 0 0 1 7 -10 V -4', class: 'lock-arc' }, g); }
-        else el('text', { y: r * 0.18 + 9, class: 'num', 'font-size': Math.round(r * 0.62) }, g).textContent = Lv.id;
-        if (state === 'cleared') { const c = el('g', { transform: `translate(${r * 0.72} ${r * 0.72})` }, g); el('circle', { r: 15, class: 'seal' }, c); el('path', { d: 'M -6 0 L -2 5 L 7 -5', class: 'tick' }, c); }
-        el('text', { y: r + (portrait ? 54 : 36), class: 'medal-name' }, g).textContent = state === 'locked' ? '' : Lv.name;
-        g.addEventListener('click', () => { if (state === 'locked') { g.classList.remove('shake'); void g.getBBox(); g.classList.add('shake'); audio.play('ui.error'); return; } this.select(Lv.id); audio.play('ui.click'); });
-        this.medals[Lv.id] = g;
-      });
-      this.select(this.selected, true);
-    },
     select(id, silent = false) {
-      const a = CHAIN.arenas[id - 1], L = a.level, sd = this.saveData; this.selected = id;
-      Object.entries(this.medals || {}).forEach(([k, g]) => g.classList.toggle('selected', +k === id));
+      const a = CHAIN.arenas[id - 1], L = a.level, sd = this.saveData; this.selected = id; if (this.art) this.art.selected = id;
       $('#mp-num').textContent = L.id; $('#mp-name').textContent = L.name; $('#mp-tag').textContent = L.tagline;
       $('#mp-r').textContent = `${a.R} m`; $('#mp-t').textContent = `${a.theta}°`; $('#mp-g').textContent = L.speed;
       $('#mp-stars').innerHTML = starsHtml(sd.stars[L.id] || 0);
       $('#mp-best').textContent = sd.best[L.id] ? `Best score ${sd.best[L.id]}` : (sd.cleared[L.id] ? '' : 'Not cleared yet');
       $('#btn-enter').textContent = sd.cleared[L.id] ? 'Replay arena' : (L.id === 1 ? 'Enter the jungle' : 'Enter arena');
-      // mini diagram: the sector this arena asks for
       const d = $('#mp-diagram'), cx = 100, cy = 104, rr = 74, a0 = (90 - a.theta / 2) * Math.PI / 180, a1 = (90 + a.theta / 2) * Math.PI / 180;
       d.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${rr}" class="d-ring"/>
         <path d="M ${cx} ${cy} L ${cx + rr * Math.cos(a0)} ${cy - rr * Math.sin(a0)} A ${rr} ${rr} 0 ${a.theta > 180 ? 1 : 0} 0 ${cx + rr * Math.cos(a1)} ${cy - rr * Math.sin(a1)} Z" class="d-sector"/>
@@ -160,9 +120,9 @@ export const ui = {
         <circle cx="${cx}" cy="${cy}" r="4" class="d-hub"/>
         <text x="${cx}" y="${cy - 26}" class="d-theta">θ = ${a.theta}°</text>
         <text x="${cx + rr * 0.55 * Math.cos(a0) + 14}" y="${cy - rr * 0.55 * Math.sin(a0) + 14}" class="d-r">r = ${a.R}</text>`;
-      if (!silent) $('#map-panel').classList.remove('flash'), void $('#map-panel').offsetWidth, $('#map-panel').classList.add('flash');
+      if (!silent) { $('#map-panel').classList.remove('flash'); void $('#map-panel').offsetWidth; $('#map-panel').classList.add('flash'); }
     },
-    hide() { ui.hide('map'); if (this._onResize) window.removeEventListener('resize', this._onResize); },
+    hide() { ui.hide('map'); cancelAnimationFrame(this.raf); if (this._onResize) window.removeEventListener('resize', this._onResize); },
   },
 
   /* ---------------------------------------------------------- results (final), game over, pause */

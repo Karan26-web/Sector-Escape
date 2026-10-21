@@ -72,12 +72,40 @@ export class ArenaScene {
     const pitch = 85 * DEG, pos = target.clone().addScaledVector(u, -D * Math.cos(pitch)).addScaledVector(up, D * Math.sin(pitch));
     return { pos, target, fov };
   }
+  /** Pose (inside the ring) that frames Karan low and the guarded arc high, verified by projecting both. */
+  solveTwoShot(arc, look) {
+    const cam = new THREE.PerspectiveCamera(60, this.world.camera.aspect, 0.3, 500), side = new THREE.Vector3(-look.z, 0, look.x);
+    const guards = this.bots.alive.map((b) => b.g.position.clone().setY(1.1));
+    const gC = guards.length ? guards.reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(1 / guards.length) : arc.clone().setY(1.1);
+    const feet = this.hero.pos.clone().setY(0.05), head = this.hero.pos.clone().setY(1.85), v = new THREE.Vector3();
+    const scr = (p) => { v.copy(p).project(cam); return { x: (v.x + 1) / 2, y: (1 - v.y) / 2, z: v.z }; };
+    let best = null;
+    for (const h of [3.6, 4.4, 5.2, 6.0]) for (const lat of [-3, -1.5, 0, 1.5, 3]) for (const back of [0.5, 1.5, 2.5]) {
+      const pos = this.clampInside(this.hero.pos.clone().addScaledVector(side, lat).addScaledVector(look, -back).add(new THREE.Vector3(0, h, 0)), 0.8);
+      for (const f of [0.25, 0.35, 0.45, 0.55, 0.65]) for (const fov of [56, 62]) {
+        const target = this.hero.pos.clone().lerp(gC, f).setY(0.6);
+        cam.fov = fov; cam.updateProjectionMatrix(); cam.position.copy(pos); cam.lookAt(target); cam.updateMatrixWorld();
+        const F = scr(feet), Hd = scr(head), G = scr(gC);
+        if (F.z > 1 || G.z > 1) continue;
+        const gx = guards.map((g) => scr(g).x), gMin = Math.min(G.x, ...gx), gMax = Math.max(G.x, ...gx);
+        let cost = 0;
+        cost += Math.max(0, F.y - 0.9) * 40 + Math.max(0, 0.62 - Hd.y) * 20;                 // Karan fully in the lower band
+        cost += Math.max(0, 0.24 - G.y) * 30 + Math.max(0, G.y - 0.42) * 20;                 // guardians in the upper band, under the banner
+        cost += Math.max(0, 0.06 - gMin) * 20 + Math.max(0, gMax - 0.94) * 20;               // guardians inside left/right edges
+        if (F.x < 0.32 && F.y > 0.78) cost += 6;                                              // not under the caption box
+        cost += Math.max(0, 0.15 - (F.y - Hd.y)) * 20;                                        // Karan big enough to read
+        cost += Math.abs(F.x - 0.58) * 1.5 + h * 0.05;
+        if (!best || cost < best.cost) best = { cost, pos: pos.clone(), target: target.clone(), fov };
+      }
+    }
+    return best ? { pos: best.pos, target: best.target, fov: best.fov } : { pos: this.hero.pos.clone().addScaledVector(look, -1.5).add(new THREE.Vector3(0, 5, 0)), target: arc.clone(), fov: 62 };
+  }
   followHero(dirFn, lambda = 3.2, { dist = 6.5, height = 3.2, clamp = null } = {}) { this.rig.follow((out) => { const p = this.behindPose(this.hero.pos, dirFn(), dist, height, 56, clamp); out.pos.copy(p.pos); out.target.copy(p.target); out.fov = p.fov; return out; }, lambda); }
   waitFor(cond, { autoAfter = 1e9, auto = null, tick = null } = {}) {
     return new Promise((res) => { let t = 0, autod = false; const u = { update: (dt) => { t += dt; if (tick) tick(dt); if (!autod && auto && t > autoAfter) { autod = true; auto(); } if (cond()) { this.world.removeUpdatable(u); res(); } } }; this.world.addUpdatable(u); });
   }
   spawnSquad(budgetMul = 1) {
-    this.bots.spawnWave({ theta: this.A.theta, breachDeg: this.A.exitDeg, count: botCountFor(this.R, this.A.theta), R: this.R, timeBudget: this.level.timeBudget * budgetMul, center: this.A.center, arena: this.A, scale: 1.12 + Math.max(0, this.R - 14) / 45 });
+    this.bots.spawnWave({ theta: this.A.theta, breachDeg: this.A.exitDeg, count: botCountFor(this.R, this.A.theta), R: this.R, timeBudget: this.level.timeBudget * budgetMul, center: this.A.center, scale: 1.12 + Math.max(0, this.R - 14) / 45 });
     if (this.level.boss && !this.boss) this.boss = new Boss(this.world, this.fx, this.W(this.A.exitDeg, this.R + (this.A.bay ? this.A.bay.D * 0.5 : 0) + 5));
   }
 
@@ -115,6 +143,7 @@ export class ArenaScene {
   async causeway() {
     this.setPhase('causeway');
     const cw = CHAIN.causeway, dir = this.dirDeg(cw.dirDeg);
+    this.chain.fadeOff = true;                                            // the wall and gate stay solid for the whole approach
     this.hero.setPosition(this.V(cw.start)); this.hero.face(dir); this.hero.surface = 'stone'; this.hero.stop();
     audio.ambient.setMode('causeway');
     await this.rig.moveTo(this.behindPose(this.hero.pos, dir, 5.5, 2.6, 58), 2.0);
@@ -124,11 +153,24 @@ export class ArenaScene {
     ui.caption('One way forward: the causeway to the small gate.', 3.6);
     if (await race(this.hero.runTo(this.V(cw.gate).addScaledVector(dir, -8), 6.5)) !== 'skip') {
       this.setPhase('gate'); this.chain.openStartGate();
-      if (await race(this.hero.runTo(this.V(this.A.spawn), 6)) !== 'skip') await race(this.chain.closeStartGate());
+      ui.caption('The gate grinds open…', 2);
+      if (await race(this.hero.runTo(this.V(this.A.spawn), 6)) !== 'skip') await race(this.gateShut());
     }
     ui.skip.hide();
     if (skipped) { tweens.clear(); this.hero.stop(); this.hero.setPosition(this.V(this.A.spawn)); this.chain.resetStartGate(false); this.chain.applySky(this.level.env.sky, 0.1); }
-    await delay(0.5);
+    this.chain.fadeOff = false;
+    await delay(0.3);
+  }
+  /** Inside the ring: Karan turns as the gate slams shut in front of him, seen from inside so nothing hides it. */
+  async gateShut() {
+    const g = this.chain.startGate, gp = g.worldPos.clone(), inward = this.C.clone().sub(gp).setY(0).normalize(), side = new THREE.Vector3(-inward.z, 0, inward.x);
+    this.hero.stop(); this.hero.faceTo(gp);
+    const camPos = this.hero.pos.clone().addScaledVector(inward, 3.4).addScaledVector(side, 1.7).add(new THREE.Vector3(0, 2.3, 0));
+    this.clampInside(camPos, 0.8);
+    await this.rig.moveTo({ pos: camPos, target: gp.clone().add(new THREE.Vector3(0, 1.9, 0)), fov: 56 }, 0.65);
+    await this.chain.closeStartGate(0.5);
+    ui.caption('The gate slams shut behind you. No way back.', 2.6);
+    await delay(1.2);
   }
 
   /* ---------------------------------------------------------------- the fight */
@@ -138,9 +180,17 @@ export class ArenaScene {
     const arc = this.W(this.A.exitDeg, this.R, 1.2), look = arc.clone().sub(this.hero.pos).setY(0).normalize();
     this.hero.face(look);
     // establishing shot: behind and above Karan, the guarded arc filling the frame
-    const Dka = this.hero.distTo(arc), B = this.R * 0.5 + 3.5, Hc = B * 1.05;
+    const Dka = this.hero.distTo(arc);
     this.chain.keepSeals = false;
-    this.rig.moveTo({ pos: this.hero.pos.clone().addScaledVector(look, -B).add(new THREE.Vector3(0, Hc, 0)), target: this.hero.pos.clone().addScaledVector(look, Dka * 0.42), fov: 56 }, 1.6);
+    if (this.index === 0) {
+      // ring 1: the camera must stay inside the wall (the gate he just came through stays solid and shut).
+      // Search a few poses and keep the one whose projection puts Karan in the lower-middle/right (clear of the
+      // caption box) and the guardians in the upper-middle (clear of the banner), with both fully in frame.
+      this.rig.moveTo(this.solveTwoShot(arc, look), 1.6);
+    } else {
+      const B = this.R * 0.5 + 3.5, Hc = B * 1.05;
+      this.rig.moveTo({ pos: this.hero.pos.clone().addScaledVector(look, -B).add(new THREE.Vector3(0, Hc, 0)), target: this.hero.pos.clone().addScaledVector(look, Dka * 0.42), fov: 56 }, 1.6);
+    }
     ui.caption(this.index === 0 ? 'Sealed in. Guardians hold the open arc.' : `Ring ${L.id}. The arc ahead is guarded.`, 2.8);
     await delay(2.0);
     this.setPhase('alert'); audio.play('alarm'); audio.music.setMode(L.boss ? 'boss' : 'arena');

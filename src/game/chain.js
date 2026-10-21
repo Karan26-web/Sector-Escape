@@ -27,7 +27,7 @@ export class ChainWorld {
   constructor(world, fx) {
     this.world = world; this.fx = fx; this.group = new THREE.Group(); world.add(this.group);
     this.H = WALL_HEIGHT; this.rng = mulberry32(4242);
-    this.rings = []; this.seals = []; this.hatches = []; this.animTorches = []; this.lights = []; this.pillarMeshes = []; this.waterMats = []; this.wallPieces = []; this.cutRing = -1; this.keepSeals = false;
+    this.rings = []; this.seals = []; this.hatches = []; this.animTorches = []; this.lights = []; this.pillarMeshes = []; this.waterMats = []; this.wallPieces = []; this.cutRing = -1; this.keepSeals = false; this.fadeOff = false;
     this.skyName = null; this.fogDensity = 0.0034; this.activeIndex = -1; this.focusIndex = -1;
     this.tint = { pano: new THREE.Color(0xffffff), sky: new THREE.Color(0xffffff), foliage: new THREE.Color(0xffffff) };
     this.build();
@@ -432,7 +432,7 @@ export class ChainWorld {
     for (const h of this.hatches) if (h) h.ring.material.opacity = h.glow ? 0.45 + Math.sin(t * 3.2) * 0.25 : Math.max(0, h.ring.material.opacity - dt * 1.5);
     if (this.templeGlow) { this.templeGlow.material.opacity = 0.5 + Math.sin(t * 2) * 0.12; this.templeLight.intensity = 30 + Math.sin(t * 2) * 6; }
     // camera rule: walls of the current ring between the camera and the ring cut away; pillars also fade when the camera brushes past
-    const cr = CHAIN.all[this.cutRing]; let camB = 0, cutOn = false;
+    const cr = this.fadeOff ? null : CHAIN.all[this.cutRing]; let camB = 0, cutOn = false;
     if (cr) { const hx = cam.x - cr.center.x, hz = cam.z - cr.center.z; cutOn = Math.hypot(hx, hz) > cr.R - 0.5 && cam.y > 2 && cam.y < 45; camB = toDeg(hx, hz); }
     const ease = Math.min(1, dt * 5);
     const applyK = (o, k) => { if (Math.abs(k - o.k) < 0.01) return; o.k = k; for (const m of o.mats) { const tr = k < 0.99; if (m.transparent !== tr) { m.transparent = tr; m.needsUpdate = true; } m.opacity = k; m.depthWrite = !tr; } };
@@ -441,15 +441,15 @@ export class ChainWorld {
     const occludes = (px, pz, rad) => { const t = ((px - cam.x) * sx + (pz - cam.z) * sz) / sl2; if (t < 0.02 || t > 0.86) return false; if (cam.y + (tg.y - cam.y) * t > WT) return false; const qx = cam.x + sx * t - px, qz = cam.z + sz * t - pz; return qx * qx + qz * qz < rad * rad; };
     for (const w of this.wallPieces) {
       if (!w.pts) { const o = CHAIN.all[w.ring]; w.pts = (w.a0 != null ? [w.a0, w.mid, w.a1] : [w.mid]).map((d) => { const p = polar(d, o.R + 0.5); return [o.center.x + p.x, o.center.z + p.z]; }); }
-      const blocking = cam.y > 1.5 && w.pts.some(([px, pz]) => occludes(px, pz, 2.0));
+      const blocking = !this.fadeOff && cam.y > 1.5 && w.pts.some(([px, pz]) => occludes(px, pz, 2.0));
       const t = (cutOn && !(w.seal && this.keepSeals) && w.ring === this.cutRing && Math.abs(degDiff(camB, w.mid)) < 72) || (blocking && !(w.seal && this.keepSeals)) ? 0.08 : 1; applyK(w, w.k + (t - w.k) * ease);
     }
     for (const tr of this.animTorches) { if (tr.deg == null) continue; const t = cutOn && tr.ring === this.cutRing && Math.abs(degDiff(camB, tr.deg)) < 72 ? 0 : 1; const c = tr.cut + (t - tr.cut) * ease; if (Math.abs(c - tr.cut) > 0.01 || (t !== tr.cut && Math.abs(c - t) < 0.01)) { tr.cut = Math.abs(c - t) < 0.01 ? t : c; tr.spr.material.opacity = tr.cut; tr.spr.sprite.visible = tr.cut > 0.02; } }
     for (const p of this.pillarMeshes) {
-      const d = Math.hypot(cam.x - p.g.position.x, cam.z - p.g.position.z), near = cam.y < 12 ? Math.min(1, Math.max(0.18, (d - 1.5) / 3.5)) : 1;
+      const d = Math.hypot(cam.x - p.g.position.x, cam.z - p.g.position.z), near = !this.fadeOff && cam.y < 12 ? Math.min(1, Math.max(0.18, (d - 1.5) / 3.5)) : 1;
       let cut = 1;
       if (cutOn) { const o = CHAIN.all[this.cutRing], dx = p.g.position.x - o.center.x, dz = p.g.position.z - o.center.z; if (Math.abs(Math.hypot(dx, dz) - o.R) < 1.6 && Math.abs(degDiff(camB, toDeg(dx, dz))) < 72) cut = 0.08; }   // junction pillars sit on two circles: test against the cut ring itself
-      if (cam.y > 1.5 && occludes(p.g.position.x, p.g.position.z, 1.6)) cut = Math.min(cut, 0.08);
+      if (!this.fadeOff && cam.y > 1.5 && occludes(p.g.position.x, p.g.position.z, 1.6)) cut = Math.min(cut, 0.08);
       applyK(p, p.k + (Math.min(near, cut) - p.k) * ease);
     }
     if (this.fireflies && this.fireflies.visible) for (const fl of this.flies) {

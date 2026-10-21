@@ -8,10 +8,13 @@ import { AnimatedSprite, makeShadow } from '../engine/sprites.js';
 import { audio } from '../engine/audio.js';
 import { polar, degDiff, clamp, Ease } from '../engine/util.js';
 import { tweens } from '../engine/tween.js';
-import { enemyMaxR } from './levels.js';
 
 const ATTACK_R = 2.7;
 const PEDESTAL_R = 2.4;
+// Guardians accelerate as they close in: speed × (1 + ACCEL·p²), p = progress from the arc (0) to the gun (1).
+// Base speed is scaled by ∫₀¹ du / (1 + ACCEL·u²) so the first guardian still arrives on the LXD time budget.
+const ACCEL = 0.6;
+const ACCEL_INTEGRAL = Math.atan(Math.sqrt(ACCEL)) / Math.sqrt(ACCEL);
 
 export class BotManager {
   constructor(world, fx) {
@@ -24,28 +27,22 @@ export class BotManager {
   get threat() { const r = this.nearestR; if (!isFinite(r)) return 0; return clamp(1 - (r - ATTACK_R) / (this.R + 2 - ATTACK_R), 0, 1); }
 
   /** Spawn a squad standing just beyond the open arc (idle until alert()). */
-  spawnWave({ theta, breachDeg, count, R, timeBudget, center, arena = null, tint = null, speedMul = 0.35, scale = 1 }) {
+  /** Spawn the squad standing ON the open arc of the current ring (they trace the sector's curved edge), idle until alert(). */
+  spawnWave({ theta, breachDeg, count, R, timeBudget, center, tint = null, speedMul = 0.35, scale = 1 }) {
     this.clear(); this.R = R; this.budget = timeBudget; this.waveTime = 0; this.active = false; this.theta = theta; this.breachDeg = breachDeg; this.speedMul = speedMul; this.stepCooldown = 0; this.scale = scale;
     if (center) this.C.set(center.x, 0, center.z);
-    const rows = count > 14 ? 3 : 2, perRow = Math.ceil(count / rows);
-    const margin = Math.max(Math.min(6, theta * 0.08), (1.1 / R) * 57.3);
-    let idx = 0;
-    for (let row = 0; row < rows; row++) {
-      const n = Math.min(perRow, count - idx);
-      for (let i = 0; i < n; i++, idx++) {
-        const f = n === 1 ? 0.5 : (i + 0.5 + (row % 2) * 0.25) / (n + 0.5);
-        const deg = breachDeg - theta / 2 + margin + (theta - margin * 2) * f + (Math.random() - 0.5) * 2;
-        const room = arena ? enemyMaxR(arena, deg) - 0.2 : R + 6;
-        const r0 = Math.max(R + 0.9, Math.min(R + 1.3 + row * 2.0 + Math.random() * 0.5, room));
-        const spr = new AnimatedSprite('enemy_bot', { worldHeight: 2.1, anim: 'idle', tint });
-        spr.setScale(scale);
-        const shadow = makeShadow(0.7, 0.8);
-        const g = new THREE.Group(); g.add(spr.sprite, shadow); this.group.add(g);
-        const arrival = timeBudget * (0.94 + Math.random() * 0.12);
-        const bot = { g, spr, shadow, deg, r: r0, r0, speed: (r0 - ATTACK_R) / arrival, state: 'walking', phase: Math.random() * Math.PI * 2, lurch: 1.4 + Math.random() * 0.5, delay: row * 0.9 + Math.random() * 0.7, y: 0 };
-        spr.time = Math.random() * 3;
-        this.place(bot); this.bots.push(bot);
-      }
+    const marginDeg = Math.max(theta * 0.05, (1.7 / R) * 57.2958);   // keep clear of the junction pillars at the arc ends
+    const span = Math.max(0, theta - 2 * marginDeg), rArc = R - 0.55;
+    for (let i = 0; i < count; i++) {
+      const deg = breachDeg + (count === 1 ? 0 : -span / 2 + (span * i) / (count - 1));
+      const spr = new AnimatedSprite('enemy_bot', { worldHeight: 2.1, anim: 'idle', tint });
+      spr.setScale(scale);
+      const shadow = makeShadow(0.7, 0.8);
+      const g = new THREE.Group(); g.add(spr.sprite, shadow); this.group.add(g);
+      const arrival = timeBudget * (0.94 + Math.random() * 0.12), L = Math.max(0.5, rArc - ATTACK_R);
+      const bot = { g, spr, shadow, deg, r: rArc, r0: rArc, speed: (L * ACCEL_INTEGRAL) / arrival, state: 'walking', phase: Math.random() * Math.PI * 2, lurch: 1.4 + Math.random() * 0.5, delay: Math.random() * 0.6, y: 0 };
+      spr.time = Math.random() * 3;
+      this.place(bot); this.bots.push(bot);
     }
   }
   place(b) { const p = polar(b.deg, b.r); b.g.position.set(this.C.x + p.x, 0, this.C.z + p.z); b.spr.sprite.position.y = b.y; }
@@ -107,9 +104,10 @@ export class BotManager {
       if (b.delay > 0) { b.delay -= dt; b.spr.play('idle'); continue; }
       b.phase += (dt * Math.PI * 2) / b.lurch;
       const m = 1 + 0.92 * Math.sin(b.phase);
-      b.r -= b.speed * m * this.speedMul * dt;
-      b.spr.play('walk', { speed: clamp((0.45 + m * 0.5) * Math.max(0.5, this.speedMul), 0.3, 1.5) });
-      if (m > 1.85 && this.stepCooldown <= 0 && b.r < this.R) { this.stepCooldown = 0.45; audio.play('bot.step', { pan: this.pan(b), vol: clamp(0.85 - b.r / this.R, 0.12, 0.55), minGap: 0.3 }); }
+      const prog = clamp(1 - (b.r - ATTACK_R) / Math.max(0.01, b.r0 - ATTACK_R), 0, 1), accel = 1 + ACCEL * prog * prog;   // faster near the gun
+      b.r -= b.speed * m * accel * this.speedMul * dt;
+      b.spr.play('walk', { speed: clamp((0.45 + m * 0.5) * Math.max(0.5, this.speedMul) * accel, 0.3, 1.9) });
+      if (m > 1.85 && this.stepCooldown <= 0 && b.r < this.R) { this.stepCooldown = 0.45 / accel; audio.play('bot.step', { pan: this.pan(b), vol: clamp(0.85 - b.r / this.R, 0.12, 0.55), minGap: 0.25 }); }
       if (b.r <= ATTACK_R) { b.r = ATTACK_R; b.state = 'arrived'; b.spr.play('idle'); if (this.onReach) { const cb = this.onReach; this.onReach = null; cb(b); } }
       this.place(b);
     }
