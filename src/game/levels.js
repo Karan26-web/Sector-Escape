@@ -141,7 +141,7 @@ function buildChain() {
       bay: D ? { D, corners: [-1, 1].map((s) => ({ inner: add(center, polar(L.exitDeg + s * L.theta / 2, R)), outer: add(center, polar(L.exitDeg + s * L.theta / 2, R + D)) })) } : null,
       chord: { mid: add(center, polar(L.exitDeg, ln.h)), width: 2 * ln.c },
       spawn: add(center, polar(entranceDeg, R - (i === 0 ? 2.8 : 3.2))),
-      stand: add(center, polar(L.exitDeg + 180, 3.2)),
+      stand: add(center, polar(L.exitDeg + 180, 2.5)),
       side: [add(center, polar(L.exitDeg + 90, 3.0)), add(center, polar(L.exitDeg - 90, 3.0))],
       map: MAP_LAYOUT.arenas[i],
     };
@@ -187,13 +187,17 @@ function buildChain() {
     const next = all[a.index + 1];
     a.seal = { ring: next.index, arcs: keepRanges((deg) => { const p = add(next.center, polar(deg, next.R)); return insideDisk(p, a) || inBay(a, p, 0); }, 0.25) };
   }
-  // ---- pillars at every wall end (deduped, not on gates)
+  // ---- columns: only where a RING wall ends (the gateposts of each passage) and where a bay wall runs into the next
+  //      ring. The bay's own outer corners are closed by extending its side walls (chain.js), so no stack of columns
+  //      forms along a bay wall.
   const ends = [];
   const pushEnd = (p) => { if (!ends.some((e) => dist(e, p) < 1.0)) ends.push(p); };
-  for (const ring of all) for (const r of ring.wallArcs) if (r.a1 - r.a0 < 359.9) { pushEnd(add(ring.center, polar(r.a0, ring.R))); pushEnd(add(ring.center, polar(r.a1, ring.R))); }
+  const atEdge = (a, d) => !!a.bay && [a.exitDeg - a.theta / 2, a.exitDeg + a.theta / 2].some((e) => Math.abs(degDiff(e, d)) < 0.6);
+  // a ring wall that turns into its bay's side wall is a corner, not an opening: no column there
+  for (const ring of all) for (const r of ring.wallArcs) if (r.a1 - r.a0 < 359.9) for (const d of [r.a0, r.a1]) if (!atEdge(ring, d)) pushEnd(add(ring.center, polar(d, ring.R)));
   for (const a of arenas) if (a.bay) {
-    for (const r of a.bay.outerArcs) { pushEnd(add(a.center, polar(r.a0, a.R + a.bay.D))); pushEnd(add(a.center, polar(r.a1, a.R + a.bay.D))); }
-    for (const w of a.bay.radials) { pushEnd(add(a.center, polar(w.deg, w.r0))); pushEnd(add(a.center, polar(w.deg, w.r1))); }
+    for (const r of a.bay.outerArcs) for (const d of [r.a0, r.a1]) if (!atEdge(a, d)) pushEnd(add(a.center, polar(d, a.R + a.bay.D)));
+    for (const w of a.bay.radials) if (w.r1 < a.R + a.bay.D - 0.05) pushEnd(add(a.center, polar(w.deg, w.r1)));
   }
   const gateSpots = [add(arenas[0].center, polar(arenas[0].gate.deg, arenas[0].R)), sanctuary.gatePos];
   const pillars = ends.filter((p) => gateSpots.every((g) => dist(g, p) > 2.4));

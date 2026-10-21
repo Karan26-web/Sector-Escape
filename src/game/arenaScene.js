@@ -18,7 +18,6 @@ import { audio } from '../engine/audio.js';
 import { ui } from '../ui/ui.js';
 
 const ABORT = Symbol('abort');
-const TIMEOUT = Symbol('timeout');
 
 export class ArenaScene {
   /** mode: 'causeway' (arena 1 from the jungle path) | 'inside' (spawn at the entrance) | 'entering' (Karan just ran in through the arc) */
@@ -204,7 +203,7 @@ export class ArenaScene {
     const L = this.level, A = this.A, R = this.R;
     this.attempt = 0;
     await this.reveal();
-    // ---- run to the centre (player controlled; guardians creep)
+    // ---- run to the centre (player controlled; the guardians march on the gun and hold a ring around it)
     this.setPhase('run');
     const runDir = this.C.clone().sub(this.hero.pos).setY(0).normalize();
     this.followHero(() => runDir, 4.5, { clamp: 1.0 });
@@ -217,16 +216,17 @@ export class ArenaScene {
     this.setPhase('rise');
     const first = this.firstGun, stand = this.V(A.stand);
     await this.hero.runTo(stand, 5); this.hero.faceTo(this.C);
-    this.rig.moveTo({ pos: this.clampInside(stand.clone().addScaledVector(this.dirDeg(A.exitDeg), -5.2).add(new THREE.Vector3(0, first ? 2.2 : 3.4, 0)), 1.0), target: this.C.clone().add(new THREE.Vector3(0, first ? 1.2 : 0.8, 0)), fov: 52 }, first ? 0.8 : 0.5);
+    this.rig.moveTo({ pos: this.clampInside(stand.clone().addScaledVector(this.dirDeg(A.exitDeg), -4.2).add(new THREE.Vector3(0, first ? 1.9 : 2.8, 0)), 1.0), target: this.C.clone().add(new THREE.Vector3(0, first ? 0.9 : 0.7, 0)), fov: 52 }, first ? 0.8 : 0.5);
     this.chain.setHatchGlow(this.index, false);
     await this.chain.openHatch(this.index, first ? 1.0 : 0.6);
     await this.cannon.rise(first ? 1.4 : 0.8);
-    this.hero.keepOutRadius = 2.7; this.hero.boundsCenter.copy(this.C);
+    this.hero.keepOutRadius = 2.0; this.hero.boundsCenter.copy(this.C);
     if (first) { ui.caption('The Sector Cannon wakes. It needs the exact area of the open sector.', 3.4); save.load().seenGun = true; save.write(); this.firstGun = false; }
     await Promise.all([this.hero.playSpecial('activate', { hold: 0.15 }), this.cannon.activate()]);
     if (first) await delay(0.4);
     // ---- tactical view + scan
     this.setPhase('tactical'); audio.play('ui.whoosh'); ui.objective(null);
+    this.bots.freeze(true);   // top-down = thinking time: the guardians lock in stasis until the cannon fires
     this.chain.setFocus(this.index, true, 0.85, { cull: true });
     await this.rig.moveTo(this.tacticalPose(), 0.85, Ease.inOutCubic);
     await delay(0.15);
@@ -237,26 +237,12 @@ export class ArenaScene {
     while (true) {
       this.attempt++;
       this.setPhase('input');
-      this.bots.speedMul = 1;
       if (this.attempt === 1) ui.panel.open({ r: R, theta: A.theta, scaffold: L.scaffold, piFriendly: true, hintLevel: this.hintLevel, attempts: this.attempt, onFire: (v) => this._resolveFire && this._resolveFire(v), onHint: (lvl) => { this.usedHints = true; this.hintLevel = lvl; } });
       else ui.panel.setAttempts(`Attempt ${this.attempt}`);
-      ui.hud.setThreat(this.bots.threat, true);
-      this.bots.onReach = () => this._resolveFire && this._resolveFire(TIMEOUT);
       const t0 = this.world.elapsed;
       const answer = await new Promise((res) => { this._resolveFire = res; });
       this._resolveFire = null; this.timeUsed += this.world.elapsed - t0;
       if (answer === ABORT) throw ABORT;
-      if (answer === TIMEOUT) {
-        this.setPhase('result'); ui.panel.lock();
-        await ui.stamp('under', 'TOO SLOW!', 'The guardians reached the gun'); audio.play('sting.fail');
-        await this.bots.lunge(this.hero.pos, () => this.hitHero('bot'), (b) => b.r < R * 0.5);
-        if (this.shields <= 0) return this.gameOver();
-        this.cannon.pulse(); this.bots.pulseKill(); await delay(1.1);
-        ui.panel.setFeedback({ type: 'bad', title: 'The guardians reached you before you fired.', html: 'Calculate faster this time — the arc is the same: (θ/360) × πr².' });
-        this.hintLevel = Math.min(3, this.hintLevel + 1); if (this.firstTry === null) this.firstTry = false;
-        this.spawnSquad(0.85); this.bots.alert(); ui.panel.unlock(); ui.panel.renderFormula();
-        continue;
-      }
       const res = evaluateAnswer(answer, R, A.theta);
       if (res.status === 'invalid') { ui.panel.setFeedback({ type: 'bad', title: 'Enter a number', html: 'Type the sector area in m², e.g. 38.5' }); audio.play('ui.error'); this.attempt--; continue; }
       // ---- fire
@@ -292,7 +278,7 @@ export class ArenaScene {
       const d = res.diagnosis;
       ui.panel.setFeedback({ type: 'bad', title: d.title, html: `${d.tip}<br><span style="color:#b9cbd4">You entered <b>${res.enteredText}</b> m² — the laser covered <b>${Math.round(res.firedTheta)}°</b> of the <b>${A.theta}°</b> arc.</span>` });
       this.hintLevel = Math.min(3, this.hintLevel + 1); this.usedHints = this.usedHints || this.hintLevel >= 3;
-      this.spawnSquad(0.85); this.bots.alert();
+      this.spawnSquad(0.85); this.bots.active = true; this.bots.freeze(true, true); this.bots.appear();   // the next squad arrives already in stasis
       ui.panel.unlock(); ui.panel.hintLevel = this.hintLevel; ui.panel.renderFormula(); ui.panel.setAttempts(`Attempt ${this.attempt + 1}`);
     }
   }
@@ -377,7 +363,6 @@ export class ArenaScene {
 
   update(dt) {
     if (this.boss) this.boss.update(dt);
-    if (this.phase === 'input') ui.hud.setThreat(this.bots.threat, true);
   }
   dispose() {
     if (this.disposed) return; this.disposed = true; this.aborted = true;

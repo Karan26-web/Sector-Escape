@@ -144,11 +144,12 @@ export class ChainWorld {
     floor.rotation.x = -Math.PI / 2; floor.position.y = -0.006; g.add(floor);
     for (const [a0, a1] of this.splitArcs(a.bay.outerArcs, 24)) g.add(this.wallArc(Rb, a0, a1, col));
     for (const w of a.bay.radials) {
-      const L = w.r1 - w.r0; if (L < 0.3) continue;
+      const r1 = w.r1 >= Rb - 0.05 ? w.r1 + T : w.r1, L = r1 - w.r0; if (L < 0.3) continue;   // reach the outer wall's far face: closed corner, no column
       const wt = assets.texture('arena_wall', {}).clone(); wt.needsUpdate = true; wt.repeat.set(L / H, 1);
       const side = new THREE.MeshLambertMaterial({ map: wt, color: col }), topM = new THREE.MeshLambertMaterial({ map: assets.texture('wall_top', {}), color: 0xb8b8a8 });
-      const box = new THREE.Mesh(new THREE.BoxGeometry(T, H, L), [side, side, topM, topM, side, side]);
-      const mp = polar(w.deg, (w.r0 + w.r1) / 2); box.position.set(mp.x, H / 2, mp.z);
+      const Hb = H + 0.03;   // a hair above the ring wall's cap where they overlap at the inner corner (no z-fight)
+      const box = new THREE.Mesh(new THREE.BoxGeometry(T, Hb, L), [side, side, topM, topM, side, side]);
+      const mp = polar(w.deg, (w.r0 + r1) / 2); box.position.set(mp.x, Hb / 2, mp.z);
       const u = polar(w.deg, 1); box.rotation.y = Math.atan2(u.x, u.z);
       // nudge outward so the wall face lines up with the sector's radial line
       const n = polar(w.deg + 90 * Math.sign(degDiff(a.exitDeg, w.deg)), T / 2); box.position.x += n.x; box.position.z += n.z;
@@ -184,19 +185,19 @@ export class ChainWorld {
     return this._pillarArt;
   }
   buildPillars() {
-    const H = this.H, Hp = H + 0.6, art = this.pillarArt(), capTex = assets.texture('wall_top', {});
+    const H = this.H, Hp = H + 0.35, art = this.pillarArt(), capTex = assets.texture('wall_top', {});
     const oldTex = assets.texture('arena_wall', {}).clone(); oldTex.needsUpdate = true; oldTex.repeat.set(0.6, 1.1);
     for (const p of CHAIN.pillars) {
       const g = new THREE.Group(); g.position.set(p.x, 0, p.z); const mats = [];
       if (art) {
-        const rS = 0.86, hS = Hp * art.fr.shaft, hB = Hp * art.fr.base, hC = Hp * art.fr.cap;
+        const rS = 0.64, hS = Hp * art.fr.shaft, hB = Hp * art.fr.base, hC = Hp * art.fr.cap;
         const part = (b, r0, r1, h, y) => {
           const tex = b.tex.clone(); tex.needsUpdate = true;
           const natural = (b.w / b.h) * h, around = Math.max(2, Math.round((2 * Math.PI * Math.max(r0, r1)) / natural)); tex.repeat.set(around, 1);
           const side = new THREE.MeshLambertMaterial({ map: tex }), topM = new THREE.MeshLambertMaterial({ map: capTex, color: 0xb8b8a8 }), bot = new THREE.MeshLambertMaterial({ color: 0x3a372e });
           const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 16), [side, topM, bot]); m.position.y = y + h / 2; g.add(m); mats.push(side, topM, bot);
         };
-        const rB = Math.min(1.3, rS * (art.base.w / art.shaftW)), rC = Math.min(1.3, rS * (art.cap.w / art.shaftW));
+        const rB = Math.min(0.98, rS * (art.base.w / art.shaftW)), rC = Math.min(0.98, rS * (art.cap.w / art.shaftW));
         part(art.base, rB * 0.97, rB, hB, 0);
         part(art.shaft, rS, rS, hS, hB);
         part(art.cap, rC, rC * 0.92, hC, hB + hS);
@@ -216,45 +217,74 @@ export class ChainWorld {
   /* ---------------------------------------------------------------- hatch (buried gun cap) */
   buildHatch(floorY) {
     const g = new THREE.Group(); g.rotation.x = -Math.PI / 2; g.position.y = floorY + 0.03;
-    const shaft = new THREE.Mesh(new THREE.CircleGeometry(2.25, 40), new THREE.MeshBasicMaterial({ color: 0x050807, polygonOffset: true, polygonOffsetFactor: -20, polygonOffsetUnits: -3 })); shaft.position.z = -0.01; g.add(shaft);
+    const shaft = new THREE.Mesh(new THREE.CircleGeometry(1.6, 40), new THREE.MeshBasicMaterial({ color: 0x050807, polygonOffset: true, polygonOffsetFactor: -20, polygonOffsetUnits: -3 })); shaft.position.z = -0.01; g.add(shaft);
     const tex = assets.texture('floor_hatch', { wrap: false });
-    const mk = (start) => new THREE.Mesh(new THREE.CircleGeometry(2.3, 40, start, Math.PI), new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -30, polygonOffsetUnits: -4 }));
+    const mk = (start) => new THREE.Mesh(new THREE.CircleGeometry(1.66, 40, start, Math.PI), new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -30, polygonOffsetUnits: -4 }));
     const a = mk(-Math.PI / 2), b = mk(Math.PI / 2); g.add(a, b);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(2.42, 2.62, 64), new THREE.MeshBasicMaterial({ color: 0x52ded8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); ring.position.z = 0.02; g.add(ring);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.76, 1.92, 64), new THREE.MeshBasicMaterial({ color: 0x52ded8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); ring.position.z = 0.02; g.add(ring);
     return { group: g, halves: [a, b], ring, shaft, open: false, glow: 0 };
   }
   async openHatch(i, dur = 1.0) {
     const h = this.hatches[i]; if (!h || h.open) return; h.open = true; audio.play('hatch.open');
     const C = this.rings[i].arena.center; this.fx.dust(new THREE.Vector3(C.x, 0, C.z), 4, 0xd8d0b8, 1.1);
-    await Promise.all(h.halves.map((m, k) => tweenTo(m.position, { x: (k === 0 ? 1 : -1) * 3.05, z: -0.22 }, { duration: dur, ease: Ease.inOutCubic })));
+    await Promise.all(h.halves.map((m, k) => tweenTo(m.position, { x: (k === 0 ? 1 : -1) * 2.2, z: -0.22 }, { duration: dur, ease: Ease.inOutCubic })));
     h.halves.forEach((m) => (m.visible = false));
   }
   closeHatch(i) { const h = this.hatches[i]; if (!h) return; h.open = false; h.halves.forEach((m) => { m.visible = true; m.position.set(0, 0, 0); }); h.glow = 0; h.ring.material.opacity = 0; }
   setHatchGlow(i, on) { const h = this.hatches[i]; if (h) h.glow = on ? 1 : 0; }
 
   /* ---------------------------------------------------------------- gate of ring 1 */
+  /** Ring 1's gate as a real archway: carved frame on both faces, a stone passage through the wall thickness, and an
+   *  arch-shaped door that exactly fills the opening (so it can never overlap the arch stones). */
   buildGate(a) {
     const o = a.gate, R = a.R, H = this.H, slot = GATE.smallWidth;
     const fdef = assets.def('gate_small_frame') || {}; const openingF = fdef.opening ?? 0.46, top = fdef.top ?? 0.3;
-    const W = Math.min(slot / openingF, H * 1.15), doorH = W * (1 - top) * 0.98;
+    const W = Math.min(slot / openingF, H * 1.15), ow = W * openingF, apex = W * (1 - top), spring = Math.max(0.6, apex - ow / 2);
     const frameTex = assets.texture('gate_small_frame', { wrap: false }), doorTex = assets.texture('gate_small_door', { wrap: false });
     const g = new THREE.Group(); g.position.set(a.center.x, 0, a.center.z); this.group.add(g);
-    const ang = o.deg * DEG, rotY = Math.atan2(-Math.cos(ang), Math.sin(ang));
-    const face = (radius, outward) => { const p = polar(o.deg, radius); const m = new THREE.Mesh(new THREE.PlaneGeometry(W, W), new THREE.MeshLambertMaterial({ map: frameTex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })); m.position.set(p.x, W / 2, p.z); m.rotation.y = rotY + (outward ? Math.PI : 0); return m; };
-    g.add(face(R - 0.08, false), face(R + T + 0.08, true));
-    const dp = polar(o.deg, R + T * 0.5);
-    const leaf = new THREE.Mesh(new THREE.PlaneGeometry(slot + 0.1, doorH), new THREE.MeshLambertMaterial({ map: doorTex, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 }));
-    leaf.rotation.y = rotY; leaf.position.set(dp.x, doorH / 2, dp.z); g.add(leaf);
-    this.wallPieces.push({ g, ring: a.index, mid: o.deg, mats: g.children.map((c) => c.material), k: 1 });   // the gate cuts away with its wall
-    return { group: g, leaf, doorH, open: false, worldPos: new THREE.Vector3(a.center.x + dp.x, 0, a.center.z + dp.z) };
+    const ang = o.deg * DEG, rotY = Math.atan2(-Math.cos(ang), Math.sin(ang)), mid = polar(o.deg, R + T / 2);
+    const arch = new THREE.Group(); arch.position.set(mid.x, 0, mid.z); arch.rotation.y = rotY; g.add(arch);   // local x along the wall, y up, z through it
+    // both carved frames are bent onto the wall's curve (a flat card would sink behind the concave inner face of a small ring)
+    const Rm = R + T / 2, rIn = R - 0.06, rOut = R + T + 0.06, zAt = (r, x) => Rm - Math.sqrt(r * r - x * x);   // local z of the wall face at lateral x
+    for (const r of [rIn, rOut]) {
+      const fg = new THREE.PlaneGeometry(W, W, 24, 1); if (r === rOut) fg.rotateY(Math.PI);   // outer frame faces out of the ring
+      const fp = fg.attributes.position;
+      for (let i = 0; i < fp.count; i++) { const x = fp.getX(i), ph = x / r; fp.setXYZ(i, r * Math.sin(ph), fp.getY(i) + W / 2, Rm - r * Math.cos(ph)); }
+      fg.computeVertexNormals();
+      arch.add(new THREE.Mesh(fg, new THREE.MeshLambertMaterial({ map: frameTex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })));
+    }
+    // the passage: jambs + arch vault extruded through the wall
+    const outline = [[-ow / 2, 0], [-ow / 2, spring]];
+    for (let k = 1; k < 24; k++) { const t = Math.PI - (Math.PI * k) / 24; outline.push([Math.cos(t) * ow / 2, spring + Math.sin(t) * ow / 2]); }
+    outline.push([ow / 2, spring], [ow / 2, 0]);
+    const pos = [], uv = []; let acc = 0;
+    for (let k = 0; k < outline.length - 1; k++) {
+      const [x0, y0] = outline[k], [x1, y1] = outline[k + 1], len = Math.hypot(x1 - x0, y1 - y0), u0 = acc / 3, u1 = (acc + len) / 3; acc += len;
+      const a0 = zAt(rOut, x0), a1 = zAt(rOut, x1), b0 = zAt(rIn, x0), b1 = zAt(rIn, x1);   // the passage runs frame to frame
+      pos.push(x0, y0, a0, x1, y1, a1, x1, y1, b1, x0, y0, a0, x1, y1, b1, x0, y0, b0);
+      uv.push(u0, 0, u1, 0, u1, 1, u0, 0, u1, 1, u0, 1);
+    }
+    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); tg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); tg.computeVertexNormals();
+    const tt = assets.texture('arena_wall', {}).clone(); tt.needsUpdate = true; tt.repeat.set(1, 0.35);
+    arch.add(new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ map: tt, color: 0x8f8878, side: THREE.DoubleSide })));
+    // the door: an arch-shaped leaf in the middle of the passage
+    const e = 0.03, shape = new THREE.Shape();
+    shape.moveTo(-ow / 2 + e, 0); shape.lineTo(-ow / 2 + e, spring); shape.absarc(0, spring, ow / 2 - e, Math.PI, 0, true); shape.lineTo(ow / 2 - e, 0); shape.closePath();
+    const lg = new THREE.ShapeGeometry(shape, 24), lp = lg.attributes.position, luv = lg.attributes.uv;
+    for (let i = 0; i < lp.count; i++) luv.setXY(i, (lp.getX(i) + ow / 2) / ow, lp.getY(i) / apex);
+    const leaf = new THREE.Mesh(lg, new THREE.MeshLambertMaterial({ map: doorTex, side: THREE.DoubleSide, alphaTest: 0.5 }));
+    arch.add(leaf);
+    const mats = []; g.traverse((c) => { if (c.material) mats.push(c.material); });
+    this.wallPieces.push({ g, ring: a.index, mid: o.deg, mats, k: 1 });   // the gate cuts away with its wall
+    return { group: g, leaf, doorH: apex, openY: -(apex + 0.25), open: false, worldPos: new THREE.Vector3(a.center.x + mid.x, 0, a.center.z + mid.z) };
   }
-  async openStartGate(dur = 1.4) { const g = this.startGate; if (g.open) return; g.open = true; audio.play('gate.open'); this.world.rig.shake(0.06, dur); await tweenTo(g.leaf.position, { y: g.leaf.position.y - g.doorH - 0.15 }, { duration: dur, ease: Ease.inOutCubic }); }
+  async openStartGate(dur = 1.4) { const g = this.startGate; if (g.open) return; g.open = true; audio.play('gate.open'); this.world.rig.shake(0.06, dur); await tweenTo(g.leaf.position, { y: g.openY }, { duration: dur, ease: Ease.inOutCubic }); }
   async closeStartGate(dur = 0.55) {
     const g = this.startGate; if (!g.open) return; g.open = false; audio.play('gate.slam');
-    await tweenTo(g.leaf.position, { y: g.doorH / 2 }, { duration: dur, ease: Ease.inCubic });
+    await tweenTo(g.leaf.position, { y: 0 }, { duration: dur, ease: Ease.inCubic });
     this.world.rig.shake(0.35, 0.4); this.fx.dust(g.worldPos.clone(), 6, 0xd8d0b8, 1.4);
   }
-  resetStartGate(open = false) { const g = this.startGate; g.open = open; g.leaf.position.y = open ? -g.doorH / 2 - 0.15 : g.doorH / 2; }
+  resetStartGate(open = false) { const g = this.startGate; g.open = open; g.leaf.position.y = open ? g.openY : 0; }
 
   /* ---------------------------------------------------------------- seals: the missing arc of the next ring rises */
   buildSeal(a) {

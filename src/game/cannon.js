@@ -59,26 +59,26 @@ export class Cannon {
     this.lift = new THREE.Group(); this.group.add(this.lift);                          // everything that rises out of the hatch shaft
     // stone drum with a bronze rim: the floor section the gun stands on (flush with the floor when risen)
     const PH = 0.42, stoneTex = assets.texture('arena_wall', {}).clone(); stoneTex.needsUpdate = true; stoneTex.repeat.set(2.2, 0.14);
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(2.14, 2.2, 3.8 + PH, 40), [new THREE.MeshLambertMaterial({ map: stoneTex, color: 0x9a9484 }), new THREE.MeshLambertMaterial({ map: assets.texture('wall_top', {}), color: 0x8a8576 }), new THREE.MeshLambertMaterial({ color: 0x2a2822 })]);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.55, 3.8 + PH, 40), [new THREE.MeshLambertMaterial({ map: stoneTex, color: 0x9a9484 }), new THREE.MeshLambertMaterial({ map: assets.texture('wall_top', {}), color: 0x8a8576 }), new THREE.MeshLambertMaterial({ color: 0x2a2822 })]);
     drum.position.y = PH - (3.8 + PH) / 2; this.lift.add(drum);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(2.16, 0.09, 8, 64), new THREE.MeshLambertMaterial({ color: 0xb98a44, emissive: 0x3a2408 })); rim.rotation.x = Math.PI / 2; rim.position.y = PH; this.lift.add(rim);
-    this.shadow = makeShadow(1.25, 0.85); this.shadow.position.y = PH + 0.02; this.lift.add(this.shadow);
-    // 3/4 view (arena shots): the upright cannon on its own ring pedestal, sized so the pedestal matches the drum
-    this.body = makeBillboard('cannon', 4.0); this.body.position.y = PH - 0.05; this.lift.add(this.body);
-    this.glow = makeBillboard('fx_glow', 1.6, { additive: true, tint: 0x52ded8, centerY: 0.5 }); this.glow.position.y = PH + 2.0; this.glow.material.opacity = 0.35; this.lift.add(this.glow);
-    this.ring = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.05, 8, 64), new THREE.MeshBasicMaterial({ color: 0x52ded8, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.52, 0.08, 8, 64), new THREE.MeshLambertMaterial({ color: 0xb98a44, emissive: 0x3a2408 })); rim.rotation.x = Math.PI / 2; rim.position.y = PH; this.lift.add(rim);
+    this.shadow = makeShadow(0.9, 0.85); this.shadow.position.y = PH + 0.02; this.lift.add(this.shadow);
+    // 3/4 view (arena shots): the upright cannon on its own ring pedestal (~2.7 m wide: a prop in the ring, not a building)
+    this.body = makeBillboard('cannon', 2.5); this.body.position.y = PH - 0.05; this.lift.add(this.body);
+    this.glow = makeBillboard('fx_glow', 1.1, { additive: true, tint: 0x52ded8, centerY: 0.5 }); this.glow.position.y = PH + 1.25; this.glow.material.opacity = 0.35; this.lift.add(this.glow);
+    this.ring = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.05, 8, 64), new THREE.MeshBasicMaterial({ color: 0x52ded8, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.ring.rotation.x = Math.PI / 2; this.ring.position.y = PH + 0.03; this.ring.visible = false; this.lift.add(this.ring);   // the cannon art carries its own glowing ring
     // top-down view (puzzle mode): the painted top-down cannon lies on the drum, barrel aimed at the open arc
     this.topTex = assets.texture('cannon_top', { wrap: false });
     const cs = assets.texture('cannon_top_charge', { wrap: false }); this.chargeTex = cs.clone(); this.chargeTex.needsUpdate = true; this.chargeTex.repeat.set(1 / 5, 1);
-    const dg = new THREE.PlaneGeometry(5.3, 5.3); dg.rotateX(-Math.PI / 2);
+    const dg = new THREE.PlaneGeometry(3.2, 3.2); dg.rotateX(-Math.PI / 2);
     this.decal = new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ map: this.topTex, transparent: true, alphaTest: 0.04, depthWrite: false, opacity: 0 }));
     this.decal.position.y = PH + 0.04; this.decal.renderOrder = 12; this.lift.add(this.decal);
     const ot = assets.texture('cannon_orbs', { wrap: false }); this.orbTex = ot.clone(); this.orbTex.needsUpdate = true; this.orbTex.repeat.set(1 / 4, 1);
     this.orb = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.orbTex, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, opacity: 0 }));
     this.orb.renderOrder = 14; this.orb.visible = false; this.lift.add(this.orb);
     this.topW = 0;   // 0 = 3/4 sprite, 1 = top-down decal (driven by camera elevation)
-    this.light = new THREE.PointLight(0x52ded8, 12, 16, 2); this.light.position.y = PH + 2.4; this.lift.add(this.light);
+    this.light = new THREE.PointLight(0x52ded8, 12, 12, 2); this.light.position.y = PH + 1.6; this.lift.add(this.light);
     this.beacon = new THREE.Object3D(); // kept for API compatibility (the hatch ring is the cue now)
     this.overlays = new THREE.Group(); world.add(this.overlays);
     this.lasers = []; this.active = false; this.spin = 0.6; this.t = 0; this.chargeLevel = 0; this.risen = false;
@@ -89,13 +89,13 @@ export class Cannon {
   setArena(a) {
     this.C.set(a.center.x, 0, a.center.z); this.R = a.R; this.group.position.copy(this.C); this.overlays.position.copy(this.C);
     const e = a.exitDeg * DEG; this.decal.rotation.y = Math.atan2(Math.cos(e), -Math.sin(e));   // texture-down (+Z) → exit direction
-    const m = polar(a.exitDeg, 0.7); this.orb.position.set(m.x, 0.9, m.z);
+    const m = polar(a.exitDeg, 0.42); this.orb.position.set(m.x, 0.6, m.z);
     this.reset();
   }
   reset() {
     this.clearOverlays(false); this.lasers = [];
     this.lift.position.y = -4.4; this.lift.visible = false; this.risen = false; this.active = false; this.chargeLevel = 0; this.spin = 0.6;
-    this.glow.material.opacity = 0.35; this.glow.scale.setScalar(1.6); this.glow.material.color.setHex(0x52ded8); this.light.intensity = 12;
+    this.glow.material.opacity = 0.35; this.glow.scale.setScalar(1.1); this.glow.material.color.setHex(0x52ded8); this.light.intensity = 12;
     this.decal.material.map = this.topTex; this.orb.visible = false; this.orb.material.opacity = 0;
   }
   setBeacon() {}
@@ -162,10 +162,10 @@ export class Cannon {
     audio.play('cannon.charge'); this.world.rig.shake(0.05, 1.4);
     this.decal.material.map = this.chargeTex; this.orb.visible = true;
     await tweenValue(0, 1, 1.35, (v) => {
-      this.chargeLevel = v; this.spin = 5 + v * 30; this.glow.material.opacity = 0.35 + v * 0.45; this.glow.scale.setScalar(1.6 + v * 1.4); this.light.intensity = 40 + v * 120; this.glow.material.color.setHSL(0.52 - v * 0.05, 1, 0.6 + v * 0.35);
+      this.chargeLevel = v; this.spin = 5 + v * 30; this.glow.material.opacity = 0.35 + v * 0.45; this.glow.scale.setScalar(1.1 + v * 1.0); this.light.intensity = 40 + v * 120; this.glow.material.color.setHSL(0.52 - v * 0.05, 1, 0.6 + v * 0.35);
       this.chargeTex.offset.x = Math.min(4, Math.floor(v * 5)) / 5;                     // 5 painted frames: core lights → beam stub
       const of = Math.min(3, Math.floor(v * 4)); this.orbTex.offset.x = of / 4;        // 4 painted orbs: spark → full charge ring
-      this.orb.material.opacity = Math.min(1, v * 2.5); this.orb.scale.setScalar(0.9 + v * 2.1);
+      this.orb.material.opacity = Math.min(1, v * 2.5); this.orb.scale.setScalar(0.6 + v * 1.4);
     }, { ease: Ease.inQuad });
   }
   /**
@@ -176,7 +176,7 @@ export class Cannon {
     const R = this.R, W = this.world;
     audio.play('cannon.fire'); const hum = audio.play('laser.loop');
     W.rig.shake(0.45, 0.8);
-    this.fx.flash(this.worldPos(0, 0, 2.4), 0xffffff, 10, 0.5);
+    this.fx.flash(this.worldPos(0, 0, 1.6), 0xffffff, 10, 0.5);
     const fired = clamp(r.firedTheta, 0, 360), covered = Math.min(fired, r.theta);
     const mainStart = r.breachDeg - covered / 2;
     const main = sectorMesh(R, mainStart, covered, 0x66ddff); this.overlays.add(main); this.lasers.push(main);
@@ -219,9 +219,9 @@ export class Cannon {
     kids.forEach((k) => { const mat = k.material; const s = mat.uniforms ? mat.uniforms.opacity.value : mat.opacity; tweenValue(s, 0, 0.6, (v) => { if (mat.uniforms) mat.uniforms.opacity.value = v; else mat.opacity = v; }).then(() => this.overlays.remove(k)); });
     this.chargeLevel = 0;
     tweenValue(1, 0, 0.5, (v) => { this.orb.material.opacity = v; }).then(() => { this.orb.visible = false; this.decal.material.map = this.topTex; this.chargeTex.offset.x = 0; });
-    tweens.to(this.glow.material, { opacity: 0.5 }, { duration: 0.6 }); tweens.add({ duration: 0.8, onUpdate: (e) => { this.glow.scale.setScalar(3 - e * 1.4); this.light.intensity = 160 - e * 120; this.spin = 35 - e * 30; this.glow.material.color.setHSL(0.52, 1, 0.6); } });
+    tweens.to(this.glow.material, { opacity: 0.5 }, { duration: 0.6 }); tweens.add({ duration: 0.8, onUpdate: (e) => { this.glow.scale.setScalar(2.1 - e * 1.0); this.light.intensity = 160 - e * 120; this.spin = 35 - e * 30; this.glow.material.color.setHSL(0.52, 1, 0.6); } });
   }
-  pulse() { audio.play('pulse'); this.fx.shockwave(this.C.clone(), this.R + 2, 0.8, 0xbff6ff); this.fx.flash(this.worldPos(0, 0, 1.5), 0x9ff4ff, 8, 0.5); this.world.rig.shake(0.3, 0.4); }
+  pulse() { audio.play('pulse'); this.fx.shockwave(this.C.clone(), this.R + 2, 0.8, 0xbff6ff); this.fx.flash(this.worldPos(0, 0, 1.1), 0x9ff4ff, 8, 0.5); this.world.rig.shake(0.3, 0.4); }
 
   update(dt, t) {
     this.t = t; this.ring.rotation.z += dt * this.spin;

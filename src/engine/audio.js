@@ -239,6 +239,13 @@ SFX['bots.notice'] = (A) => {
   A.burst({ t0: t + 0.3, dur: 0.5, vol: 0.1, type: 'bandpass', f0: 300, f1: 1500, Q: 1, env: { a: 0.05, d: 0.25, s: 0.4, r: 0.2 } });
 };
 
+SFX['bots.stasis'] = (A) => {   // the guardians lock in a cyan stasis field when the camera goes top-down
+  const t = A.now;
+  A.burst({ t0: t, dur: 0.5, vol: 0.12, type: 'bandpass', f0: 4200, f1: 600, Q: 4, env: { a: 0.01, d: 0.2, s: 0.4, r: 0.25 } });
+  A.tone({ t0: t, type: 'sine', f0: 1600, f1: 420, dur: 0.45, vol: 0.08, env: { a: 0.005, d: 0.2, s: 0.3, r: 0.2 } });
+  A.seq([[88, 0.06, 0.3, 1], [93, 0.14, 0.45, 1]], { type: 'triangle', vol: 0.05 });
+};
+
 // --- Combat -------------------------------------------------------------
 SFX['cannon.charge'] = (A) => {
   const t = A.now, D = 1.35;
