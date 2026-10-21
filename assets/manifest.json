@@ -142,7 +142,7 @@
     },
     "cannon": {
       "path": "sprites/cannon.webp",
-      "worldHeight": 2.5,
+      "worldHeight": 1.8,
       "baseline": 1.0
     },
     "jungle_tree": {

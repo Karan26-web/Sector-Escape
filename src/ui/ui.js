@@ -182,26 +182,47 @@ export const ui = {
   panel: {
     cfg: null, hintLevel: 0, locked: false,
     init() {
-      const keys = ['7', '8', '9', '⌫', '4', '5', '6', '/', '1', '2', '3', '.', '0', 'π', 'C'];
-      const pad = $('#keypad'); pad.innerHTML = '';
-      for (const k of keys) { const b = document.createElement('button'); b.textContent = k; b.className = 'silent' + (k === '0' ? ' wide' : ''); b.addEventListener('click', () => this.key(k)); pad.appendChild(b); }
+      // stone keypad: digits, a column of maths keys (π / .), red delete (hold = clear), green ✓ = FIRE
+      const ICON = {
+        del: '<svg viewBox="0 0 44 30" aria-hidden="true"><path d="M14 3 H40 Q42 3 42 5 V25 Q42 27 40 27 H14 L3 15 Z" fill="#fff6ec" stroke="#3a0f0a" stroke-width="2.6" stroke-linejoin="round"/><path d="M21 10 L31 20 M31 10 L21 20" stroke="#d2402f" stroke-width="3.6" stroke-linecap="round"/></svg>',
+        ok: '<svg viewBox="0 0 44 34" aria-hidden="true"><path d="M7 18 L17 27 L37 6" fill="none" stroke="#0d3a24" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 18 L17 27 L37 6" fill="none" stroke="#fbfff8" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      };
+      const keys = [['7'], ['8'], ['9'], ['π', 'sym'], ['4'], ['5'], ['6'], ['/', 'sym'], ['1'], ['2'], ['3'], ['.', 'sym'], ['⌫', 'del'], ['0'], ['✓', 'ok']];
+      const pad = $('#keypad'); pad.innerHTML = ''; this.keyEls = {};
+      for (const [k, kind] of keys) {
+        const b = document.createElement('button'); b.className = `silent k${kind ? ' k-' + kind : ''}`; b.dataset.k = k;
+        b.innerHTML = `<span class="k-face"><span class="k-glyph">${ICON[kind] || k}</span></span>`;
+        if (kind === 'ok') { b.setAttribute('aria-label', 'Fire the cannon'); b.addEventListener('click', () => this.fire()); }
+        else if (kind === 'del') {
+          b.setAttribute('aria-label', 'Delete (hold to clear)'); let t = null, held = false;
+          b.addEventListener('pointerdown', () => { held = false; clearTimeout(t); t = setTimeout(() => { held = true; this.key('C'); }, 550); });
+          for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearTimeout(t));
+          b.addEventListener('click', () => { if (!held) this.key('⌫'); held = false; });
+        } else b.addEventListener('click', () => this.key(k));
+        pad.appendChild(b); this.keyEls[k] = b;
+      }
       const inp = $('#answer');
       inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^0-9./πpiPI*() ]/g, ''); this.refresh(); audio.play('ui.type', { minGap: 0.03 }); });
-      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.fire(); } });
+      inp.addEventListener('keydown', (e) => {
+        const map = { Backspace: '⌫', Delete: '⌫', Enter: '✓', p: 'π', P: 'π' }, el = this.keyEls[map[e.key] || e.key];
+        if (el) { el.classList.add('press'); setTimeout(() => el.classList.remove('press'), 120); }   // typing lights the stone key too
+        if (e.key === 'Enter') { e.preventDefault(); this.fire(); }
+      });
       $('#btn-fire').addEventListener('click', () => this.fire());
       $('#btn-hint').addEventListener('click', () => this.hint());
       const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      let pref = null; try { pref = localStorage.getItem('se_keypad'); } catch {}
-      $('#cannon-panel').classList.toggle('show-keypad', pref === null ? coarse : pref === '1');
+      // the stone keypad is the primary input on every device (new storage key, so an old "hidden" choice doesn't hide it)
+      let pref = null; try { pref = localStorage.getItem('se_keypad2'); } catch {}
+      $('#cannon-panel').classList.toggle('show-keypad', pref === null ? true : pref === '1');
       if (coarse) { $('#answer').setAttribute('inputmode', 'none'); $('#answer').setAttribute('readonly', ''); }
-      $('#btn-keypad').addEventListener('click', () => { const on = $('#cannon-panel').classList.toggle('show-keypad'); try { localStorage.setItem('se_keypad', on ? '1' : '0'); } catch {} });
+      $('#btn-keypad').addEventListener('click', () => { const on = $('#cannon-panel').classList.toggle('show-keypad'); try { localStorage.setItem('se_keypad2', on ? '1' : '0'); } catch {} });
     },
     key(k) {
       const inp = $('#answer'); audio.play('ui.type', { minGap: 0.02 });
       if (k === '⌫') inp.value = inp.value.slice(0, -1); else if (k === 'C') inp.value = ''; else if (inp.value.length < 10) inp.value += k;
       this.refresh();
     },
-    refresh() { $('#btn-fire').classList.toggle('ready', $('#answer').value.trim().length > 0 && !this.locked); },
+    refresh() { const on = $('#answer').value.trim().length > 0 && !this.locked; $('#btn-fire').classList.toggle('ready', on); $('#numpad').classList.toggle('ready', on); },
     open(cfg) {
       this.cfg = cfg; this.hintLevel = cfg.hintLevel ?? 0; this.locked = false;
       $('#cannon-panel').classList.add('open'); $('#cannon-panel').classList.remove('locked'); audio.play('ui.panel');
@@ -228,7 +249,7 @@ export const ui = {
       setTimeout(() => { try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {} }, 420);
     },
     setAttempts(t) { $('#attempts').textContent = t; },
-    lock() { this.locked = true; $('#cannon-panel').classList.add('locked'); $('#btn-fire').disabled = true; $('#btn-fire').classList.remove('ready'); },
+    lock() { this.locked = true; $('#cannon-panel').classList.add('locked'); $('#btn-fire').disabled = true; $('#btn-fire').classList.remove('ready'); $('#numpad').classList.remove('ready'); },
     unlock() { this.locked = false; $('#cannon-panel').classList.remove('locked'); $('#btn-fire').disabled = false; $('#answer').value = ''; this.refresh(); if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 50); },
     setValue(v) { $('#answer').value = String(v); this.refresh(); },
     fire() { if (this.locked || !this.cfg) return; const v = $('#answer').value.trim(); if (!v) { audio.play('ui.error'); $('#answer').focus(); return; } audio.play('ui.confirm'); this.cfg.onFire && this.cfg.onFire(v); },

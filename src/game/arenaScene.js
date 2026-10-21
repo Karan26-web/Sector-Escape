@@ -218,7 +218,7 @@ export class ArenaScene {
     await this.hero.runTo(stand, 5); this.hero.faceTo(this.C);
     // over Karan's shoulder (offset sideways) so he never hides the cannon as it rises
     const fwd = this.dirDeg(A.exitDeg), side = new THREE.Vector3(-fwd.z, 0, fwd.x);
-    this.rig.moveTo({ pos: this.clampInside(stand.clone().addScaledVector(fwd, -4.0).addScaledVector(side, 1.7).add(new THREE.Vector3(0, first ? 2.3 : 3.0, 0)), 1.0), target: this.C.clone().addScaledVector(side, -0.3).add(new THREE.Vector3(0, first ? 1.0 : 0.8, 0)), fov: 52 }, first ? 0.8 : 0.5);
+    this.rig.moveTo({ pos: this.clampInside(stand.clone().addScaledVector(fwd, -4.0).addScaledVector(side, 1.7).add(new THREE.Vector3(0, first ? 2.3 : 3.0, 0)), 1.0), target: this.C.clone().addScaledVector(side, -0.3).add(new THREE.Vector3(0, first ? 0.85 : 0.7, 0)), fov: 52 }, first ? 0.8 : 0.5);
     this.chain.setHatchGlow(this.index, false);
     await this.chain.openHatch(this.index, first ? 1.0 : 0.6);
     await this.cannon.rise(first ? 1.4 : 0.8);

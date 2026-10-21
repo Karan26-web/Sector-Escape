@@ -467,14 +467,16 @@ export class ChainWorld {
     const cr = this.fadeOff ? null : CHAIN.all[this.cutRing]; let camB = 0, cutOn = false;
     if (cr) { const hx = cam.x - cr.center.x, hz = cam.z - cr.center.z; cutOn = Math.hypot(hx, hz) > cr.R - 0.5 && cam.y > 2 && cam.y < 45; camB = toDeg(hx, hz); }
     const ease = Math.min(1, dt * 5);
-    const applyK = (o, k) => { if (Math.abs(k - o.k) < 0.01) return; o.k = k; for (const m of o.mats) { const tr = k < 0.99; if (m.transparent !== tr) { m.transparent = tr; m.needsUpdate = true; } m.opacity = k; m.depthWrite = !tr; } };
+    // ease k toward its target and SNAP the last step: an asymptotic ease used to stall at ~0.96, leaving pieces
+    // transparent with depthWrite off for good (walls then painted over the gate frame and other walls)
+    const applyK = (o, t) => { let k = o.k + (t - o.k) * ease; if (Math.abs(t - k) < 0.02) k = t; if (k === o.k) return; o.k = k; for (const m of o.mats) { const tr = k < 0.99; if (m.transparent !== tr) { m.transparent = tr; m.needsUpdate = true; } m.opacity = k; m.depthWrite = !tr; } };
     // occluder test: does a wall sample sit on the camera→target sightline, below the wall top?
     const tg = this.world.rig.target, sx = tg.x - cam.x, sz = tg.z - cam.z, sl2 = sx * sx + sz * sz || 1, WT = this.H + 0.6;
     const occludes = (px, pz, rad) => { const t = ((px - cam.x) * sx + (pz - cam.z) * sz) / sl2; if (t < 0.02 || t > 0.86) return false; if (cam.y + (tg.y - cam.y) * t > WT) return false; const qx = cam.x + sx * t - px, qz = cam.z + sz * t - pz; return qx * qx + qz * qz < rad * rad; };
     for (const w of this.wallPieces) {
       if (!w.pts) { const o = CHAIN.all[w.ring]; w.pts = (w.a0 != null ? [w.a0, w.mid, w.a1] : [w.mid]).map((d) => { const p = polar(d, o.R + 0.5); return [o.center.x + p.x, o.center.z + p.z]; }); }
       const blocking = !this.fadeOff && cam.y > 1.5 && w.pts.some(([px, pz]) => occludes(px, pz, 2.0));
-      const t = (cutOn && !(w.seal && this.keepSeals) && w.ring === this.cutRing && Math.abs(degDiff(camB, w.mid)) < 72) || (blocking && !(w.seal && this.keepSeals)) ? 0.08 : 1; applyK(w, w.k + (t - w.k) * ease);
+      const t = (cutOn && !(w.seal && this.keepSeals) && w.ring === this.cutRing && Math.abs(degDiff(camB, w.mid)) < 72) || (blocking && !(w.seal && this.keepSeals)) ? 0.08 : 1; applyK(w, t);
     }
     for (const tr of this.animTorches) { if (tr.deg == null) continue; const t = cutOn && tr.ring === this.cutRing && Math.abs(degDiff(camB, tr.deg)) < 72 ? 0 : 1; const c = tr.cut + (t - tr.cut) * ease; if (Math.abs(c - tr.cut) > 0.01 || (t !== tr.cut && Math.abs(c - t) < 0.01)) { tr.cut = Math.abs(c - t) < 0.01 ? t : c; tr.spr.material.opacity = tr.cut; tr.spr.sprite.visible = tr.cut > 0.02; } }
     for (const p of this.pillarMeshes) {
@@ -482,7 +484,7 @@ export class ChainWorld {
       let cut = 1;
       if (cutOn) { const o = CHAIN.all[this.cutRing], dx = p.g.position.x - o.center.x, dz = p.g.position.z - o.center.z; if (Math.abs(Math.hypot(dx, dz) - o.R) < 1.6 && Math.abs(degDiff(camB, toDeg(dx, dz))) < 72) cut = 0.08; }   // junction pillars sit on two circles: test against the cut ring itself
       if (!this.fadeOff && cam.y > 1.5 && occludes(p.g.position.x, p.g.position.z, 1.6)) cut = Math.min(cut, 0.08);
-      applyK(p, p.k + (Math.min(near, cut) - p.k) * ease);
+      applyK(p, Math.min(near, cut));
     }
     if (this.fireflies && this.fireflies.visible) for (const fl of this.flies) {
       fl.ph += dt * fl.sp; const s = fl.s;

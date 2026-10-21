@@ -5,7 +5,7 @@
 | **Save as** | `assets/sprites/cannon.png` |
 | **Type** | Single image (PNG-32 with alpha) |
 | **Canvas size** | 336 × 305 px |
-| **World scale** | 2.5 m tall (≈ 2.7 m wide; the pedestal sits on a 3 m stone drum) |
+| **World scale** | 1.8 m tall in the low 3/4 shots (≈ 2 m wide; the painted pedestal stands on a 3 m stone drum). Keep the pedestal ellipse drawn at ~30° (height ≈ half its width) with its centre ~25 % of the image height above the bottom edge: the game grounds the card using those proportions |
 | **Priority** | P0 |
 | **Manifest key** | `cannon` |
 

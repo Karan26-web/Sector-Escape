@@ -174,8 +174,10 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 @keyframes labelpop { from { scale: 0.5; } to { scale: 1; } }
 
 /* ---------- Sector Cannon panel ---------- */
-.panel { position: absolute; right: 22px; top: 74px; width: min(370px, 40vw); background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 14px; box-shadow: var(--shadow); transform: translateX(115%); opacity: 0; transition: transform 0.5s cubic-bezier(0.2, 1.1, 0.3, 1), opacity 0.4s; max-height: calc(100vh - 96px); overflow: auto; }
+.panel { position: absolute; right: 22px; top: 74px; width: min(370px, 40vw); background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 14px; box-shadow: var(--shadow); transform: translateX(115%); opacity: 0; transition: transform 0.5s cubic-bezier(0.2, 1.1, 0.3, 1), opacity 0.4s; max-height: calc(100vh - 96px); overflow: hidden; display: flex; flex-direction: column; }
 .panel.open { transform: none; opacity: 1; }
+.panel > * { flex: none; }
+.panel .panel-info { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -4px; padding: 0 4px; scrollbar-width: thin; }
 .panel header { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .panel header .icon { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, var(--cyan) 35%, #1f6f6b 75%); box-shadow: 0 0 16px rgba(82, 222, 216, 0.6); flex: none; }
 .panel h2 { font-family: var(--font-head); font-weight: 800; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; color: var(--ivory); }
@@ -189,15 +191,42 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 .values li { background: rgba(243, 235, 216, 0.05); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 14px; }
 .values li b { color: var(--ivory); } .values li.theta b { color: var(--cyan); } .values li.pi { border-color: rgba(82, 222, 216, 0.4); }
 .muted-small { font-size: 11px; color: var(--muted); font-weight: 500; }
-.input-row { display: flex; align-items: center; gap: 10px; background: rgba(5, 11, 9, 0.5); border: 1px solid var(--line); border-radius: 12px; padding: 6px 12px; font-weight: 600; font-size: 14px; color: var(--muted); }
-.input-row input { flex: 1; min-width: 0; font-family: var(--font-head); font-weight: 700; font-size: 32px; letter-spacing: 0.04em; text-align: right; background: transparent; color: var(--ivory); border: none; border-bottom: 2px solid rgba(82, 222, 216, 0.5); padding: 2px 6px; outline: none; }
-.input-row input:focus { border-bottom-color: var(--cyan); }
-.input-row .unit { color: var(--muted); }
-.keypad { display: none; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 8px 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* stone keypad (theme from the newNumPad mockup): mossy stone frame carved from the wall-top texture, cyan crest gem,
+   glowing display, chamfered slate keys with a gold-to-cyan rim, red delete, green ✓ (= FIRE when the keypad is shown) */
+.numpad { position: relative; margin: 18px 2px 4px; padding: 12px 10px; border: 20px solid transparent; border-image: url(../assets/ui/numpad_frame.webp) 40 round; background: radial-gradient(120% 90% at 50% 0%, #17322e 0%, #0c1a17 55%, #08110f 100%) padding-box; filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5)); }
+.numpad::before { content: ''; position: absolute; inset: -2px; border: 2px solid rgba(201, 160, 80, 0.45); box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.65); pointer-events: none; }
+.np-crest { position: absolute; left: 50%; top: -37px; width: 50px; height: 31px; transform: translateX(-50%); filter: drop-shadow(0 0 5px rgba(82, 222, 216, 0.55)); transition: filter 0.3s; pointer-events: none; z-index: 2; }
+.numpad.ready .np-crest { animation: gempulse 1.2s ease-in-out infinite alternate; }
+@keyframes gempulse { to { filter: drop-shadow(0 0 12px rgba(120, 255, 248, 0.95)); } }
+.np-vine { position: absolute; width: 42px; height: 63px; pointer-events: none; z-index: 2; }
+.np-vine.v-tl { left: -34px; top: -30px; } .np-vine.v-l { left: -35px; top: 42%; transform: scale(0.85) rotate(8deg); }
+.np-vine.v-tr { right: -33px; top: -24px; transform: scaleX(-1) scale(0.85); } .np-vine.v-br { right: -33px; bottom: -34px; transform: scaleX(-1) rotate(-10deg); }
+.np-vine.v-bl { left: -32px; bottom: -36px; transform: scale(0.75) rotate(-6deg); }
+.np-display { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 14px; border-radius: 12px; background: linear-gradient(180deg, #051110, #0a1a18); border: 2px solid var(--cyan); box-shadow: 0 0 12px rgba(82, 222, 216, 0.5), inset 0 0 14px rgba(82, 222, 216, 0.2); cursor: text; }
+.np-display input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--ivory); font-family: var(--font-head); font-weight: 700; font-size: 34px; letter-spacing: 0.05em; caret-color: var(--cyan); padding: 0; }
+.np-display input::placeholder { color: rgba(82, 222, 216, 0.5); font-size: 19px; font-weight: 600; letter-spacing: 0.08em; }
+.np-display .unit { color: var(--muted); font-weight: 600; font-size: 15px; }
+.keypad { display: none; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
 .panel.show-keypad .keypad { display: grid; }
-.keypad button { height: 40px; border-radius: 9px; border: 1px solid var(--line); background: rgba(243, 235, 216, 0.06); color: var(--ivory); font-weight: 600; font-size: 18px; cursor: pointer; }
-.keypad button:active { background: rgba(243, 235, 216, 0.14); }
-.keypad button.wide { grid-column: span 2; }
+.panel.show-keypad #btn-fire { display: none; }   /* the green ✓ key is the trigger when the keypad is out */
+.keypad .k { --ch: 10px; position: relative; height: 50px; padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 3px 0 #040807); transition: transform 0.06s, filter 0.15s; }
+.keypad .k-face { position: absolute; inset: 0; display: grid; place-items: center; clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch)); background: linear-gradient(180deg, #e3c47c 0%, #a9c9b0 28%, #4fd8d0 62%, #2aa6a1 100%); }
+.keypad .k-face::before { content: ''; position: absolute; inset: 2.5px; --c2: calc(var(--ch) - 1px); clip-path: polygon(var(--c2) 0, calc(100% - var(--c2)) 0, 100% var(--c2), 100% calc(100% - var(--c2)), calc(100% - var(--c2)) 100%, var(--c2) 100%, 0 calc(100% - var(--c2)), 0 var(--c2)); background: radial-gradient(90% 70% at 28% 18%, rgba(255, 255, 255, 0.13), transparent 60%), linear-gradient(180deg, #56645f 0%, #404c48 55%, #313b38 100%); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25); }
+.keypad .k-glyph { position: relative; font-family: var(--font-head); font-weight: 800; font-size: 30px; line-height: 1; color: #f8f3e8; text-shadow: -1.5px -1.5px 0 #0d1312, 1.5px -1.5px 0 #0d1312, -1.5px 1.5px 0 #0d1312, 1.5px 1.5px 0 #0d1312, 0 3px 0 #0d1312; }
+.keypad .k-glyph svg { display: block; width: 34px; height: auto; }
+.keypad .k-sym .k-glyph { color: #8ff7f2; font-size: 27px; }
+.keypad .k-del .k-face { background: linear-gradient(180deg, #ffc0ad 0%, #f07b67 45%, #c8473a 100%); }
+.keypad .k-del .k-face::before { background: radial-gradient(90% 70% at 28% 18%, rgba(255, 255, 255, 0.16), transparent 60%), linear-gradient(180deg, #e2654f 0%, #c0412f 55%, #9c3024 100%); }
+.keypad .k-ok { grid-column: span 2; }
+.keypad .k-ok .k-face { background: linear-gradient(180deg, #e2ffee 0%, #8af0bf 40%, #3fc98c 100%); }
+.keypad .k-ok .k-face::before { background: radial-gradient(90% 70% at 28% 18%, rgba(255, 255, 255, 0.18), transparent 60%), linear-gradient(180deg, #56d396 0%, #31a56b 55%, #247f53 100%); }
+.keypad .k-ok .k-glyph svg { width: 38px; }
+.numpad.ready .k-ok { animation: okglow 1.2s ease-in-out infinite alternate; }
+@keyframes okglow { from { filter: drop-shadow(0 3px 0 #040807) drop-shadow(0 0 2px rgba(94, 224, 166, 0.2)); } to { filter: drop-shadow(0 3px 0 #040807) drop-shadow(0 0 12px rgba(110, 240, 180, 0.85)); } }
+.keypad .k:hover { filter: drop-shadow(0 3px 0 #040807) brightness(1.08); }
+.keypad .k:active, .keypad .k.press { transform: translateY(2px); filter: drop-shadow(0 1px 0 #040807) brightness(1.18); }
+.keypad .k:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 6px; }
 button.fire { width: 100%; margin-top: 10px; font-family: var(--font-head); font-weight: 800; font-size: 28px; letter-spacing: 0.24em; text-transform: uppercase; padding: 12px; border-radius: 12px; border: none; background: var(--amber); color: #23180a; cursor: pointer; transition: box-shadow 0.3s, transform 0.08s, filter 0.2s; }
 button.fire.ready { animation: fireglow 1.2s ease-in-out infinite alternate; }
 @keyframes fireglow { to { box-shadow: 0 0 26px 2px rgba(244, 191, 85, 0.5); } }
@@ -211,7 +240,8 @@ button.fire:disabled { filter: grayscale(0.7) brightness(0.6); cursor: default; 
 .feedback.bad { border-color: rgba(220, 102, 87, 0.55); } .feedback.hint { border-color: rgba(244, 191, 85, 0.5); }
 .feedback h4 { margin: 0 0 3px; font-size: 13.5px; color: var(--amber); } .feedback.bad h4 { color: #f08b7f; }
 .feedback ol { margin: 4px 0 0; padding-left: 18px; } .feedback li { margin: 2px 0; } .feedback li b { color: var(--cyan); font-weight: 600; }
-.panel.locked .keypad, .panel.locked .input-row { opacity: 0.5; pointer-events: none; }
+.panel.locked .numpad { opacity: 0.55; pointer-events: none; }
+.panel.locked .numpad .k-ok { animation: none; }
 
 /* ---------- toast ---------- */
 #toast { position: absolute; right: 22px; bottom: 26px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 18px; text-align: left; transform: translateX(130%); transition: transform 0.45s cubic-bezier(0.2, 1.2, 0.4, 1); box-shadow: var(--shadow); pointer-events: none; min-width: 210px; }
@@ -223,6 +253,11 @@ button.fire:disabled { filter: grayscale(0.7) brightness(0.6); cursor: default; 
 .card.results td .st { color: var(--amber); letter-spacing: 2px; margin-left: 8px; }
 
 /* ---------- responsive ---------- */
+@media (max-height: 800px) and (min-width: 761px) {
+  .panel { padding-top: 14px; } .panel header { margin-bottom: 6px; } .panel header p { display: none; }
+  .np-display { height: 48px; } .np-display input { font-size: 29px; }
+  .numpad { padding: 9px 9px; } .keypad { gap: 7px; margin-top: 9px; } .keypad .k { height: 42px; } .keypad .k-glyph { font-size: 27px; }
+}
 @media (max-width: 760px) {
   #screen-title { justify-content: center; align-items: flex-end; background: linear-gradient(0deg, rgba(8, 16, 14, 0.95) 0%, rgba(8, 16, 14, 0.75) 45%, rgba(8, 16, 14, 0) 75%); }
   .title-wrap { margin: 0 0 9vh; width: 88vw; align-items: center; }
@@ -232,7 +267,11 @@ button.fire:disabled { filter: grayscale(0.7) brightness(0.6); cursor: default; 
   .panel header p { display: none; } .panel h2 { font-size: 20px; }
   .formula { font-size: 17px; padding: 6px 10px; } .formula .sub { font-size: 14px; }
   .panel button.fire { position: sticky; bottom: 0; margin-bottom: 10px; z-index: 2; }
-  .keypad button { height: 38px; }
+  /* phone sheet: Hint / Keypad move up beside the title, the keypad trims a little → more room for feedback */
+  .panel { padding-bottom: 10px; } .panel header { margin-bottom: 4px; min-height: 34px; } .panel header .icon { width: 26px; height: 26px; } .panel h2 { font-size: 18px; }
+  .panel-foot { position: absolute; top: 10px; right: 12px; margin: 0; } .panel-foot #attempts { display: none; } .panel-foot .btn.small { padding: 7px 10px; font-size: 13px; }
+  .numpad { margin-top: 16px; padding: 8px 7px; } .np-display { height: 44px; } .np-display input { font-size: 26px; } .np-display input::placeholder { font-size: 16px; }
+  .keypad { gap: 5px; margin-top: 8px; } .keypad .k { height: 40px; --ch: 8px; } .keypad .k-glyph { font-size: 25px; } .keypad .k-glyph svg { width: 30px; }
   .hud-left { width: 52vw; } .hud-title { font-size: 17px; } .shields img { width: 32px; height: 32px; }
   .hud-right { flex-direction: column; align-items: flex-end; gap: 6px; } button.icon-btn { width: 36px; height: 36px; }
   #objective { top: auto; bottom: 60vh; font-size: 13px; white-space: normal; max-width: 86vw; text-align: center; }
