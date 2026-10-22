@@ -55,6 +55,8 @@ All art is GPT-generated, installed as WebP and registered in `assets/manifest.j
 ## Deploy (Vercel)
 Static site, no build step: import the repo (framework preset **Other**, no build command) or run `npx vercel --prod` in the folder. `.vercelignore` publishes only the game (`index.html`, `vercel.json`, `src/`, `styles/`, `vendor/`, `assets/`); docs, tools, playtests and the DEV button stay out.
 
+Caching: the page, code and art are revalidated on every load (unchanged files cost a tiny "not modified" reply), so a new deploy always shows up. Every asset URL also carries the manifest's `version` (`?v=...`): bump it when you replace art under the same file name to force every browser onto the new files at once.
+
 ## Playtests
 ```bash
 python3 playtest/smoke_chain.py    # title → map → causeway → arena 1 (too small, too wide, exact) → results → arena 2

@@ -63,8 +63,10 @@ export class Assets {
     let img = null;
     if (def.path) {
       const alt = def.path.endsWith('.webp') ? def.path.replace(/\.webp$/, '.png') : def.path.replace(/\.png$/, '.webp');
+      // ?v=<manifest version>: a replaced file gets a new URL, so no browser can keep showing a cached old copy
+      const v = this.manifest && this.manifest.version ? `?v=${encodeURIComponent(this.manifest.version)}` : '';
       try {
-        img = await loadImageEl(ASSET_BASE + def.path).catch(() => loadImageEl(ASSET_BASE + alt));
+        img = await loadImageEl(ASSET_BASE + def.path + v).catch(() => loadImageEl(ASSET_BASE + alt + v));
         if (def.chromaKey) img = chromaKey(img, def.chromaKey, def.chromaTolerance ?? 60, def.chromaFeather ?? 40);
         this.status.set(name, 'file');
       } catch { img = null; }
