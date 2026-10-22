@@ -25,6 +25,7 @@ export class World {
     this.updatables = new Set();
     this.clock = new THREE.Clock();
     this.timeScale = 1; this.paused = false; this.elapsed = 0;
+    this.sleeping = false;   // an opaque full-screen UI (the map) covers the 3D view: skip updating and rendering it
     this._resize = () => this.resize(); window.addEventListener('resize', this._resize); this.resize();
     this.running = false;
     this.onFrame = null;
@@ -45,6 +46,7 @@ export class World {
       if (!this.running) return;
       requestAnimationFrame(loop);
       const raw = this.clock.getDelta();
+      if (this.sleeping) return;
       // adaptive resolution: drop the pixel ratio when frames are slow, restore when they are fast
       this._ft += (Math.min(raw, 0.1) - this._ft) * 0.05; this._prTimer += raw;
       if (this._prTimer > 2) { this._prTimer = 0; if (this._ft > 0.028 && this.pr > 0.75) { this.pr = Math.max(0.75, this.pr - 0.25); this.renderer.setPixelRatio(this.pr); } else if (this._ft < 0.013 && this.pr < this.maxPR) { this.pr = Math.min(this.maxPR, this.pr + 0.25); this.renderer.setPixelRatio(this.pr); } }

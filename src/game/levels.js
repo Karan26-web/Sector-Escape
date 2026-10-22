@@ -10,7 +10,12 @@
 import { reduceFraction, formatNumber, DEG, polar, wrapDeg, degDiff, toDeg } from '../engine/util.js';
 
 export const PI = { num: 22, den: 7, value: 22 / 7, label: '22/7' };
-export const TOLERANCE = { abs: 0.5, rel: 0.005, coefRel: 0.005 };
+// LXD 2026-10-22: fractions and decimals are accepted, compared at 3 decimal places (38.5, 38.500, 77/2 are all right;
+// 38 is not). Every answer in the game is an exact decimal with π = 22/7, so no wider tolerance is needed.
+export const TOLERANCE = { dp: 3 };
+const round3 = (v) => Math.round(v * 1000) / 1000;
+/** LXD 2026-10-22: the passage you came through stays open (no seal rises behind Karan). */
+export const SEAL_BEHIND = false;
 
 const round6 = (v) => Math.round(v * 1e6) / 1e6;
 export const sectorArea = (r, theta, pi = PI.value) => round6((theta / 360) * pi * r * r);
@@ -23,8 +28,8 @@ export function formatArea(r, theta) {
   if (isPiFriendly(r)) return formatNumber(sectorArea(r, theta));
   return `${formatNumber(sectorCoef(r, theta))}π ≈ ${formatNumber(sectorArea(r, theta))}`;
 }
-/** Guardians per breach: ~1 per 2.2 m of arc, 4..24. */
-export const botCountFor = (r, theta) => Math.max(4, Math.min(24, Math.round(arcLength(r, theta) / 2.2)));
+/** Guardians per breach: ~1 per 1.6 m of arc, 6..30 (LXD: more of them). */
+export const botCountFor = (r, theta) => Math.max(6, Math.min(30, Math.round(arcLength(r, theta) / 1.6)));
 
 /* ---------------------------------------------------------------------- */
 /* World constants                                                         */
@@ -36,14 +41,17 @@ export const gateHalfDeg = (widthM, r) => ((widthM / r) * 180) / Math.PI / 2;
 export const CAUSEWAY = { dirDeg: 0, length: 46, width: 4.4 };
 export const SANCTUARY = { radius: 21, gateDeg: 0, name: 'The Lost Temple' };
 
+// One evening across the journey (sky presets in chain.js): golden evening → deeper dusk → last light → the Warden's
+// red storm-dusk → the temple court's golden finale. The keys are kept so the level table reads as before.
 const ENV = {
-  day: { sky: 'day', floor: '#8d8f7a', wall: '#8f9a80', torches: 8 },
-  day2: { sky: 'day', floor: '#8a8478', wall: '#9a8f7e', torches: 8 },
+  day: { sky: 'evening', floor: '#8d8f7a', wall: '#8f9a80', torches: 8 },
+  day2: { sky: 'evening', floor: '#8a8478', wall: '#9a8f7e', torches: 8 },
   dusk: { sky: 'dusk', floor: '#7f8d7c', wall: '#7d8f7f', torches: 10 },
   dusk2: { sky: 'dusk', floor: '#8f7a72', wall: '#9a7f74', torches: 12 },
-  night: { sky: 'night', floor: '#86818f', wall: '#8b8299', torches: 14 },
-  night2: { sky: 'night', floor: '#777f8f', wall: '#7a8296', torches: 16 },
+  night: { sky: 'twilight', floor: '#8c8680', wall: '#928b86', torches: 14 },
+  night2: { sky: 'twilight', floor: '#83827f', wall: '#8a8984', torches: 16 },
   storm: { sky: 'storm', floor: '#8a7d6a', wall: '#9c8a6f', torches: 18 },
+  golden: { sky: 'golden', floor: '#9a8f78', wall: '#a39578', torches: 10 },
 };
 
 /**
@@ -151,7 +159,7 @@ function buildChain() {
   const last = arenas[arenas.length - 1];
   const sEntrance = wrapDeg(last.exitDeg + 180);
   const sanctuary = { index: arenas.length, id: 'temple', name: SANCTUARY.name, R: SANCTUARY.radius, center, exitDeg: SANCTUARY.gateDeg, entrance: { deg: sEntrance },
-    gate: { deg: SANCTUARY.gateDeg, half: gateHalfDeg(GATE.templeWidth, SANCTUARY.radius), temple: true }, env: ENV.day, spawn: add(center, polar(sEntrance, SANCTUARY.radius - 3.2)), map: MAP_LAYOUT.temple };
+    gate: { deg: SANCTUARY.gateDeg, half: gateHalfDeg(GATE.templeWidth, SANCTUARY.radius), temple: true }, env: ENV.golden, spawn: add(center, polar(sEntrance, SANCTUARY.radius - 3.2)), map: MAP_LAYOUT.temple };
   sanctuary.gatePos = add(center, polar(SANCTUARY.gateDeg, SANCTUARY.radius));
   sanctuary.escape = add(center, polar(SANCTUARY.gateDeg, SANCTUARY.radius + 9));
   const all = [...arenas, sanctuary];
@@ -281,8 +289,8 @@ export function evaluateAnswer(raw, r, theta) {
   const base = { exact, coef, exactText: formatArea(r, theta), isPi: p.isPi, enteredText: p.text };
   if (!isFinite(p.value) || p.value <= 0) return { ...base, status: 'invalid', entered: NaN, ratio: 0, firedTheta: 0, excessTheta: 0, coverage: 0, diagnosis: null };
   let status, ratio;
-  if (p.isPi) { ratio = p.piCoef / coef; status = Math.abs(p.piCoef - coef) <= Math.max(0.005, coef * TOLERANCE.coefRel) ? 'correct' : p.piCoef < coef ? 'under' : 'over'; }
-  else { ratio = p.value / exact; const tol = Math.max(TOLERANCE.abs, exact * TOLERANCE.rel); status = Math.abs(p.value - exact) <= tol ? 'correct' : p.value < exact ? 'under' : 'over'; }
+  if (p.isPi) { ratio = p.piCoef / coef; status = Math.abs(round3(p.piCoef) - round3(coef)) < 1e-6 ? 'correct' : p.piCoef < coef ? 'under' : 'over'; }
+  else { ratio = p.value / exact; status = Math.abs(round3(p.value) - round3(exact)) < 1e-6 ? 'correct' : p.value < exact ? 'under' : 'over'; }
   const firedTheta = Math.min(360, theta * ratio);
   return { ...base, status, entered: p.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis: status === 'correct' ? null : diagnose(p.value, r, theta, exact) };
 }
@@ -321,6 +329,42 @@ export const FORMULA_HTML = 'A = <span class="frac"><span>θ</span><span>360</sp
 export function substituted(r, theta) {
   return `A = <span class="frac"><span>${theta}</span><span>360</span></span> × <span class="frac"><span>22</span><span>7</span></span> × ${r} × ${r}`;
 }
+/** Numbers for the formula above the keypad (user, 2026-10-22). The formula A = θ/360 × π × r² is shown from the start;
+ *  the 1st wrong shot substitutes the numbers (θ, π = 22/7, r), crosses out what cancels (θ/360 → n/d; one r against
+ *  the 7 of 22/7 → k = r/7) and simplifies (A = n/d × 22 × k × r); the 2nd shows the answer as a fraction. Every LXD
+ *  radius is a multiple of 3.5, so k is 1, 1.5, 2, 2.5 or 3. */
+export function formulaParts(r, theta) {
+  const [n, d] = reduceFraction(theta, 360), k = r / 7, P = 22 * k * r;
+  const [an, ad] = reduceFraction(Math.round(n * P * 2), d * 2);
+  return { theta, r, n, d, k, P, an, ad, rText: formatNumber(r), kText: formatNumber(k), PText: formatNumber(P), answerFraction: ad === 1 ? `${an}` : `${an}/${ad}` };
+}
+/** One line near the beam after a WRONG shot: just the numbers (the banner already says too small / too wide). */
+export function beamLine(res, theta) {
+  if (res.status === 'correct') return '';
+  return `Your beam covered ${Math.round(res.firedTheta)}° — the arc is ${theta}°.`;
+}
+/** The misconception tip: one line just above the answer field. */
+export function tipLine(diag, r, theta) {
+  if (!diag) return '';
+  const [n, d] = reduceFraction(theta, 360), f = d === 1 ? `${n}` : `${n}/${d}`, rr = formatNumber(r), r2 = formatNumber(r * r);
+  const lines = {
+    'full-circle': `That's the whole circle — now take θ/360 = ${f} of it.`,
+    'arc-length': `That's the arc length — area needs π r², not 2πr.`,
+    'not-squared': `Looks like you didn't square r: ${rr} × ${rr} = ${r2}`,
+    circumference: `That's the circumference — area uses π r², not 2πr.`,
+    'used-diameter': `Looks like you used the diameter — r is ${rr} m.`,
+    angle: `That's just the angle — use (θ/360) × π r².`,
+    'r-squared': `r² = ${r2} is only one step — now × 22/7 × ${f}.`,
+    'forgot-pi': `π is missing — multiply by 22/7.`,
+    radius: `That's just the radius — use (θ/360) × π r².`,
+    decimal: diag.under ? `Ten times too small — check the decimal point.` : `Ten times too big — check the decimal point.`,
+    'fraction-flipped': `The fraction is upside down — use θ/360, not 360/θ.`,
+    double: `Exactly double — is there an extra × 2?`,
+    half: `Exactly half — check θ/360 = ${f}.`,
+    'pi-as-3': `π was taken as 3 — use 22/7.`,
+  };
+  return lines[diag.code] || '';   // no generic advice: the solution line on the floor already shows the next step
+}
 export function hintSteps(r, theta) {
   const [n, d] = reduceFraction(theta, 360);
   const fracTxt = d === 1 ? `${n}` : `${n}/${d}`;
@@ -336,15 +380,16 @@ export function hintSteps(r, theta) {
 /* ---------------------------------------------------------------------- */
 /* Scoring                                                                 */
 /* ---------------------------------------------------------------------- */
-export const SCORE = { base: 500, timeMax: 300, noDamage: 300, perfectShot: 200, noHints: 100 };
-export function computeScore({ timeUsed, timeBudget, shieldsLost, firstTryCorrect, usedHints }) {
+export const SCORE = { base: 500, timeMax: 300, noDamage: 300, perfectShot: 200 };
+/** Stars (shown on the results card with the reason for each): ★ cleared · ★ at most one miss · ★ first shot. */
+export function computeScore({ timeUsed, timeBudget, shieldsLost, firstTryCorrect }) {
   const timeBonus = Math.round(SCORE.timeMax * Math.max(0, 1 - timeUsed / Math.max(1, timeBudget)));
   const rows = [
     { label: 'Arena cleared', value: SCORE.base }, { label: 'Time bonus', value: timeBonus },
     { label: 'No damage', value: shieldsLost === 0 ? SCORE.noDamage : 0 }, { label: 'Perfect first shot', value: firstTryCorrect ? SCORE.perfectShot : 0 },
-    { label: 'No hints', value: usedHints ? 0 : SCORE.noHints },
   ];
   const total = rows.reduce((s, r) => s + r.value, 0);
-  const stars = shieldsLost === 0 && firstTryCorrect ? 3 : shieldsLost <= 1 ? 2 : 1;
-  return { rows, total, stars };
+  const criteria = [{ label: 'Cleared', ok: true }, { label: 'At most 1 miss', ok: shieldsLost <= 1 }, { label: 'First shot', ok: !!firstTryCorrect }];
+  const stars = criteria.filter((c) => c.ok).length;
+  return { rows, total, stars, criteria };
 }

@@ -11,7 +11,7 @@
 import { sectorArea } from '../game/levels.js';
 
 const enabled = ['localhost', '127.0.0.1', ''].includes(location.hostname) || new URLSearchParams(location.search).has('dev');
-const ARENA_PHASES = ['gate', 'inside', 'alert', 'run', 'rise', 'tactical', 'scan', 'input', 'firing', 'result'];
+const ARENA_PHASES = ['gate', 'inside', 'alert', 'run', 'rise', 'tactical', 'scan', 'input', 'firing', 'result', 'cleared'];
 
 if (enabled) {
   const btn = document.createElement('button');
@@ -25,7 +25,7 @@ if (enabled) {
   });
   document.body.appendChild(btn);
 
-  let queued = false, ranToHatch = false;
+  let queued = false, ranToHatch = false, pressNext = false;
   const label = () => { btn.textContent = queued ? 'DEV · skipping…' : 'DEV · Skip ring ⏭'; };
   label();
   btn.addEventListener('click', () => { queued = true; ranToHatch = false; label(); });
@@ -34,11 +34,12 @@ if (enabled) {
     const se = window.__se, scene = se && se.scene, phase = se && se.phase;
     const inArena = !!scene && ARENA_PHASES.includes(phase);
     btn.style.display = inArena || queued ? 'block' : 'none';
+    if (pressNext && phase === 'cleared') { const b = document.getElementById('btn-ar-next'); if (b) { pressNext = false; b.click(); } }   // past the results card
     if (!queued || !scene) return;
     if (phase === 'run' && !ranToHatch && scene.hero && scene.C) { ranToHatch = true; scene.hero.control = false; scene.hero.runTo(scene.C, 7); }
     if (phase === 'input') {
       se.fire(String(sectorArea(scene.R, scene.A.theta)));
-      queued = false; label();
+      queued = false; pressNext = true; label();
     }
     if (!inArena && phase !== 'exit') { queued = false; label(); }   // left the ring some other way (quit, game over)
   }, 200);

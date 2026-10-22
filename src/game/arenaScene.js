@@ -8,7 +8,7 @@
 // moves through them.
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
-import { CHAIN, botCountFor, evaluateAnswer, computeScore } from './levels.js';
+import { CHAIN, botCountFor, evaluateAnswer, computeScore, beamLine, tipLine, SEAL_BEHIND } from './levels.js';
 import { Boss } from './boss.js';
 import { save } from './save.js';
 import { assets } from '../engine/assets.js';
@@ -26,7 +26,7 @@ export class ArenaScene {
     this.world = game.world; this.fx = game.fx; this.hero = game.hero; this.rig = game.world.rig; this.chain = game.chain; this.cannon = game.cannon; this.bots = game.bots;
     this.R = this.A.R; this.C = new THREE.Vector3(this.A.center.x, 0, this.A.center.z);
     this.next = index + 1 < CHAIN.arenas.length ? CHAIN.arenas[index + 1] : CHAIN.sanctuary;
-    this.shields = 3; this.maxShields = 3; this.hintLevel = 0; this.usedHints = false; this.firstTry = null; this.timeUsed = 0; this.attempt = 0;
+    this.shields = 3; this.maxShields = 3; this.misses = 0; this.firstTry = null; this.timeUsed = 0; this.attempt = 0;
     this.phase = 'init'; this.aborted = false; this.disposed = false; this._resolveFire = null; this.boss = null; this.pathDots = [];
     this.firstGun = !save.load().seenGun;
     this.world.addUpdatable(this);
@@ -61,10 +61,11 @@ export class ArenaScene {
   tacticalPose() {
     const R = this.R, A = this.A, u = this.dirDeg(A.exitDeg), right = new THREE.Vector3(-u.z, 0, u.x), up = new THREE.Vector3(0, 1, 0);
     const vw = window.innerWidth, vh = window.innerHeight, narrow = vw < 760, fov = 32, pitch = 85 * DEG, tanH = Math.tan((fov / 2) * DEG);
-    const panel = document.getElementById('cannon-panel'), pad = narrow ? 8 : 20;
+    const dock = document.getElementById('cannon-panel'), pad = narrow ? 8 : 20;
     const free = narrow
-      ? { x0: pad, x1: vw - pad, y0: 100, y1: vh * 0.42 - pad }   // the sheet can grow to 58vh once feedback shows
-      : { x0: pad, x1: vw - ((panel && panel.offsetWidth) || 370) - 22 - pad, y0: 88, y1: vh - pad };
+      ? { x0: pad, x1: vw - pad, y0: 100, y1: vh - ((dock && dock.offsetHeight) || 300) - 8 - 34 - pad }   // above the answer dock (+ room for the tip line)
+      : { x0: pad, x1: vw - ((dock && dock.offsetWidth) || 276) - 20 - pad, y0: 88, y1: vh - pad };
+
     // must be in frame: the ring floor plus a sliver of wall, and headroom above the arc (sprites stand toward screen-up)
     const pts = [];
     for (let a = 0; a < 360; a += 10) pts.push(this.C.clone().addScaledVector(this.dirDeg(a), R + 0.5));
@@ -82,6 +83,7 @@ export class ArenaScene {
       D *= Math.max((x1 - x0) / (free.x1 - free.x0), (y1 - y0) / (free.y1 - free.y0));
     }
     place();
+    v.copy(this.C).project(cam); ui.setArenaCentre(((v.x + 1) / 2) * vw, ((1 - v.y) / 2) * vh);   // stamps hang just below the centre O
     return { pos: cam.position.clone(), target, fov };
   }
   /** Pose (inside the ring) that frames Karan low and the guarded arc high, verified by projecting both. */
@@ -129,18 +131,26 @@ export class ArenaScene {
   }
   async flow() {
     const L = this.level;
-    ui.hud.setArena(L, this.A, this.index); ui.hud.setShields(this.shields, this.maxShields);
+    ui.hud.setArena(L, this.A, this.index);
+    const prevShields = this.game.lastShields; this.game.lastShields = null;
+    if (prevShields != null && prevShields < this.maxShields) ui.hud.refillShields(prevShields, this.maxShields);   // show the refill (LXD)
+    else ui.hud.setShields(this.shields, this.maxShields);
     audio.ambient.start('jungle'); audio.music.start('explore'); audio.music.setMode('explore');
     this.chain.setActiveArena(this.index); this.chain.setFocus(this.index, false, 0);
-    if (this.index > 0) { this.chain.raiseSeal(this.index - 1, true); this.chain.closeHatch(this.index - 1); }
+    if (this.index > 0) { if (SEAL_BEHIND) this.chain.raiseSeal(this.index - 1, true); this.chain.closeHatch(this.index - 1); }
     this.cannon.setArena(this.A); this.chain.closeHatch(this.index);
     this.hero.group.visible = true;
     if (this.mode === 'causeway') await this.s(this.causeway());
     else if (this.mode === 'inside') await this.s(this.placeInside());
     audio.ambient.setMode(L.boss ? 'boss' : 'arena');
     const ok = await this.s(this.battle());
+    this.game.lastShields = this.shields;
     if (!ok) { this.setPhase('gameover'); return { outcome: 'gameover' }; }
-    const score = computeScore({ timeUsed: this.timeUsed, timeBudget: L.timeBudget, shieldsLost: this.maxShields - this.shields, firstTryCorrect: this.firstTry === true, usedHints: this.usedHints });
+    const score = computeScore({ timeUsed: this.timeUsed, timeBudget: L.timeBudget, shieldsLost: this.maxShields - this.shields, firstTryCorrect: this.firstTry === true });
+    // results card (LXD): which stars, why, and Retry; the next arena only starts when the student presses Next
+    this.setPhase('cleared');
+    const choice = await this.s(ui.result.show({ level: L, score, last: this.index === CHAIN.arenas.length - 1 }));
+    if (choice === 'retry') { this.setPhase('done'); return { outcome: 'cleared', score, retry: true }; }
     await this.s(this.exitRun(score));
     this.setPhase('done');
     return { outcome: 'cleared', score };
@@ -156,21 +166,21 @@ export class ArenaScene {
     this.setPhase('causeway');
     const cw = CHAIN.causeway, dir = this.dirDeg(cw.dirDeg);
     this.chain.fadeOff = true;                                            // the wall and gate stay solid for the whole approach
+    this.chain.setFireflies(true);                                        // evening: fireflies over the lake, as on the title
     this.hero.setPosition(this.V(cw.start)); this.hero.face(dir); this.hero.surface = 'stone'; this.hero.stop();
     audio.ambient.setMode('causeway');
-    await this.rig.moveTo(this.behindPose(this.hero.pos, dir, 5.5, 2.6, 58), 2.0);
+    // coming from the map screen: cut straight to the shot behind Karan (a fly-back from the title spot hid him for 2 s)
+    this.rig.setPose(this.behindPose(this.hero.pos, dir, 5.5, 2.6, 58)); await delay(0.5);
     this.followHero(() => dir, 4);
     let skipped = false; ui.skip.show(() => { skipped = true; });
     const race = (p) => { let t; const skipP = new Promise((res) => { t = setInterval(() => { if (skipped) { clearInterval(t); res('skip'); } }, 50); }); return Promise.race([p, skipP]).finally(() => clearInterval(t)); };
-    ui.caption('One way forward: the causeway to the small gate.', 3.6);
     if (await race(this.hero.runTo(this.V(cw.gate).addScaledVector(dir, -8), 6.5)) !== 'skip') {
       this.setPhase('gate'); this.chain.openStartGate();
-      ui.caption('The gate grinds open…', 2);
       if (await race(this.hero.runTo(this.V(this.A.spawn), 6)) !== 'skip') await race(this.gateShut());
     }
     ui.skip.hide();
     if (skipped) { tweens.clear(); this.hero.stop(); this.hero.setPosition(this.V(this.A.spawn)); this.chain.resetStartGate(false); this.chain.applySky(this.level.env.sky, 0.1); }
-    this.chain.fadeOff = false;
+    this.chain.fadeOff = false; this.chain.setFireflies(false);
     await delay(0.3);
   }
   /** Inside the ring: Karan turns as the gate slams shut in front of him, seen from inside so nothing hides it. */
@@ -181,8 +191,7 @@ export class ArenaScene {
     this.clampInside(camPos, 0.8);
     await this.rig.moveTo({ pos: camPos, target: gp.clone().add(new THREE.Vector3(0, 1.9, 0)), fov: 56 }, 0.65);
     await this.chain.closeStartGate(0.5);
-    ui.caption('The gate slams shut behind you. No way back.', 2.6);
-    await delay(1.2);
+    await delay(1.0);
   }
 
   /* ---------------------------------------------------------------- the fight */
@@ -203,14 +212,11 @@ export class ArenaScene {
       const B = this.R * 0.5 + 3.5, Hc = B * 1.05;
       this.rig.moveTo({ pos: this.hero.pos.clone().addScaledVector(look, -B).add(new THREE.Vector3(0, Hc, 0)), target: this.hero.pos.clone().addScaledVector(look, Dka * 0.42), fov: 56 }, 1.6);
     }
-    ui.caption(this.index === 0 ? 'Sealed in. Guardians hold the open arc.' : `Ring ${L.id}. The arc ahead is guarded.`, 2.8);
-    await delay(2.0);
+    await delay(1.7);
     this.setPhase('alert'); audio.play('alarm'); audio.music.setMode(L.boss ? 'boss' : 'arena');
-    ui.banner('GUARDIANS AWAKEN', 'alert', 1.8); this.bots.alert(); if (this.boss) this.boss.roar(); this.rig.shake(0.15, 0.5);
+    this.bots.alert(); if (this.boss) this.boss.roar(); this.rig.shake(0.15, 0.5);
     await delay(1.3);
     this.chain.setHatchGlow(this.index, true); audio.play('scan.ping');
-    ui.objective('Reach the glowing hatch');
-    if (this.index === 0) ui.caption('Something is buried under the hatch at the centre.', 3);
   }
   async battle() {
     const L = this.level, A = this.A, R = this.R;
@@ -223,7 +229,7 @@ export class ArenaScene {
     this.hero.boundsCenter.copy(this.C); this.hero.boundsRadius = R - 1.2; this.hero.keepOutRadius = null; this.hero.control = true;
     const inp = this.world.input; let idle = 0, assisted = false;
     await this.waitFor(() => this.hero.distTo(this.C) < 2.9, { autoAfter: this.game.autoRun ? 0.2 : 1e9, auto: () => { this.hero.control = false; this.hero.runTo(this.C, 7); },
-      tick: (dt) => { if (inp.axis().active || inp.pointer.down || this.hero.target) idle = 0; else idle += dt; if (!assisted && idle > 12) { assisted = true; this.hero.runTo(this.C, 6.5); this.hero.control = true; ui.caption('Tip: use WASD / arrow keys or tap the floor to move.', 3); } } });
+      tick: (dt) => { if (inp.axis().active || inp.pointer.down || this.hero.target) idle = 0; else idle += dt; if (!assisted && idle > 12) { assisted = true; this.hero.runTo(this.C, 6.5); this.hero.control = true; } } });
     this.hero.control = false; this.hero.stop(); this.hero.boundsRadius = null; ui.objective(null);
     // ---- the hatch opens, the Sector Cannon rises out of the floor (cinematic the first time, brisk later)
     this.setPhase('rise');
@@ -236,7 +242,7 @@ export class ArenaScene {
     await this.chain.openHatch(this.index, first ? 1.0 : 0.6);
     await this.cannon.rise(first ? 1.4 : 0.8);
     this.hero.keepOutRadius = 2.0; this.hero.boundsCenter.copy(this.C);
-    if (first) { ui.caption('The Sector Cannon wakes. It needs the exact area of the open sector.', 3.4); save.load().seenGun = true; save.write(); this.firstGun = false; }
+    if (first) { save.load().seenGun = true; save.write(); this.firstGun = false; }
     await Promise.all([this.hero.playSpecial('activate', { hold: 0.15 }), this.cannon.activate()]);
     if (first) await delay(0.4);
     // ---- tactical view + scan
@@ -252,53 +258,64 @@ export class ArenaScene {
     audio.music.setMode(L.boss ? 'boss' : 'tension');
     this.setPhase('scan');
     await this.cannon.scan({ breachDeg: A.exitDeg, theta: A.theta });
+    // ---- the formula above the keypad (user, 2026-10-22): shown from the start on every ring; misses work it through
+    ui.formula.show(R, A.theta);
+    const arcTop = this.W(A.exitDeg, R, 0.6), outward = this.dirDeg(A.exitDeg);
     // ---- input loop
     while (true) {
       this.attempt++;
       this.setPhase('input');
-      if (this.attempt === 1) ui.panel.open({ r: R, theta: A.theta, scaffold: L.scaffold, piFriendly: true, hintLevel: this.hintLevel, attempts: this.attempt, onFire: (v) => this._resolveFire && this._resolveFire(v), onHint: (lvl) => { this.usedHints = true; this.hintLevel = lvl; } });
-      else ui.panel.setAttempts(`Attempt ${this.attempt}`);
+      if (this.attempt === 1) ui.panel.open({ onFire: (v) => this._resolveFire && this._resolveFire(v), onType: () => ui.beamline.hide() });
       const t0 = this.world.elapsed;
       const answer = await new Promise((res) => { this._resolveFire = res; });
       this._resolveFire = null; this.timeUsed += this.world.elapsed - t0;
       if (answer === ABORT) throw ABORT;
       const res = evaluateAnswer(answer, R, A.theta);
-      if (res.status === 'invalid') { ui.panel.setFeedback({ type: 'bad', title: 'Enter a number', html: 'Type the sector area in m², e.g. 38.5' }); audio.play('ui.error'); this.attempt--; continue; }
-      // ---- fire
-      this.setPhase('firing'); ui.panel.lock(); this.bots.active = false; ui.hud.setThreat(0, false);
+      if (res.status === 'invalid') { ui.panel.setTip('Enter a number like 38.5 or 77/2'); audio.play('ui.error'); this.attempt--; ui.panel.unlock(); continue; }
+      // ---- fire: pull back a little so the whole wedge and wall are in view, then scan → bolts → wall → ghost (LXD)
+      this.setPhase('firing'); ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false); this.bots.active = false; ui.hud.setThreat(0, false);
+      const tp = this.tacticalPose();
+      this.rig.moveTo({ pos: tp.target.clone().add(tp.pos.clone().sub(tp.target).multiplyScalar(1.14)), target: tp.target, fov: tp.fov }, 0.6, Ease.inOutCubic);
       await this.cannon.charge();
+      const covered = Math.min(res.firedTheta, A.theta);
       await this.cannon.fire({ ...res, theta: A.theta, breachDeg: A.exitDeg }, {
-        onFront: (half) => { this.bots.killInSector(A.exitDeg, half); if (this.boss && res.status !== 'under') this.boss.defeat(); else if (this.boss) this.boss.hurt(); },
+        targets: () => this.bots.alive.filter((b) => this.bots.inSector(b, A.exitDeg, covered / 2)),
+        kill: (b) => this.bots.kill(b, 0, 0.7),
         onReflect: () => this.hitHero('reflect'),
-        onWallHit: () => {},
       });
+      if (this.boss) { if (res.status !== 'under') this.boss.defeat(); else this.boss.hurt(); }
       this.setPhase('result');
+      if (res.status !== 'correct') ui.beamline.show(beamLine(res, A.theta), res.status, arcTop, outward);
       if (res.status === 'correct') {
         if (this.firstTry === null) this.firstTry = this.attempt === 1;
         audio.play('sting.perfect');
-        await delay(0.35);
-        await ui.stamp('perfect', 'PERFECT SECTOR', `Exact area ${res.exactText} m² — every guardian destroyed`);
-        ui.panel.close(); this.cannon.clearOverlays(true); await delay(0.3);
+        await delay(1.6);   // let the gold snap of the wedge read before the results card
+        this.cannon.releaseGhost(0.6); ui.panel.close(); ui.beamline.hide(); ui.setArenaCentre(null);
+        this.cannon.clearOverlays(true); await delay(0.3);
         return true;
       }
       if (this.firstTry === null) this.firstTry = false;
+      this.misses++;
+      audio.play('sting.fail');
       if (res.status === 'under') {
-        audio.play('sting.fail');
-        await ui.stamp('under', 'UNDERCHARGED', `The laser covered only ${Math.round(res.coverage * 100)}% of the arc — survivors attack!`);
+        await ui.stamp('under', 'TOO SMALL', '', 1.3);
         await this.bots.lunge(this.hero.pos, () => this.hitHero('bot'));
         if (this.shields <= 0) return this.gameOver();
-        this.cannon.pulse(); this.bots.pulseKill(); await delay(1.1);
+        this.cannon.pulse(); this.bots.pulseKill(); await delay(0.9);
       } else {
-        audio.play('sting.fail');
-        await ui.stamp('over', 'OVERCHARGED', `Too wide by ${Math.round(res.excessTheta)}° — the excess hit the wall and reflected back!`);
+        await ui.stamp('over', 'TOO WIDE', '', 1.3);
         if (this.shields <= 0) return this.gameOver();
-        await delay(0.5);
+        await delay(0.6);
       }
-      const d = res.diagnosis;
-      ui.panel.setFeedback({ type: 'bad', title: d.title, html: `${d.tip}<br><span style="color:#b9cbd4">You entered <b>${res.enteredText}</b> m² — the laser covered <b>${Math.round(res.firedTheta)}°</b> of the <b>${A.theta}°</b> arc.</span>` });
-      this.hintLevel = Math.min(3, this.hintLevel + 1); this.usedHints = this.usedHints || this.hintLevel >= 3;
+      this.cannon.releaseGhost(0.8);
+      // ---- back to the puzzle view; one-line tip above the answer; the formula works itself through:
+      //      1st miss → substitute, cross out, simplify; 2nd miss → the answer as a fraction (LXD)
+      ui.panel.setTip(tipLine(res.diagnosis, R, A.theta));
+      this.rig.moveTo(this.tacticalPose(), 0.6, Ease.inOutCubic);
       this.spawnSquad(0.85); this.bots.active = true; this.bots.freeze(true, true); this.bots.appear();   // the next squad arrives already in stasis
-      ui.panel.unlock(); ui.panel.hintLevel = this.hintLevel; ui.panel.renderFormula(); ui.panel.setAttempts(`Attempt ${this.attempt + 1}`);
+      if (this.misses === 1) await ui.formula.walkthrough();
+      else if (this.misses === 2) await ui.formula.solve();
+      ui.panel.unlock();
     }
   }
   hitHero(kind) {
@@ -307,7 +324,7 @@ export class ArenaScene {
     audio.play(kind === 'reflect' ? 'reflect.hit' : 'bot.hit'); audio.play('player.hurt'); audio.play('shield.break');
     this.fx.hit(this.hero.pos.clone().add(new THREE.Vector3(0, 1, 0))); this.rig.shake(0.6, 0.6); this.hero.hurt();
   }
-  gameOver() { this.chain.setFocus(this.index, false, 0.6, { cull: false }); audio.play('sting.gameover'); audio.music.setMode('calm'); ui.panel.close(); this.cannon.clearOverlays(true); return false; }
+  gameOver() { this.chain.setFocus(this.index, false, 0.6, { cull: false }); audio.play('sting.gameover'); audio.music.setMode('calm'); ui.panel.close(); ui.beamline.hide(); ui.setArenaCentre(null); this.cannon.clearOverlays(true); return false; }
 
   /* ---------------------------------------------------------------- reward + progression: through the open arc into the next ring */
   lightPath(points) {
@@ -341,16 +358,15 @@ export class ArenaScene {
     this.chain.setFocus(this.index, false, 0.9, { cull: false });
     this.lightPath([this.hero.pos.clone(), sidePt, spawn]);
     this.rig.moveTo({ pos: this.C.clone().addScaledVector(u, -(this.R * 0.8 + 6)).add(new THREE.Vector3(0, this.R * 0.9 + 9, 0)), target: nextC.clone().addScaledVector(u, -next.R * 0.35).add(new THREE.Vector3(0, 1, 0)), fov: 56 }, 1.3);
-    ui.toast({ title: `Arena ${this.level.id} cleared`, stars: score.stars, points: score.total });
-    ui.caption(this.index === CHAIN.arenas.length - 1 ? 'The last ring is broken. The temple court lies ahead!' : 'The way opens. Into the next ring!', 3);
     await this.hero.celebrate(0.25);
     await delay(0.5);
     // progression: overhead chase through the arc; the next ring closes behind Karan
     const overhead = (out) => { out.pos.copy(this.hero.pos).addScaledVector(u, -3.5).add(new THREE.Vector3(0, 9, 0)); out.target.copy(this.hero.pos).addScaledVector(u, 2.5).add(new THREE.Vector3(0, 0.6, 0)); out.fov = 58; return out; };
     this.rig.follow(overhead, 3.2);
     if (this.game.prepareNext) this.game.prepareNext(this.index + 1);
-    const seal = this.chain.seals[this.index];
-    const sealWhenInside = seal ? this.waitFor(() => this.hero.distTo(nextC) < next.R - 1.6).then(() => { this.chain.cutRing = next.index; this.chain.keepSeals = true; this.chain.raiseSeal(this.index); ui.caption('The ring closes behind you.', 2.4); }) : null;
+    const seal = SEAL_BEHIND ? this.chain.seals[this.index] : null;   // LXD: the passage you came through stays open
+    const inside = this.waitFor(() => this.hero.distTo(nextC) < next.R - 1.6).then(() => { this.chain.cutRing = next.index; this.chain.keepSeals = true; if (seal) this.chain.raiseSeal(this.index); });
+    const sealWhenInside = seal ? inside : null;
     await this.hero.runPath([sidePt, spawn], 7);
     this.clearPath(0.6);
     if (sealWhenInside) {
@@ -372,7 +388,6 @@ export class ArenaScene {
     const gate = new THREE.Vector3(S.gatePos.x, 0, S.gatePos.z), esc = new THREE.Vector3(S.escape.x, 0, S.escape.z), dir = esc.clone().sub(gate).normalize();
     hero.faceTo(gate);
     rig.follow((out) => { const d = gate.clone().sub(hero.pos).setY(0).normalize(); out.pos.copy(hero.pos).addScaledVector(d, -7).add(new THREE.Vector3(0, 3.4, 0)); out.target.copy(hero.pos).addScaledVector(d, 8).add(new THREE.Vector3(0, 1.5, 0)); out.fov = 56; return out; }, 3);
-    ui.caption('The temple gate stands open. Run!', 3.5);
     await hero.runTo(gate.clone().addScaledVector(dir, -2.5), 7);
     audio.play('gate.unlock'); game.fx.flash(gate.clone().add(new THREE.Vector3(0, 2.5, 0)), 0xffe0a0, 12, 0.8);
     await hero.runTo(esc.clone().addScaledVector(dir, -1), 7);
@@ -386,6 +401,6 @@ export class ArenaScene {
   dispose() {
     if (this.disposed) return; this.disposed = true; this.aborted = true;
     this.world.removeUpdatable(this); if (this.boss) { this.boss.dispose(); this.boss = null; } this.clearPath(0.01);
-    this.cannon.clearOverlays(false); this.world.labels.clear(); ui.panel.close(); ui.objective(null);
+    this.cannon.clearOverlays(false); this.world.labels.clear(); ui.panel.close(); ui.result.hide(); ui.setArenaCentre(null); ui.objective(null);
   }
 }

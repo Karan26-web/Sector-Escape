@@ -3,6 +3,22 @@
 
 > Written for the LXD + production team. The gameplay follows the LXD brief (approach → trapped → breach → run to the cannon → scan → enter area → FIRE → three outcomes → exit) and the 12-panel wireframe; this document explains how each beat is implemented, why the maths is wired the way it is, and which knobs exist for tuning.
 
+## 0. LXD review 2026-10-22 — what changed
+Implemented from the LXD's feedback PDF (*sector arena feedbacks.pdf*, 11 pages, every item; archived outside the project):
+- **Title**: the painted evening sky, the temple behind the gate and the sun low on the right; camera low on the causeway, close to the gate; Karan stands with his back to us facing the gate (idle); carved-stone tablet buttons (glow on hover, press-down, the primary one pulses); Continue only with a save, labelled "Continue · Arena N" and highlighted; How to play is a real secondary tablet; tagline removed; the dark gradient stays behind the logo column; slow camera drift toward the gate, birds, fireflies, lake mist, torch light flickering on the stone; the old box posts are free-standing torches in stone sockets.
+- **How to play**: 3 swipeable parchment cards (dots, Back/Next, swipe, ← →): *Reach the cannon* (animated: Karan runs to the hatch, the cannon rises) · *Find the sector area* (textbook diagram O, r, θ, open arc + formula) · *Fire!* (too small / just right / too big side by side; 3 shields; answers like 38.5 or 77/2). Last button "Let's go!".
+- **Map**: fills the screen, start bottom-left → temple top-right (portrait on phones: bottom → top); the side panel became a small parchment tag next to the selected ring (placed where it covers the fewest other rings; docked at the bottom on phones) with Arena N of 7 · name · stars · Enter; removed tagline, diagram, radius/angle/guardian boxes, "Not cleared yet", START label, padlocks, decorative islands; slim top bar (← title · ★ x / 21 · sound · settings: sound, how to play, reset progress with confirm); ring states (cleared = lit stone, cyan rim, stars under the badge · current = gold pulse with Karan on it · locked = darker with drifting mist and hanging vines); number badges that never collide; finger-sized tap targets; torches lit up to the current ring; glowing doorway arcs between cleared rings; golden light beam over the temple; the Warden's red silhouette on arena 7; Karan walks the route between rings; unlock moment (pan in, mist clears, vines fall, ring flashes); first-visit "Tap to begin" arrow (once); tapping a cleared ring shows its stars and best score; hovering/tapping a locked ring shakes it: "Clear Arena N first"; twinkling water, waterfall spray, drifting cloud shadows, birds.
+- **Arena / cannon**: from above the cannon is a slim crystal piece (half width) under a bright centre dot **O**; both radius lines start at O; the r label sits beside its line, θ beside the angle arc.
+- **Answer dock** (was the Sector Cannon panel): the formula, a one-line misconception tip, the answer field with m², and a compact stone keypad (7–9 ⌫ / 4–6 / / 1–3 . / 0 ✓), docked right-centre (follow-up request 2026-10-22; full-width bottom on phones). No header, no scroll box, no keypad toggle, no attempt counter, no hint button, no frame/leaves, no π key. Fractions and decimals to 3 places are accepted.
+- **The formula, just above the keypad** (follow-up request 2026-10-22; it was a line on the floor under the sector): A = θ/360 × π × r² is shown on every ring. After the 1st wrong shot it works itself through in place: the numbers are substituted (θ → 90, π → 22/7, r² → 7 × 7), what cancels is crossed out in red with the small result written beside it, textbook style (90/360 → 1 over 4; the 7 of 22/7 against one 7 → 1 and 1; for r = 10.5 it becomes 1.5), and it simplifies to A = 1/4 × 22 × 7. After the 2nd it shows the answer as a fraction (A = 1/4 × 154 = 77/2). The beam feedback is one line near the arc ("Your beam covered 47° — the arc is 90°. Too small!"); the tip is one line above the answer ("Looks like you didn't square r: 7 × 7 = 49"); both clear as soon as a new answer is typed.
+- **Firing**: the camera pulls back a little; a scan line sweeps exactly the wedge the answer asked for (cyan inside the arc, red for any excess); slow motion as radial bolts from O hit each guardian inside it and the beam hits the wall; overcharge reflects back at Karan. A ghost comparison stays for the banner: target wedge dashed in gold over a smaller shot · excess pulsing red · gold snap for exact. Wrong shots get a short banner (TOO SMALL / TOO WIDE), centred on the arena under the centre O, never behind the dock; the exact shot has no banner: the wedge snaps gold and the results card follows. Survivors' attack is short with one clear hit; the lost shield cracks.
+- **End of arena**: results card (Arena N cleared · ★ ☆ ☆ · ✗ for each missed star only · Next arena ▶ · ↻ Retry for ★★★ when a star is missing). The next arena starts only on Next; Retry replays the arena. Shields pop back one by one at the start of the next arena.
+- **Guardians**: more of them (one per ~1.6 m of arc, 6–30), three ranks, size and tone variety, perfectly smooth approach (no stride surge, eased start, animation phase accumulated so speed changes never skip frames). A more realistic sprite needs new art: the `enemy_bot` spec was updated for GPT.
+- **Passages stay open**: no seal rises behind Karan (`SEAL_BEHIND = false` in `levels.js`).
+- **The temple** (follow-up, 2026-10-22: "the temple is getting stretched"). The 3:1 panorama wrapped once around 360° was stretched 3.3–4.6× sideways, so it now repeats 3 times around (1.1–1.5×). The goal temple is the user's painted temple (`temple`) as a sprite far beyond the temple court on the chain's axis: behind ring 1's gate on the title with the low sun just to its right (one painted temple of the panorama hides behind it), growing as Karan travels east, towering over the temple gate in the finale. The same art is the temple on the 2D map.
+- **Text diet** (follow-up request, 2026-10-22: "remove every unnecessary text"). The game now shows text only where it teaches or is a control. Gone: every narration caption (causeway, gate, "Sealed in…", hatch, cannon wakes, "The way opens…", "The ring closes…", temple gate, the idle movement tip), the GUARDIANS AWAKEN banner (the alarm, red eyes and camera shake carry it), the "Reach the glowing hatch" objective (the hatch glows), the PERFECT! banner and the "exactly 90°" line, the points and the ✓ ticks on the results card (only missed stars are listed, with ✗), the "Shields restored" label, the generic "re-check each step" tip, the game-over formula paragraph and the final screen's subtitle. Kept: θ, r, O, the solution line, TOO SMALL / TOO WIDE, the one numbers line after a wrong shot ("Your beam covered 47° — the arc is 90°."), misconception tips, the answer field, the results card's title, stars and buttons, Skip, and the map / title / how-to-play copy the LXD specified.
+- **One evening for the whole game** (follow-up requests, 2026-10-22). The sky and backdrop are the user's painted evening art: the `sky` texture on a sphere that follows the camera (its warm bottom on the horizon, its deep-blue top 35° up, clamped above) and the `jungle_panorama` wrapped once around the world on a 175-high cylinder, rotated so its right-hand temple stands behind ring 1's gate on the title and its painted sun sits to the right of the gate; only the panorama's very top fades into the sky. A soft round bloom is pinned on the painted sun (it also hides the art's horizontal stretch). Ring by ring the light deepens through tints of the same art: golden evening (rings 1–2, = the title) → dusk (3–4) → last light (5–6) → red storm-dusk for the Warden (7) → when he falls, the temple court's golden finale; lights, fog, foliage tint and the sun's bloom tween with it (`SKIES` in `chain.js`, `ENV` in `levels.js`). Fireflies drift over the lake during the causeway run as on the title. The trees are the user's six painted trees (`jungle_tree`), in the world and on the 2D map; the map's temple is the painted temple on its cliff island.
+
 ## 1. Learning design
 
 **Hero.** Karan, an 11–12-year-old explorer (sprite sheets `hero_front` / `hero_back`).
@@ -22,7 +38,7 @@
 
 **Why area maps to the angle (fixed radius).** The breach spans the wall, so the natural "shape" of the blast is the sector of the arena. Keeping r fixed and varying the angle makes the error *visible as angular coverage* — the undercharged beam visibly leaves bots standing at the edges, the overcharged beam visibly spills onto the wall — exactly as panels 10 and 11 of the wireframe show. (Mapping error to radius would hide the mistake behind the enemies.)
 
-**Tolerance.** Decimal answers are correct if |entered − exact| ≤ max(0.5 m², 0.5 %), which accepts 153.86 for 154 (π = 3.14 or 3.1416) without accepting genuine slips. π-form answers (`49π`) compare the coefficient of π exactly (±0.5 %). Fractions such as `616/4` or `98π/2` are accepted as input.
+**Answer format (LXD 2026-10-22).** Decimals and fractions are accepted and compared at 3 decimal places: 38.5, 38.500 and 77/2 are all correct for ring 1, 38 is not. Every answer in the game is exact with π = 22/7, so no wider tolerance is needed (π = 3.14 answers are deliberately not accepted). The keypad has digits, a fraction bar and a decimal point; a physical keyboard can still type `…π` forms, which are compared on the coefficient of π.
 
 ### Misconception diagnostics
 Wrong answers are matched against the most common procedural errors before a generic message is shown. (Research on fraction games found that feedback improves correctness but not misconceptions unless it is *specific to the error type* — so the game logs and names the error.)
@@ -44,15 +60,15 @@ Wrong answers are matched against the most common procedural errors before a gen
 
 Every feedback card also states the geometric consequence: *"You entered 100 m² — the laser covered 58° of the 90° breach."*
 
-### Scaffolding ladder
-| Hint level | What the panel shows |
+### Scaffolding ladder (the formula above the keypad)
+| When | What the formula shows (ring 1) |
 |---|---|
-| 0 | values only (r, θ, π = 22/7); formula hidden behind 💡 |
-| 1 | the formula A = θ/360 × πr² |
-| 2 | formula + substituted values `90/360 × 22/7 × 14 × 14` |
-| 3 | + worked steps: θ/360 = 1/4 · r² = 196 · πr² = 616 · **A = 1/4 × 616 = ?** (final step left to the learner) |
+| start (every ring) | A = θ/360 × π × r² |
+| after the 1st wrong shot | substituted A = 90/360 × 22/7 × 7 × 7 → crossed out (90/360 → 1/4, 7 against 7) → A = 1/4 × 22 × 7 |
+| after the 2nd wrong shot | A = 1/4 × 154 = 77/2 (the answer as a fraction) |
 
-Per-arena starting level (`scaffold` in `levels.js`): arena 1 starts at level 2 (`full`), arena 2 at level 1 (`formula`), arenas 3+ at level 0 (`hint`). Each failed attempt raises the level by one automatically. Hints are always free; using one forfeits the small "No hints" bonus so fluent learners still have something to chase.
+The per-ring scaffold of the LXD brief (formula hidden from ring 3) is not applied any more: the user asked for the formula above the keypad on every ring. (One flag away if the LXD wants it back.)
+There is no hint button (LXD): every miss automatically shows the next step; the changed parts glow amber, dissolve, and the new ones dissolve in left to right. The beam line and the one-line misconception tip carry the diagnosis.
 
 ## 2. Core loop — seven beats per ring (redesign 2026-10-21)
 Each game state has **one** focal point; jungle and architecture are atmosphere, the maths is unmistakable.
@@ -72,15 +88,15 @@ Wrong answers keep the LXD's consequences (UNDERCHARGED: survivors break out of 
 ## 3. Progression — the LXD's final table
 Seven arenas with fixed dimensions (π = 22/7, every answer a clean number). Guardian march speed is derived from the time budget (1.7 m/s in ring 1 → ~2.5 m/s in ring 7), so later rings get faster guardians, as the brief asks; the budget also scales the time bonus. Exit directions zig-zag (right / lower-right / upper-right); where the suggested direction would have made the open arc overlap the entrance arc the turn was softened.
 
-| # | Arena | r (m) | θ | Area | Guardians | Time budget | Exit faces | Sky | Scaffold |
+| # | Arena | r (m) | θ | Area | As a fraction | Guardians | Time budget | Exit faces | Sky |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | The Mossy Gate | 7 | 90° | **38.5** | 5 | 60 s | upper-right (45°) | day | formula + substitution |
-| 2 | Fallen Idol | 10.5 | 120° | **115.5** | 10 | 54 s | right (0°) | day | formula |
-| 3 | Serpent Court | 14 | 90° | **154** | 10 | 50 s | lower-right (320°) | dusk | hint only |
-| 4 | Crimson Ruins | 14 | 135° | **231** | 15 | 46 s | right (0°) | dusk | hint only |
-| 5 | Twin Falls | 17.5 | 72° | **192.5** | 10 | 42 s | lower-right (315°) | night | hint only |
-| 6 | Thunder Well | 21 | 60° | **231** | 10 | 38 s | upper-right (45°) | night | hint only |
-| 7 | The Warden's Court | 21 | 120° | **462** | 20 + the Warden | 34 s | right (0°) → temple | storm | hint only |
+| 1 | The Mossy Gate | 7 | 90° | **38.5** | 77/2 | 7 | 60 s | upper-right (45°) | golden evening |
+| 2 | Fallen Idol | 10.5 | 120° | **115.5** | 231/2 | 14 | 54 s | right (0°) | golden evening |
+| 3 | Serpent Court | 14 | 90° | **154** | 154 | 14 | 50 s | lower-right (320°) | dusk |
+| 4 | Crimson Ruins | 14 | 135° | **231** | 231 | 21 | 46 s | right (0°) | dusk |
+| 5 | Twin Falls | 17.5 | 72° | **192.5** | 385/2 | 14 | 42 s | lower-right (315°) | last light |
+| 6 | Thunder Well | 21 | 60° | **231** | 231 | 14 | 38 s | upper-right (45°) | last light |
+| 7 | The Warden's Court | 21 | 120° | **462** | 462 | 27 + the Warden | 34 s | right (0°) → temple | red storm-dusk |
 
 ### Chain geometry (how the overlap is computed)
 - **Lens (the passage).** Ring i's wall is open over θ_i. The passage into ring i+1 is the lens of the two circles, with its angle capped at **64°** (θ ≤ 72° uses θ itself). For equal radii that gives a lens depth of ~15 % of a diameter (12–17 % across the chain), so rings touch without merging. Half-chord c = R·sin(φ/2); the next centre sits h + √(R′² − c²) along the exit direction.
@@ -92,8 +108,8 @@ Seven arenas with fixed dimensions (π = 22/7, every answer a clean number). Gua
 The guardians stand **on the open arc of the ring Karan is in** (one line at R − 0.55 m, spaced evenly across θ, clear of the junction columns), so they literally trace the sector's curved edge. After GUARDIANS AWAKEN they **march briskly and smoothly** on the gun (1.7–2.5 m/s by ring, walk cycle synced to ground speed, only a light stride surge, no stop-start lurch). They **accelerate as they close in**: speed × (1 + 0.6·p²), where p is progress from the arc to the halt line. Over the last 1.4 m they brake and plant their feet in **two ranks** around the gun (halt line max(3.8 m, 0.42 R), back rank 1.3 m behind), clear of Karan's stand and the angle label. Ring 1's squad is in place within ~2 s; ring 7's within ~4 s. **Stasis:** when the camera goes top-down they freeze in place (`bots.freeze`) under a cyan tint, until the shot resolves. Survivors of an undercharged shot break stasis and pounce, and the laser shatters frozen guardians inside the beam.
 
 ## 4. Scoring
-`Arena cleared 500` + `Time bonus 0–300` (linear on time spent in the input phase vs. budget) + `No damage 300` + `Perfect shot 200 × waves` (first try on every wave) + `No hints 100`.
-Stars: ★★★ perfect first try & no damage · ★★ ≤ 1 shield lost · ★ cleared. Best score and stars per arena are saved (`localStorage`), the map shows them, and the total appears at the temple.
+`Arena cleared 500` + `Time bonus 0–300` (linear on time spent in the input phase vs. budget) + `No damage 300` + `Perfect first shot 200`.
+Stars, one per criterion, shown with ✓/✗ on the results card so the learner knows exactly what to replay for: ★ Cleared · ★ At most 1 miss · ★ First shot. Best score and stars per arena are saved (`localStorage`), the map shows them, and the total appears at the temple.
 
 ## 5. The Warden (arena 7)
 The Sector Warden stands behind the last squad in the open arc of the seventh ring and roars when Karan is noticed. There are no shields any more (the brief's final table has none): a perfect sector destroys the squad and the Warden together; an undercharged shot leaves it standing. It is the "final arena" flavour, not a separate mechanic.
@@ -101,10 +117,10 @@ The Sector Warden stands behind the last squad in the open arc of the seventh ri
 ## 6. Presentation modes & cameras
 | Mode | Composition |
 |---|---|
-| **Title** | Locked cinematic shot from the lake, down the causeway to the gate of ring 1 at twilight; the logo and one primary button (Play) in a dark left column; Continue appears only with a save; fireflies and torches are the only motion. No orbit, so no foliage popping |
-| **Map** | A painted isometric miniature of the **real** chain (`src/ui/mapArt.js`), in the style of an illustrated adventure map: cliff plateau over turquoise water, waterfalls, jungle canopy masses, ruins on framing islands, mist, torches, the temple glowing at the end. Every ring is drawn from `CHAIN` at its true centre and radius, with walls only where the game has walls (the lens passages and breach bays read exactly as in play), pillars at the real junctions, the causeway and the temple court. States: locked (dimmed, lock plate), available, selected (amber rim + glow + marching dashes, the only animated element), cleared (cyan seal + check). Click a ring to select it; a docked right-hand panel holds the name, a mini sector diagram, r / θ / guardian speed, stars and the single Enter button. Phones: the route turns vertical above a bottom sheet |
+| **Title** | Dusk shot low on the causeway, close to the gate of ring 1, the temple backlit by a low sun; Karan stands on the causeway facing the gate; logo + stone-tablet buttons (Continue · Arena N highlighted when there is a save, else Play) + How to play; slow drift toward the gate, birds, fireflies, lake mist, flickering torch light (see §0) |
+| **Map** | A painted isometric miniature of the **real** chain (`src/ui/mapArt.js`) filling the screen, start bottom-left → temple top-right (bottom → top on phones); parchment tag beside the selected ring; slim top bar; ring states, badges, lit route, doorway glows, temple beam, the Warden, Karan walking, unlock moment, living water (see §0) |
 | **Establishing / arena** | Ring 1: a projection-verified two-shot from inside the wall (a small solver tries heights, lateral offsets and aim points and keeps the pose that puts Karan fully in the lower band, clear of the caption box, and the guardians in the upper band, clear of the banner), so the gate he just came through stays solid. Other rings: elevated shot from behind Karan (distance 0.5 R + 3.5, height 1.05 × distance). **Camera rule:** whenever the camera is outside the current ring, its wall pieces, gate and torches within ±72° of the camera bearing fade to 8 % (smoothly), so nothing stands between the camera and the player. The run itself uses a behind-the-shoulder chase with a locked heading, clamped inside the ring; pillars that brush the camera fade |
-| **Puzzle** | 85° near top-down, FOV 32°, arc pointing up. Distance is solved so the wall **tops** (which project outward) fit: the ring fills the left ~68 % beside the panel (top 58 % on phones). The spotlight darkens (×0.28) and desaturates the world beyond R + 1.6 m (fully by R + 7.5 m); billboards taller than 4 m near the ring sink away; overlay line widths scale with R so they stay crisp |
+| **Puzzle** | 85° near top-down, FOV 32°, arc pointing up; the ring is fitted to the free screen area (left of the answer dock on desktop, above it on phones). The centre O, both radii, the arc, θ and r are drawn on top of the slim top-down cannon; the formula sits just above the keypad |
 | **Reward / exit** | The camera rises over the cleared ring to frame the next one while an amber path lights up; then an overhead chase (9 m up) keeps the seal in frame as it rises behind Karan |
 
 All moves are eased; impacts add screen shake.
@@ -113,13 +129,13 @@ All moves are eased; impacts add screen shake.
 Palette: deep jungle `#142925`, ancient stone `#776F60`, muted moss `#446549`, **temple cyan `#52DED8`** (maths, machinery, completed seals), **active amber `#F4BF55`** (selection, actions, the next objective), warm ivory `#F3EBD8` (text), **threat red `#DC6657`** (guardians, damage, errors). Type: Barlow Condensed for headings and buttons, Poppins for body; the expressive logo is the only comic lettering. One primary (amber) button per screen.
 
 ### Jungle (three layers)
-1. **Distant forest:** a wide ellipse of tall, dark, low-detail clumps (or `forest_silhouette` sprites).
-2. **Canopy masses:** hand-placed clusters of 3–6 trees (or one `jungle_canopy` sprite) on two bands around each ring and behind the lake banks, with deliberate gaps of open ground.
+1. **Distant forest:** a wide ellipse of tall, dark, low-detail `forest_silhouette` clumps.
+2. **Tree clusters:** seeded clusters of 2–4 of the six painted trees (`jungle_tree`, one big and 1–3 smaller, 7–13 m) on two bands around each ring and behind the lake banks, with deliberate gaps of open ground. The painted trees are about as wide as they are tall, so clusters are smaller than the old cartoon canopy masses.
 3. **Foreground accents:** sparse rocks and large ferns at the foot of the walls and along the shoreline.
 No random scatter; placement is seeded and deterministic. The lake has an irregular shoreline cut into the ground with a mud bank, instead of a hard rectangle edge.
 
 ## 7. Audio
-Fully procedural (see `docs/sfx/SFX_SPEC.md`): 46 cues (incl. the stasis lock), generative music with six modes (title / explore / arena / tension / boss / calm) and a jungle ambience bed with birds and torch crackle. Every learner-facing event has a sound (UI, footsteps, gates, alarm, scan, charge, beam, explosions, ricochet, hurt, stingers). Mute with **M**.
+Fully procedural (`src/engine/audio.js`): 46 cues (incl. the stasis lock), generative music with six modes (title / explore / arena / tension / boss / calm) and a jungle ambience bed with birds and torch crackle. Every learner-facing event has a sound (UI, footsteps, gates, alarm, scan, charge, beam, explosions, ricochet, hurt, stingers). Mute with **M**.
 
 ## 8. UX & accessibility
 - Input: the **stone keypad** (theme from the `newNumPad` mockup) is the input on every device, and a physical keyboard still types into its display (Enter fires). Calculator layout: digit block, a right column with a red delete (hold = clear), π and the decimal point, a wide 0 and a wide green ✓ that fires the cannon. Fractions can still be typed on a keyboard; every answer is a clean decimal or a …π form. Frame cut from the wall-top texture (`assets/ui/numpad_frame.webp`, `tools/make_ui_numpad.py`), cyan crest gem that pulses once an answer is entered, two vine sprigs. The panel is deliberately quiet: one header row (title · attempt tag · Hint), one brief (the formula, or "hidden", plus the givens r · θ · π; the substituted line replaces the givens), then the keypad. It is pinned at the bottom and only the brief and feedback scroll, so ✓ is always reachable.
@@ -139,7 +155,8 @@ Three.js r170 (vendored), ES modules, no bundler. Billboard sprite sheets for ch
 
 ## 11. Open questions for the LXD
 1. An overcharged shot kills every guardian but still costs a shield and does not clear the arena (the exact area is required to move on). Keep?
-4. The waist seals behind Karan with a rising stone slab (the "entrance gate closes and never reopens" beat). It is one flag in `levels.js` if you prefer the waist to stay open.
+4. Resolved 2026-10-22: the passage stays open behind Karan (`SEAL_BEHIND = false`); set it to true to bring the rising seal back.
 2. Decimal radii (e.g. 3.5 m) and radian mode for senior classes — trivial to add to `levels.js`.
+6. Guardian art: the sprite sheet is the GPT art; "more realistic" needs a regenerated `enemy_bot` sheet from its updated spec (rebuild the GPT specs with `python3 tools/gen_asset_docs.py`). In code they already vary in size and tone.
 3. Arc-length variant: the same arena with "energy fence length" instead of area would reuse everything.
-5. Stasis during input (design request, 2026-10-21) removes the brief's "too slow" consequence: there is no clock while the learner computes, and time only affects the bonus. If the LXD wants pressure back, the cleanest option is a visible stasis meter that runs out after N seconds and lets the march resume.
+5. Stasis during input (design request, 2026-10-21; the LXD's How-to-play text asked for guardians that "move towards you slowly while you think" — the card now says they freeze, matching the game) removes the brief's "too slow" consequence: there is no clock while the learner computes, and time only affects the bonus. If the LXD wants pressure back, the cleanest option is a visible stasis meter that runs out after N seconds and lets the march resume.

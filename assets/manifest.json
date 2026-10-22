@@ -140,6 +140,22 @@
         }
       }
     },
+    "torch_stand": {
+      "path": "sprites/torch_stand.webp",
+      "worldHeight": 1.7,
+      "baseline": 1.0,
+      "sheet": {
+        "cols": 10,
+        "rows": 3,
+        "anims": {
+          "idle": {
+            "row": 0,
+            "frames": 30,
+            "fps": 14
+          }
+        }
+      }
+    },
     "cannon": {
       "path": "sprites/cannon.webp",
       "worldHeight": 1.8,
@@ -147,30 +163,44 @@
     },
     "jungle_tree": {
       "path": "sprites/jungle_tree.webp",
-      "worldHeight": 9,
+      "worldHeight": 10,
       "sheet": {
-        "cols": 4,
-        "rows": 1,
+        "cols": 3,
+        "rows": 2,
         "anims": {
           "a": {
             "col": 0,
+            "row": 0,
             "frames": 1
           },
           "b": {
             "col": 1,
+            "row": 0,
             "frames": 1
           },
           "c": {
             "col": 2,
+            "row": 0,
             "frames": 1
           },
           "d": {
-            "col": 3,
+            "col": 0,
+            "row": 1,
+            "frames": 1
+          },
+          "e": {
+            "col": 1,
+            "row": 1,
+            "frames": 1
+          },
+          "f": {
+            "col": 2,
+            "row": 1,
             "frames": 1
           }
         }
       },
-      "baseline": 0.918
+      "baseline": 0.975
     },
     "jungle_plant": {
       "path": "sprites/jungle_plant.webp",
@@ -199,38 +229,6 @@
       },
       "baseline": 0.916
     },
-    "stone_idol": {
-      "path": "sprites/stone_idol.webp",
-      "worldHeight": 4,
-      "baseline": 0.999
-    },
-    "rubble": {
-      "path": "sprites/rubble.webp",
-      "worldHeight": 1.2,
-      "sheet": {
-        "cols": 4,
-        "rows": 1,
-        "anims": {
-          "a": {
-            "col": 0,
-            "frames": 1
-          },
-          "b": {
-            "col": 1,
-            "frames": 1
-          },
-          "c": {
-            "col": 2,
-            "frames": 1
-          },
-          "d": {
-            "col": 3,
-            "frames": 1
-          }
-        }
-      },
-      "baseline": 0.914
-    },
     "arena_floor": {
       "path": "textures/arena_floor.webp"
     },
@@ -242,9 +240,6 @@
     },
     "ground_jungle": {
       "path": "textures/ground_jungle.webp"
-    },
-    "path_dirt": {
-      "path": "textures/path_dirt.webp"
     },
     "jungle_panorama": {
       "path": "textures/jungle_panorama.webp"
@@ -264,12 +259,6 @@
       "path": "textures/gate_large_frame.webp",
       "opening": 0.444,
       "top": 0.285
-    },
-    "gate_large_door": {
-      "path": "textures/gate_large_door.webp"
-    },
-    "energy_lock": {
-      "path": "textures/energy_lock.webp"
     },
     "fx_explosion": {
       "path": "sprites/fx_explosion.webp",
@@ -299,9 +288,6 @@
     "fx_shockwave": {
       "path": "sprites/fx_shockwave.webp"
     },
-    "fx_laser": {
-      "path": "sprites/fx_laser.webp"
-    },
     "ui_logo": {
       "path": "ui/logo.webp"
     },
@@ -311,39 +297,9 @@
     "ui_story_art": {
       "path": "ui/story_illustration.webp"
     },
-    "ui_map_bg": {
-      "path": "ui/map_bg.webp"
-    },
-    "ui_map_node": {
-      "path": "ui/map_node.webp",
-      "sheet": {
-        "cols": 4,
-        "rows": 1,
-        "anims": {
-          "locked": {
-            "col": 0,
-            "frames": 1
-          },
-          "open": {
-            "col": 1,
-            "frames": 1
-          },
-          "cleared": {
-            "col": 2,
-            "frames": 1
-          },
-          "boss": {
-            "col": 3,
-            "frames": 1
-          }
-        }
-      }
-    },
-    "ui_map_marker": {
-      "path": "ui/map_marker.webp"
-    },
-    "ui_map_temple": {
-      "path": "ui/map_temple.webp"
+    "temple": {
+      "path": "sprites/temple.webp",
+      "baseline": 0.957
     },
     "ui_shield": {
       "path": "ui/shield.webp",
@@ -448,34 +404,6 @@
     },
     "seal_slab": {
       "path": "textures/seal_slab.webp"
-    },
-    "jungle_canopy": {
-      "path": "sprites/jungle_canopy.webp",
-      "worldHeight": 12,
-      "fallback": "jungle_tree",
-      "sheet": {
-        "cols": 4,
-        "rows": 1,
-        "anims": {
-          "a": {
-            "col": 0,
-            "frames": 1
-          },
-          "b": {
-            "col": 1,
-            "frames": 1
-          },
-          "c": {
-            "col": 2,
-            "frames": 1
-          },
-          "d": {
-            "col": 3,
-            "frames": 1
-          }
-        }
-      },
-      "baseline": 0.957
     },
     "forest_silhouette": {
       "path": "sprites/forest_silhouette.webp",

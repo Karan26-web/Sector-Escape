@@ -6,6 +6,7 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screens") + "/";
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 async def phase(pg): return await pg.evaluate("window.__se ? window.__se.phase : null")
 ORDER = ['causeway', 'gate', 'inside', 'alert', 'run', 'rise', 'tactical', 'scan', 'input']
+NEXT = "document.getElementById('btn-ar-next').click()"   # the end-of-arena results card waits for Next
 async def wait_phase(pg, want, timeout=150, or_later=False):
     """Wait for a phase; with or_later, also accept any later phase of the same arena intro (screenshots can be slow)."""
     t0 = time.time(); last = None
@@ -24,7 +25,7 @@ async def main():
         pg.on("pageerror", lambda e: logs.append(f"[pageerror] {e}"))
         async def shot(n): await pg.screenshot(path=f"{OUT}chain_{n}.png"); print("📸", n)
         try:
-            await pg.goto(BASE + "index.html?mute=1&reset=1", wait_until="load")
+            await pg.goto(BASE + "index.html?mute=1&reset=1", wait_until="load", timeout=180000)
             await pg.wait_for_selector("#screen-title.active", timeout=120000); await pg.wait_for_timeout(2500); await shot("01_title")
             await pg.click("#btn-play"); await pg.wait_for_timeout(500); await pg.click("#screen-story", position={"x": 60, "y": 60}); await pg.wait_for_timeout(400); await pg.click("#btn-start-journey")
             await pg.wait_for_selector("#screen-map.active", timeout=30000); await pg.wait_for_timeout(1500); await shot("02_map")
@@ -41,9 +42,10 @@ async def main():
             await wait_phase(pg, "result", 40); await pg.wait_for_timeout(2500); await shot("12_under_lunge")
             await wait_phase(pg, "input", 60); await pg.evaluate("__se.fire('50')"); await pg.wait_for_timeout(2400); await shot("13_over_fire")
             await wait_phase(pg, "result", 40); await wait_phase(pg, "input", 60); await pg.evaluate("__se.fire('38.5')"); await pg.wait_for_timeout(2300); await shot("14_perfect")
+            await wait_phase(pg, "cleared", 60); await pg.wait_for_timeout(1800); await shot("14b_results_card"); await pg.evaluate(NEXT)
             await wait_phase(pg, "exit", 60); await pg.wait_for_timeout(2600); await shot("15_reward_path")
             await pg.wait_for_timeout(4200); await shot("16_seal")
-            await wait_phase(pg, "inside", 60); await pg.wait_for_timeout(3200); await shot("17_arena2_reveal")
+            await wait_phase(pg, "inside", 90, or_later=True); await pg.wait_for_timeout(3200); await shot("17_arena2_reveal")
             await wait_phase(pg, "input", 120); await pg.wait_for_timeout(1200); await shot("18_arena2_input")
             print("✅ chain smoke flow reached arena 2")
         except Exception as e:

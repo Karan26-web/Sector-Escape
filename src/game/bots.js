@@ -42,8 +42,10 @@ export class BotManager {
       spr.setScale(scale);
       const shadow = makeShadow(0.7, 0.8);
       const g = new THREE.Group(); g.add(spr.sprite, shadow); this.group.add(g);
-      const rHalt = Math.min(rArc - 0.5, halt + (i % 2) * RANK_GAP);   // alternate ranks so the squad never blobs together
-      const bot = { g, spr, shadow, deg, r: rArc, r0: rArc, rHalt, speed: v0 * (0.92 + Math.random() * 0.16), state: 'walking', phase: Math.random() * Math.PI * 2, delay: Math.random() * 0.35, y: 0 };
+      const rHalt = Math.min(rArc - 0.5, halt + (i % 3) * RANK_GAP);   // three ranks so the (bigger) squad never blobs together
+      // a little size and tone variety so a squad of 20+ does not read as one sprite copied
+      const vary = 0.94 + Math.random() * 0.12; spr.setScale(scale * vary); if (!tint) spr.material.color.setScalar(0.9 + Math.random() * 0.1); spr.baseTone = spr.material.color.clone();
+      const bot = { g, spr, shadow, deg, r: rArc, r0: rArc, rHalt, speed: v0 * (0.92 + Math.random() * 0.16), state: 'walking', phase: Math.random() * Math.PI * 2, delay: Math.random() * 0.35, y: 0, walked: 0 };
       spr.time = Math.random() * 3;
       this.place(bot); this.bots.push(bot);
     }
@@ -52,7 +54,7 @@ export class BotManager {
   /** The guardians notice Karan: eyes flash, then they advance. */
   alert() {
     this.active = true;
-    for (const b of this.bots) { b.spr.material.color.setHex(0xff6a5a); tweens.add({ duration: 0.6, delay: Math.random() * 0.3, onUpdate: (e) => b.spr.material.color.lerpColors(new THREE.Color(0xff6a5a), new THREE.Color(0xffffff), e) }); }
+    for (const b of this.bots) { b.spr.material.color.setHex(0xff6a5a); tweens.add({ duration: 0.6, delay: Math.random() * 0.3, onUpdate: (e) => b.spr.material.color.lerpColors(new THREE.Color(0xff6a5a), b.spr.baseTone || WHITE, e) }); }
     audio.play('bots.notice');
   }
   /** Stasis while the player solves (top-down view): every standing guardian holds its pose and frame under a cyan tint.
@@ -60,7 +62,7 @@ export class BotManager {
   freeze(on, instant = false) {
     if (this.frozen === on) return; this.frozen = on;
     for (const b of this.alive) {
-      const c = b.spr.material.color, from = c.clone(), to = on ? STASIS : WHITE;
+      const c = b.spr.material.color, from = c.clone(), to = on ? STASIS : (b.spr.baseTone || WHITE);
       if (instant) c.copy(to); else tweens.add({ duration: 0.3, delay: on ? Math.random() * 0.12 : 0, onUpdate: (e) => c.lerpColors(from, to, e) });
     }
     if (on && !instant && this.alive.length) audio.play('bots.stasis');
@@ -83,7 +85,7 @@ export class BotManager {
     if (b.state === 'dying' || b.state === 'dead') return; b.state = 'dying';
     tweens.delay(delayS).promise.then(() => {
       if (!this.bots.includes(b)) return;
-      b.spr.material.color.copy(WHITE);   // the stasis shell shatters with it
+      b.spr.material.color.copy(b.spr.baseTone || WHITE);   // the stasis shell shatters with it
       b.spr.play('death', { restart: true, onComplete: () => { b.state = 'dead'; this.group.remove(b.g); b.spr.dispose(); } });
       const p = b.g.position.clone(); p.y = 0.9;
       this.fx.explosion(p, 2.6); this.fx.smoke(p, 3);
@@ -104,7 +106,7 @@ export class BotManager {
         b.state = 'lunging';
         const from = b.g.position.clone(), to = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.4, 0, (Math.random() - 0.5) * 1.4));
         const rel = to.clone().sub(this.C); if (rel.length() < PEDESTAL_R) { rel.setLength(PEDESTAL_R); to.copy(this.C).add(rel); }
-        const d = from.distanceTo(to), dur = clamp(d / 14, 0.45, 1.3), dl = i * 0.12;
+        const d = from.distanceTo(to), dur = clamp(d / 16, 0.4, 0.75), dl = i * 0.04;   // short attack, one clear impact (LXD)
         tweens.delay(dl).promise.then(() => { b.spr.play('lunge', { restart: true }); audio.play('bot.lunge', { pan: this.pan(b), minGap: 0.05 }); });
         tweens.add({ duration: dur, delay: dl, ease: Ease.linear, onUpdate: (e) => { b.g.position.lerpVectors(from, to, e); b.spr.sprite.position.y = Math.sin(e * Math.PI) * 2.2; b.shadow.material.opacity = 0.8 * (1 - Math.sin(e * Math.PI) * 0.5); },
           onComplete: () => { if (!hit) { hit = true; onHit && onHit(b); res(true); } b.state = 'attacking'; b.spr.play('idle'); } });
@@ -127,10 +129,11 @@ export class BotManager {
       if (b.delay > 0) { b.delay -= dt; b.spr.play('idle'); continue; }
       const prog = clamp(1 - (b.r - b.rHalt) / Math.max(0.01, b.r0 - b.rHalt), 0, 1), accel = 1 + ACCEL * prog * prog;   // faster near the gun
       const brake = 0.3 + 0.7 * clamp((b.r - b.rHalt) / BRAKE, 0, 1);                                                   // ...then plant their feet
-      const v = b.speed * accel * brake * this.speedMul;
-      b.phase += dt * Math.PI * 2 * (v / 1.7);                    // one stride surge per walk cycle
+      b.walked += dt; const start = Math.min(1, b.walked / 0.6), ease = start * start * (3 - 2 * start);   // ease into the march
+      const v = b.speed * accel * brake * this.speedMul * ease;
+      b.phase += dt * Math.PI * 2 * (v / 1.7);                    // footstep timing only: the march itself is perfectly smooth
       const s = Math.sin(b.phase);
-      b.r -= v * (1 + 0.12 * s) * dt;
+      b.r -= v * dt;
       b.spr.play('walk', { speed: clamp(v / 1.7, 0.7, 2.1) });
       if (s > 0.97 && this.stepCooldown <= 0 && b.r < this.R) { this.stepCooldown = 0.22; audio.play('bot.step', { pan: this.pan(b), vol: clamp(0.85 - b.r / this.R, 0.12, 0.5), minGap: 0.18 }); }
       if (b.r <= b.rHalt) { b.r = b.rHalt; b.state = 'holding'; b.spr.play('idle'); if (this.onReach) { const cb = this.onReach; this.onReach = null; cb(b); } }

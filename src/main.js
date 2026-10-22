@@ -12,7 +12,7 @@ import { ChainWorld } from './game/chain.js';
 import { Cannon } from './game/cannon.js';
 import { BotManager } from './game/bots.js';
 import { ArenaScene } from './game/arenaScene.js';
-import { CHAIN, LEVELS, TOTAL_LEVELS, validateChain } from './game/levels.js';
+import { CHAIN, LEVELS, TOTAL_LEVELS, validateChain, SEAL_BEHIND } from './game/levels.js';
 import { save } from './game/save.js';
 import { ui } from './ui/ui.js';
 import { polar, DEG } from './engine/util.js';
@@ -47,19 +47,28 @@ class Game {
     if (direct >= 1 && direct <= TOTAL_LEVELS) { ui.hideAll(); const r = await this.playFrom(direct); return this.mapLoop(r.lastId); }
     const data = save.load();
     for (;;) {
-      const c = await ui.title.show(data.unlocked > 1 || Object.keys(data.cleared).length > 0);
+      const c = await ui.title.show(this.resumeInfo());
       if (c === 'howto') { await ui.howto.show(); continue; }
+      if (c === 'continue') { ui.hideAll(); const r = await this.playFrom(this.resumeInfo().id); return this.mapLoop(r.lastId); }   // straight back into the saved arena
       if (c === 'play' && !data.seenStory) { await ui.story.show(); data.seenStory = true; save.write(); }
       break;
     }
     return this.mapLoop();
   }
-  /* locked cinematic title shot: down the causeway toward the gate, a slow breath of camera drift */
+  /** Where Continue resumes: the next arena to play (null for a brand-new player). */
+  resumeInfo() { const d = save.load(); const has = d.unlocked > 1 || Object.keys(d.cleared).length > 0; return has ? { id: Math.min(TOTAL_LEVELS, d.unlocked) } : null; }
+  /* Title shot (LXD): dusk, low on the causeway and close to the gate; Karan stands with his back to us facing the gate;
+     the temple glows with the low sun behind it; the camera drifts slowly toward the gate and back. */
   showIdle() {
-    this.hero.group.visible = false; this.chain.setActiveArena(0); this.chain.applySky('night', 1.2); this.chain.setFogDensity(0.0055); this.chain.setFocus(-1, false, 0.3); this.chain.setFireflies(true);
-    this.chain.resetStartGate(false); this.chain.cutRing = -1;
-    const base = { pos: new THREE.Vector3(-43, 3.3, 0.9), target: new THREE.Vector3(-8, 3.0, -3.6) };
-    this.world.rig.follow((out) => { const t = this.world.elapsed; out.pos.copy(base.pos).add(new THREE.Vector3(Math.sin(t * 0.21) * 0.5, Math.sin(t * 0.17) * 0.15, 0)); out.target.copy(base.target); out.fov = 50; return out; }, 30);
+    this.chain.setActiveArena(0); this.chain.applySky('evening', 1.2); this.chain.setFogDensity(0.0042); this.chain.setFocus(-1, false, 0.3); this.chain.setFireflies(true);
+    this.chain.resetStartGate(false); this.chain.cutRing = -1; this.chain.fadeOff = true; this.bots.clear(); this.cannon.reset();   // walls stay solid on the title
+    // camera on the left edge of the causeway: the bridge runs up the right of the frame to the gate, clear of the logo column
+    const far = new THREE.Vector3(-37, 2.75, -1.6), near = new THREE.Vector3(-31.5, 2.55, -1.4), target = new THREE.Vector3(-8, 3.0, 1.2);
+    this.chain.setTitleMode(true, { camPos: far });   // the evening sky itself is global (chain.js); this adds the lake mist + torch light
+    this.hero.group.visible = true; this.hero.stop(); this.hero.control = false; this.hero.setPosition(new THREE.Vector3(-24.5, 0, 0.5)); this.hero.face(new THREE.Vector3(1, 0, 0));
+    const t0 = this.world.elapsed;
+    this.world.rig.setPose({ pos: far, target, fov: 50 });                      // start on the shot (no swoop), then drift
+    this.world.rig.follow((out) => { const t = this.world.elapsed - t0, k = (1 - Math.cos((t / 46) * Math.PI * 2)) / 2; out.pos.lerpVectors(far, near, k).add(new THREE.Vector3(0, Math.sin(t * 0.37) * 0.06, Math.sin(t * 0.21) * 0.12)); out.target.copy(target); out.fov = 50; return out; }, 3);
   }
 
   async mapLoop(selectedId = null) {
@@ -67,7 +76,13 @@ class Game {
       const data = save.load();
       const id = await ui.map.show({ saveData: data, selectedId: selectedId ?? data.unlocked });
       ui.map.hide();
-      if (id == null) { this.showIdle(); const c = await ui.title.show(true); if (c === 'howto') await ui.howto.show(); continue; }
+      if (id == null) {
+        this.showIdle();
+        let c = await ui.title.show(this.resumeInfo());
+        while (c === 'howto') { await ui.howto.show(); c = await ui.title.show(this.resumeInfo()); }
+        if (c === 'continue') { const r = await this.playFrom(this.resumeInfo().id); selectedId = r.lastId; }
+        continue;
+      }
       const r = await this.playFrom(id);
       selectedId = r.lastId;
     }
@@ -75,7 +90,7 @@ class Game {
 
   /** Play the chain from arena `startId` to the temple (or until game over / quit). */
   async playFrom(startId) {
-    ui.hideAll(); ui.hud.show(); this.sessionScore = 0; this.runLog = []; this.chain.setFireflies(false); this.chain.setFogDensity(0.0034, 0.6);
+    ui.hideAll(); ui.hud.show(); this.sessionScore = 0; this.runLog = []; this.lastShields = null; this.chain.setFireflies(false); this.chain.setTitleMode(false, { dur: 0.6 }); this.chain.fadeOff = false; this.chain.setFogDensity(0.0034, 0.6);
     let index = startId - 1;
     this.resetWorldFor(index);
     let scene = new ArenaScene(this, index, { mode: index === 0 && !this.skipCutscenes ? 'causeway' : 'inside' });
@@ -87,6 +102,7 @@ class Game {
         save.clearedLevel(level.id, res.score.stars, res.score.total, TOTAL_LEVELS); this.sessionScore += res.score.total; ui.hud.setScore(this.sessionScore);
         this.runLog.push({ id: level.id, name: level.name, stars: res.score.stars, score: res.score.total });
         scene.dispose();
+        if (res.retry) { this.bots.clear(); this.resetWorldFor(index); scene = new ArenaScene(this, index, { mode: 'inside' }); continue; }   // results card → Retry
         if (index === CHAIN.arenas.length - 1) {
           this.scene = null; this.phase = 'finale';
           await ArenaScene.finale(this);
@@ -106,7 +122,7 @@ class Game {
   }
   prepareNext(index) { if (index < CHAIN.arenas.length) this.nextScene = new ArenaScene(this, index, { mode: 'entering' }); }
   resetWorldFor(index) {
-    this.chain.seals.forEach((s, i) => { if (!s) return; if (i < index) this.chain.raiseSeal(i, true); else this.chain.lowerSeal(i); });
+    this.chain.seals.forEach((s, i) => { if (!s) return; if (SEAL_BEHIND && i < index) this.chain.raiseSeal(i, true); else this.chain.lowerSeal(i); });
     CHAIN.arenas.forEach((a) => this.chain.closeHatch(a.index));
     this.chain.resetStartGate(false);
     this.cannon.reset();
@@ -129,7 +145,6 @@ window.__se = {
   get scene() { return game.scene; },
   get phase() { return game.scene ? game.scene.phase : game.phase; },
   fire(v) { ui.panel.setValue(v); ui.panel.fire(); },
-  hint() { ui.panel.hint(); },
-  assets, audio, THREE,
+  assets, audio, THREE, ui,
 };
 game.boot().catch((e) => { console.error(e); document.getElementById('loading-text').textContent = 'Error: ' + e.message; });

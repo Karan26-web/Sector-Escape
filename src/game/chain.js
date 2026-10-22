@@ -14,12 +14,31 @@ import { CHAIN, GATE, WALL_HEIGHT, onGround } from './levels.js';
 import { audio } from '../engine/audio.js';
 import { FOCUS, focusable } from '../engine/focus.js';
 
+// One evening for the whole journey (LXD: "pick one mood"; the user's evening art: `jungle_panorama` = the painted
+// evening panorama with its own sun, `sky` = the painted evening sky). Ring by ring the light deepens: golden evening
+// (rings 1–2, = the title) → dusk → last light → the Warden's red storm-dusk → when he falls, the temple court's golden
+// finale. `pano` / `sky` tint the painted backdrop (white = as painted), sunK = strength of the sun's bloom.
 const SKIES = {
-  day:   { bg: 0x9fd4ec, fog: 0x1d3328, hemi: [0xdfeeff, 0x4a5a3a, 1.2], sun: [0xfff1d6, 0.9], amb: 0.25, pano: 0xffffff, sky: 0xffffff, foliage: 0xffffff },
-  dusk:  { bg: 0xe8a070, fog: 0x2b1d1a, hemi: [0xffd3a8, 0x4a3a30, 1.1], sun: [0xffb070, 0.8], amb: 0.28, pano: 0xffc8a0, sky: 0xffb888, foliage: 0xf2d2b8 },
-  night: { bg: 0x1b2440, fog: 0x141c2e, hemi: [0x8a9fd8, 0x30403a, 1.15], sun: [0x8090c0, 0.5], amb: 0.55, pano: 0x4a5a80, sky: 0x3a4a86, foliage: 0x7c8eb4 },
-  storm: { bg: 0x515a6a, fog: 0x2b1f12, hemi: [0xb0b8c8, 0x303838, 1.0], sun: [0xc0c8d0, 0.6], amb: 0.35, pano: 0x9aa0a8, sky: 0x8a929c, foliage: 0xb4bcc6 },
+  evening:  { bg: 0x2a1f3a, fog: 0x4a3048, hemi: [0xf6b48e, 0x2c2636, 1.05], sun: [0xffa060, 0.8], amb: 0.3, pano: 0xffffff, sky: 0xffffff, foliage: 0xdcb2a2, sunK: 1 },
+  dusk:     { bg: 0x251a34, fog: 0x40283e, hemi: [0xf0a28a, 0x2a2236, 1.0], sun: [0xff8a52, 0.68], amb: 0.33, pano: 0xe6cac2, sky: 0xdcc2cc, foliage: 0xcfa294, sunK: 0.8 },
+  twilight: { bg: 0x15132a, fog: 0x2a2238, hemi: [0xc6a2c6, 0x242238, 0.98], sun: [0xff7a5c, 0.42], amb: 0.44, pano: 0xb0a0bc, sky: 0xa092b8, foliage: 0xae92a4, sunK: 0.5 },
+  storm:    { bg: 0x140c12, fog: 0x2a1a20, hemi: [0xc49aa0, 0x2a1e22, 0.95], sun: [0xd06048, 0.45], amb: 0.4, pano: 0x946068, sky: 0x82505c, foliage: 0xa88a8e, sunK: 0.3 },
+  golden:   { bg: 0x2e2240, fog: 0x5a3a44, hemi: [0xffcaa0, 0x3a2e30, 1.15], sun: [0xffb070, 0.95], amb: 0.32, pano: 0xfff2e2, sky: 0xfff0e4, foliage: 0xe6c0a8, sunK: 1 },
+  // legacy daylight / night presets (unused by the levels now; kept so an old env name never breaks)
+  day:      { bg: 0x9fd4ec, fog: 0x1d3328, hemi: [0xdfeeff, 0x4a5a3a, 1.2], sun: [0xfff1d6, 0.9], amb: 0.25, pano: 0xffffff, sky: 0xffffff, foliage: 0xffffff },
+  night:    { bg: 0x1b2440, fog: 0x141c2e, hemi: [0x8a9fd8, 0x30403a, 1.15], sun: [0x8090c0, 0.5], amb: 0.55, pano: 0x4a5a80, sky: 0x3a4a86, foliage: 0x7c8eb4 },
 };
+// The panorama art is 3:1: wrapped once around 360° it was stretched 3.3–4.6× sideways (the user saw a flattened
+// temple), so it repeats 3 times around (1.1–1.5×). Rotated so one copy's painted temple (u 0.868) sits exactly behind
+// the temple sprite (which covers it) as seen from the title; that copy's sun (u 0.732, v 0.519) then glows just right
+// of the temple. (A texture u lands at cylinder u = (u + k) / copies; cylinder u → polar angle 360u − 90°.)
+const PANO = { R: 260, H: 175, top: 135, copies: 3, rotY: -14.37 * DEG, sunU: 0.732, sunV: 0.519 };
+// The lost temple: the user's painted temple on its cliff island, far beyond the temple court on the chain's axis.
+// From the title it stands behind ring 1's gate (its building clear above the wall); it grows as Karan travels east.
+const TEMPLE = { x: 260, z: 8, h: 103, base: -10.3 };
+// The sky art: its warm bottom on the horizon, its deep-blue top 35° up (where the panorama's own painted sky fades
+// into it), clamped above; wrapped twice around (less stretch). Its warmest column (u 0.565) faces the sun.
+const SKY = { span: 35, glowU: 0.565 };
 const T = 1.0;          // wall thickness
 const WATER_Y = -0.7;
 
@@ -27,6 +46,7 @@ export class ChainWorld {
   constructor(world, fx) {
     this.world = world; this.fx = fx; this.group = new THREE.Group(); world.add(this.group);
     this.H = WALL_HEIGHT; this.rng = mulberry32(4242);
+    this.causewayTorches = []; this.titleOn = 0;
     this.rings = []; this.seals = []; this.hatches = []; this.animTorches = []; this.lights = []; this.pillarMeshes = []; this.waterMats = []; this.wallPieces = []; this.cutRing = -1; this.keepSeals = false; this.fadeOff = false;
     this.skyName = null; this.fogDensity = 0.0034; this.activeIndex = -1; this.focusIndex = -1;
     this.tint = { pano: new THREE.Color(0xffffff), sky: new THREE.Color(0xffffff), foliage: new THREE.Color(0xffffff) };
@@ -42,9 +62,22 @@ export class ChainWorld {
     this.group.add(this.hemi, this.sun, this.amb);
     for (let i = 0; i < 4; i++) { const pl = new THREE.PointLight(0xff9a3a, 26, 24, 2); pl.visible = false; pl.userData.base = 26; pl.userData.phase = Math.random() * 10; this.group.add(pl); this.lights.push(pl); }
     const mid = new THREE.Vector3(B.cx, 0, B.cz);
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(540, 32, 16), new THREE.MeshBasicMaterial({ map: assets.texture('sky', { wrap: false }), side: THREE.BackSide, fog: false })); this.sky.position.copy(mid); this.sky.position.y = -40; this.group.add(this.sky);
-    const fade = document.createElement('canvas'); fade.width = 4; fade.height = 256; const fg = fade.getContext('2d'); const grd = fg.createLinearGradient(0, 0, 0, 256); grd.addColorStop(0, '#000'); grd.addColorStop(0.3, '#000'); grd.addColorStop(0.46, '#fff'); grd.addColorStop(1, '#fff'); fg.fillStyle = grd; fg.fillRect(0, 0, 4, 256);
-    this.pano = new THREE.Mesh(new THREE.CylinderGeometry(260, 260, 130, 64, 1, true), new THREE.MeshBasicMaterial({ map: assets.texture('jungle_panorama', { wrap: true }), alphaMap: new THREE.CanvasTexture(fade), transparent: true, depthWrite: false, side: THREE.BackSide, fog: false })); this.pano.position.copy(mid); this.pano.position.y = 44; this.pano.renderOrder = -5; this.group.add(this.pano);
+    // the painted evening sky: a sphere that follows the camera (so its horizon never moves), drawn first, no depth
+    const skyTex = assets.texture('sky', { wrap: false }).clone(); skyTex.wrapS = THREE.RepeatWrapping; skyTex.wrapT = THREE.ClampToEdgeWrapping;
+    skyTex.repeat.set(2, 180 / SKY.span); skyTex.offset.set(0, -0.5 * 180 / SKY.span); skyTex.needsUpdate = true;   // sphere uv.y 0.5 (horizon) → art bottom
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(540, 48, 24), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+    this.sky.renderOrder = -7; this.group.add(this.sky);
+    // the painted panorama; only its very top fades into the sky (its temple tops must stay solid)
+    const fade = document.createElement('canvas'); fade.width = 4; fade.height = 256; const fg = fade.getContext('2d'); const grd = fg.createLinearGradient(0, 0, 0, 256); grd.addColorStop(0, '#000'); grd.addColorStop(0.04, '#000'); grd.addColorStop(0.24, '#fff'); grd.addColorStop(1, '#fff'); fg.fillStyle = grd; fg.fillRect(0, 0, 4, 256);
+    const panoTex = assets.texture('jungle_panorama', { wrap: true }).clone(); panoTex.repeat.set(PANO.copies, 1); panoTex.needsUpdate = true;
+    this.pano = new THREE.Mesh(new THREE.CylinderGeometry(PANO.R, PANO.R, PANO.H, 96, 1, true), new THREE.MeshBasicMaterial({ map: panoTex, alphaMap: new THREE.CanvasTexture(fade), transparent: true, depthWrite: false, side: THREE.BackSide, fog: false }));
+    this.pano.position.copy(mid); this.pano.position.y = PANO.top - PANO.H / 2; this.pano.rotation.y = PANO.rotY; this.pano.renderOrder = -5; this.group.add(this.pano);
+    // where the painted sun sits in the world (on the cylinder); the sky's warm side is turned toward it
+    const aSun = (360 * (PANO.sunU / PANO.copies) - 90) * DEG + PANO.rotY;   // the copy whose temple hides behind the temple sprite
+    this.sunPos = new THREE.Vector3(mid.x + Math.cos(aSun) * (PANO.R - 6), PANO.top - PANO.sunV * PANO.H, mid.z - Math.sin(aSun) * (PANO.R - 6));
+    this.sky.rotation.y = aSun + 8 * DEG - (180 + 180 * SKY.glowU) * DEG;   // sphere u → polar 180° + 360u (u = glowU / 2: two wraps); +8° ≈ the sun seen from the title
+    this.buildTitleSky(mid);
+    this.buildLostTemple();
     this.buildGroundAndLake();
     this.buildCauseway();
     for (const ring of CHAIN.all) this.buildRing(ring);
@@ -318,9 +351,18 @@ export class ChainWorld {
     const a0 = CHAIN.arenas[0], lat = w / 2 + 0.25, pEnd = L / 2 - 1 - (Math.sqrt((a0.R + T) ** 2 - lat * lat) - 0.08 - a0.R), pLen = pEnd + L / 2;
     for (const s of [-1, 1]) {
       const par = new THREE.Mesh(new THREE.BoxGeometry(pLen, 0.9, 0.5), new THREE.MeshLambertMaterial({ map: sideTex, color: 0xb8bcae })); par.position.set((pEnd - L / 2) / 2, 0.45, s * lat); g.add(par);
+      // free-standing torches (torch_stand: no wall bracket) planted in small stone sockets on the parapet top;
+      // the wall-bracket 'torch' stays on the ring walls, where there is a wall to hang it on
+      const stand = !assets.isPlaceholder('torch_stand');
       for (let x = -L / 2 + 9; x < L / 2 - 4; x += 9) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.2, 0.34), new THREE.MeshLambertMaterial({ color: 0x4a4f55 })); post.position.set(x, 1.4, s * (w / 2 + 0.25)); g.add(post);
-        const spr = new AnimatedSprite('torch', { worldHeight: 1.5, center: [0.5, 0.2] }); spr.time = this.rnd(0, 10); spr.sprite.position.set(x, 1.9, s * (w / 2 + 0.25)); g.add(spr.sprite); this.animTorches.push({ spr, ring: -1, k: 1 });
+        const z = s * (w / 2 + 0.25);
+        if (stand) {
+          const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.17, 0.22, 10), new THREE.MeshLambertMaterial({ map: sideTex, color: 0x8f8a7c })); socket.position.set(x, 1.0, z); g.add(socket);
+          const spr = new AnimatedSprite('torch_stand', { worldHeight: 1.7, center: [0.5, 0] }); spr.time = this.rnd(0, 10); spr.sprite.position.set(x, 0.96, z); g.add(spr.sprite); this.animTorches.push({ spr, ring: -1, k: 1 }); this.causewayTorches.push(spr.sprite);
+        } else {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.2, 0.34), new THREE.MeshLambertMaterial({ color: 0x4a4f55 })); post.position.set(x, 1.4, z); g.add(post);
+          const spr = new AnimatedSprite('torch', { worldHeight: 1.5, center: [0.5, 0.2] }); spr.time = this.rnd(0, 10); spr.sprite.position.set(x, 1.9, z); g.add(spr.sprite); this.animTorches.push({ spr, ring: -1, k: 1 });
+        }
       }
     }
   }
@@ -346,24 +388,24 @@ export class ChainWorld {
   /* ---------------------------------------------------------------- foliage: three layers, clustered, with breathing room */
   buildJungle() {
     const cw = CHAIN.causeway, S = CHAIN.sanctuary, B = CHAIN.bounds;
+    // the user's painted trees (2026-10-22): 6 variants in one sheet; the far horizon keeps its dark silhouette clumps
     const trees = new SpriteCloud('jungle_tree', 900), plants = new SpriteCloud('jungle_plant', 360), rocks = new SpriteCloud('jungle_rocks', 360);
-    // redesigned foliage: when the canopy-mass / distant-silhouette sheets exist, one sprite replaces a hand-built cluster
-    const canopyReal = assets.status.get('jungle_canopy') === 'file', distantReal = assets.status.get('forest_silhouette') === 'file';
-    const canopy = canopyReal ? new SpriteCloud('jungle_canopy', 260) : null, distant = distantReal ? new SpriteCloud('forest_silhouette', 160) : null;
+    const TV = trees.def.cols * trees.def.rows, tv = () => Math.floor(this.rng() * TV);
+    const distant = assets.status.get('forest_silhouette') === 'file' ? new SpriteCloud('forest_silhouette', 160) : null;
     const onCauseway = (x, z, m) => x > cw.start.x - 3 - m && x < cw.gate.x + 1 && Math.abs(z - cw.gate.z) < cw.width / 2 + 0.8 + m;
     const onTemplePath = (x, z, m) => x > S.gatePos.x - 3 - m && x < S.escape.x + 14 && Math.abs(z - S.gatePos.z) < 4.5 + m;
     const blocked = (x, z, m) => onGround(x, z, -m) || onCauseway(x, z, m) || onTemplePath(x, z, m) || this.insideLake(x, z) || (m > 2 && this.insideLake(x, z, -m));
     const nearLake = (x, z, m) => !this.insideLake(x, z) && this.lakeOutline().some((p) => Math.hypot(p.x - x, p.y + z) < m);
     const clusters = [];
-    const cluster = (x, z, { n = [3, 6], big = 11, small = 7.5, shade = 0.95, spread = 2.6, minGap = 9, keep = 3.2 } = {}) => {
+    // a cluster: one big tree and 1–3 smaller ones around it (the painted trees are about as wide as they are tall)
+    const cluster = (x, z, { n = [2, 4], big = 10.5, small = 7, shade = 0.95, spread = 3.4, minGap = 9, keep = 3.2 } = {}) => {
       if (blocked(x, z, keep + 1.5) || clusters.some((c) => Math.hypot(c.x - x, c.z - z) < minGap)) return false;
       clusters.push({ x, z });
-      if (canopy) { canopy.add(x, 0, z, big + this.rnd(0, 2.5), Math.floor(this.rng() * 4), shade * this.rnd(0.9, 1)); if (this.rng() < 0.5) { const a = this.rng() * Math.PI * 2, tx = x + Math.cos(a) * (spread + 1.6), tz = z + Math.sin(a) * (spread + 1.6); if (!blocked(tx, tz, keep)) trees.add(tx, 0, tz, small, Math.floor(this.rng() * 4), shade * 0.92); } return true; }
       const count = n[0] + Math.floor(this.rng() * (n[1] - n[0] + 1));
       for (let k = 0; k < count; k++) {
-        const a = this.rng() * Math.PI * 2, r = k === 0 ? 0 : 1.1 + this.rng() * spread, tx = x + Math.cos(a) * r, tz = z + Math.sin(a) * r;
+        const a = this.rng() * Math.PI * 2, r = k === 0 ? 0 : 1.6 + this.rng() * spread, tx = x + Math.cos(a) * r, tz = z + Math.sin(a) * r;
         if (blocked(tx, tz, keep)) continue;
-        trees.add(tx, 0, tz, (k === 0 ? big : small) + this.rnd(0, 2.5), Math.floor(this.rng() * 4), shade * this.rnd(0.86, 1));
+        trees.add(tx, 0, tz, (k === 0 ? big : small) + this.rnd(0, 2.5), tv(), shade * this.rnd(0.86, 1));
       }
       for (let k = 0; k < 2; k++) { const a = this.rng() * Math.PI * 2, tx = x + Math.cos(a) * (spread + 1.4), tz = z + Math.sin(a) * (spread + 1.4); if (!blocked(tx, tz, 1.2)) plants.add(tx, 0, tz, this.rnd(1.3, 2.2), Math.floor(this.rng() * 4), this.rnd(0.85, 1)); }
       return true;
@@ -372,7 +414,7 @@ export class ChainWorld {
     for (const ring of CHAIN.all) {
       const R = ring.R + (ring.bay ? ring.bay.D * 0.6 : 0), n = Math.max(7, Math.round((2 * Math.PI * (R + 11)) / 15));
       for (let k = 0; k < n; k++) { const d = (k / n) * 360 + this.rnd(-7, 7), p = polar(d, R + this.rnd(8.5, 12.5)); cluster(ring.center.x + p.x, ring.center.z + p.z); }
-      for (let k = 0; k < n; k++) { const d = (k / n) * 360 + 180 / n + this.rnd(-6, 6), p = polar(d, R + this.rnd(19, 27)); cluster(ring.center.x + p.x, ring.center.z + p.z, { shade: 0.78, big: 12.5, minGap: 11 }); }
+      for (let k = 0; k < n; k++) { const d = (k / n) * 360 + 180 / n + this.rnd(-6, 6), p = polar(d, R + this.rnd(19, 27)); cluster(ring.center.x + p.x, ring.center.z + p.z, { shade: 0.78, big: 10.5, small: 7.5, minGap: 11 }); }   // the painted trees are twice as wide as the old ones: no taller than the inner band
     }
     // causeway framing: clusters behind the banks on both sides, bank rocks and reeds with gaps
     for (const s of [-1, 1]) {
@@ -403,10 +445,10 @@ export class ChainWorld {
     for (let k = 0; k < 64; k++) {
       const t = (k / 64) * Math.PI * 2 + this.rnd(-0.03, 0.03), sc = this.rnd(0.92, 1.12), x = B.cx + Math.cos(t) * ax * sc, z = B.cz + Math.sin(t) * az * sc;
       if (distant) { if (!blocked(x, z, 6)) distant.add(x, 0, z, this.rnd(16, 22), Math.floor(this.rng() * 4), this.rnd(0.5, 0.62)); continue; }
-      for (let j = 0; j < 4; j++) { const tx = x + this.rnd(-5, 5), tz = z + this.rnd(-5, 5); if (!blocked(tx, tz, 6)) trees.add(tx, 0, tz, this.rnd(14, 19), Math.floor(this.rng() * 4), this.rnd(0.42, 0.55)); }
+      for (let j = 0; j < 4; j++) { const tx = x + this.rnd(-5, 5), tz = z + this.rnd(-5, 5); if (!blocked(tx, tz, 6)) trees.add(tx, 0, tz, this.rnd(14, 19), tv(), this.rnd(0.42, 0.55)); }
     }
-    for (const c of [trees, plants, rocks, canopy, distant]) if (c) { c.commit(); this.group.add(c.mesh); }
-    this.clouds = { trees, plants, rocks, canopy, distant };
+    for (const c of [trees, plants, rocks, distant]) if (c) { c.commit(); this.group.add(c.mesh); }
+    this.clouds = { trees, plants, rocks, distant };
   }
 
   /* ---------------------------------------------------------------- fireflies (title ambience) */
@@ -423,17 +465,67 @@ export class ChainWorld {
   }
   setFireflies(on) { if (this.fireflies) this.fireflies.visible = on; }
 
+  /* ---------------------------------------------------------------- title screen: dusk dome, low sun behind the temple, lake mist */
+  /** The lost temple sprite (the painted temple on its cliff island), drawn with the backdrop, after the sun's bloom. */
+  buildLostTemple() {
+    const mat = new THREE.SpriteMaterial({ map: assets.texture('temple', { wrap: false }), transparent: true, alphaTest: 0.03, depthWrite: false, fog: false });
+    const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(TEMPLE.h, TEMPLE.h, 1); s.position.set(TEMPLE.x, TEMPLE.base, TEMPLE.z); s.renderOrder = -3;
+    this.group.add(s); this.temple = s; this.templeHaze = new THREE.Color(0xc9b4cc);
+  }
+  /** Sun bloom over the painted sun, and the title's lake mist. */
+  buildTitleSky(mid) {
+    const glowTex = assets.texture('fx_glow', { wrap: false });
+    // additive bloom drawn just after the panorama, on the painted sun (a round disc also hides the art's horizontal
+    // stretch). Depth-tested, so trees and walls in front of it hide it.
+    const mk = (scale, color, op) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, fog: false })); sp.scale.setScalar(scale); sp.renderOrder = -4; sp.userData.op = op; sp.position.copy(this.sunPos); this.group.add(sp); return sp; };
+    this.sunParts = [mk(300, 0xff8a4a, 0.45), mk(110, 0xffc27a, 0.75), mk(26, 0xfff1c8, 1)];   // halo, glow, disc
+    this.sunK = SKIES.evening.sunK;
+    // lake mist: two soft layers either side of the causeway, drifting slowly
+    const mc = document.createElement('canvas'); mc.width = mc.height = 256; const mg = mc.getContext('2d'); const rnd = this.rnd.bind(this);
+    for (let i = 0; i < 26; i++) { const x = rnd(0, 256), y = rnd(0, 256), r = rnd(28, 70); for (const ox of [-256, 0, 256]) for (const oy of [-256, 0, 256]) { const rg = mg.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); rg.addColorStop(0, 'rgba(255,255,255,0.55)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); mg.fillStyle = rg; mg.fillRect(x + ox - r, y + oy - r, r * 2, r * 2); } }
+    const mtex = new THREE.CanvasTexture(mc); mtex.wrapS = mtex.wrapT = THREE.RepeatWrapping; mtex.repeat.set(2.4, 1.2);
+    // soft edges (a separate, non-repeating alpha mask) so no sheet edge ever shows
+    const ec = document.createElement('canvas'); ec.width = ec.height = 128; const eg = ec.getContext('2d'); const er = eg.createRadialGradient(64, 64, 8, 64, 64, 64);
+    er.addColorStop(0, '#fff'); er.addColorStop(0.55, '#bbb'); er.addColorStop(1, '#000'); eg.fillStyle = er; eg.fillRect(0, 0, 128, 128);
+    const edge = new THREE.CanvasTexture(ec);
+    const cw = CHAIN.causeway, cx = cw.start.x * 0.55 + cw.gate.x * 0.45; this.mist = [];
+    for (const [z, y, sp] of [[-15, 0.45, 1], [15, 0.45, -0.8], [-13, 1.1, -0.6], [13, 1.1, 0.7]]) {   // over the water either side of the causeway
+      const geo = new THREE.PlaneGeometry(58, 24); geo.rotateX(-Math.PI / 2);
+      const t = mtex.clone(); t.needsUpdate = true;
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: t, alphaMap: edge, color: 0xffe2d8, transparent: true, opacity: 0, depthWrite: false, fog: false }));   // soft white haze, not additive (it vanished over bright water)
+      m.position.set(cx, y, z); m.renderOrder = 3; m.visible = false; m.userData.speed = sp; this.group.add(m); this.mist.push(m);
+    }
+  }
+  /** Title extras on/off: lake mist and torch light flickering on the causeway stone (the sky itself is always evening). */
+  setTitleMode(on, { camPos = null, dur = 1.2 } = {}) {
+    const parts = [...this.mist];
+    if (on) {
+      parts.forEach((p) => (p.visible = true));
+      // warm point light from the torches nearest the camera, flickering on the stone (LXD)
+      const torches = this.causewayTorches.map((t) => t.getWorldPosition(new THREE.Vector3())).sort((a, b) => (camPos ? a.distanceTo(camPos) - b.distanceTo(camPos) : 0));
+      this.lights.forEach((pl, k) => { const tp = torches[k]; if (tp && k < 4) { pl.position.copy(tp).add(new THREE.Vector3(0, 1.6, 0)); pl.color.setHex(0xff9a3a); pl.userData.base = 22; pl.distance = 16; pl.visible = true; } else pl.visible = false; });
+    }
+    tweens.cancelTag('title');
+    const from = this.titleOn, to = on ? 1 : 0;
+    tweens.add({ duration: dur, tag: 'title', onUpdate: (e) => {
+      const k = from + (to - from) * e; this.titleOn = k;
+      this.mist.forEach((m) => (m.material.opacity = 0.34 * k));
+    }, onComplete: () => { if (!on) parts.forEach((p) => (p.visible = false)); } });
+  }
+
   /* ================================================================ state */
   setActiveArena(i) {
     this.activeIndex = i; this.cutRing = i; const ring = this.rings[i]; if (!ring) return;
     const n = ring.torchPos.length;
-    this.lights.forEach((pl, k) => { const tp = ring.torchPos[Math.floor((k / 4) * n)]; if (tp) { pl.position.copy(tp); pl.visible = true; } else pl.visible = false; });
+    this.lights.forEach((pl, k) => { const tp = ring.torchPos[Math.floor((k / 4) * n)]; pl.userData.base = 26; pl.distance = 24; if (tp) { pl.position.copy(tp); pl.visible = true; } else pl.visible = false; });
     const env = ring.arena.level ? ring.arena.level.env : ring.arena.env; this.applySky(env.sky);
   }
   applySky(name, dur = 1.6) {
     if (this.skyName === name) return; this.skyName = name;
     const to = SKIES[name], scene = this.world.scene;
-    const from = { bg: scene.background.clone(), fog: scene.fog.color.clone(), hs: this.hemi.color.clone(), hg: this.hemi.groundColor.clone(), hi: this.hemi.intensity, sc: this.sun.color.clone(), si: this.sun.intensity, ai: this.amb.intensity, pano: this.tint.pano.clone(), sky: this.tint.sky.clone(), fol: this.tint.foliage.clone() };
+    const from = { bg: scene.background.clone(), fog: scene.fog.color.clone(), hs: this.hemi.color.clone(), hg: this.hemi.groundColor.clone(), hi: this.hemi.intensity, sc: this.sun.color.clone(), si: this.sun.intensity, ai: this.amb.intensity, pano: this.tint.pano.clone(), sky: this.tint.sky.clone(), fol: this.tint.foliage.clone(),
+      sk: this.sunK };
+    const skTo = to.sunK ?? 0;
     const T2 = { fol: new THREE.Color(to.foliage), bg: new THREE.Color(to.bg), fog: new THREE.Color(to.fog), hs: new THREE.Color(to.hemi[0]), hg: new THREE.Color(to.hemi[1]), sc: new THREE.Color(to.sun[0]), pano: new THREE.Color(to.pano), sky: new THREE.Color(to.sky) };
     tweens.cancelTag('sky');
     tweens.add({ duration: dur, tag: 'sky', onUpdate: (e) => {
@@ -442,6 +534,7 @@ export class ChainWorld {
       this.sun.color.lerpColors(from.sc, T2.sc, e); this.sun.intensity = lerp(from.si, to.sun[1], e); this.amb.intensity = lerp(from.ai, to.amb, e);
       this.tint.pano.lerpColors(from.pano, T2.pano, e); this.tint.sky.lerpColors(from.sky, T2.sky, e);
       this.tint.foliage.lerpColors(from.fol, T2.fol, e); if (this.clouds) for (const c of Object.values(this.clouds)) if (c) c.material.uniforms.tint.value.copy(this.tint.foliage);
+      this.sunK = lerp(from.sk, skTo, e);
     } });
   }
   setFogDensity(d, dur = 1.2) { const fog = this.world.scene.fog; tweens.cancelTag('fog'); const from = fog.density; tweens.add({ duration: dur, tag: 'fog', onUpdate: (e) => { fog.density = lerp(from, d, e); }, onComplete: () => { this.fogDensity = d; } }); }
@@ -459,6 +552,11 @@ export class ChainWorld {
     const f = FOCUS.amount.value, cam = this.world.camera.position;
     for (const tr of this.animTorches) { tr.spr.update(dt); const k = tr.ring === this.focusIndex ? 1 : 1 - 0.72 * f; if (Math.abs(k - tr.k) > 0.01) { tr.k = k; tr.spr.material.color.setScalar(k); } }
     this.pano.material.color.copy(this.tint.pano).multiplyScalar(1 - 0.65 * f); this.sky.material.color.copy(this.tint.sky).multiplyScalar(1 - 0.65 * f);
+    if (this.titleOn > 0) for (const m of this.mist) { m.material.map.offset.x += dt * 0.006 * m.userData.speed; m.material.map.offset.y += dt * 0.003 * m.userData.speed; }
+    this.sky.position.copy(cam);   // the sky is "at infinity"
+    { const d = cam.distanceTo(this.temple.position), haze = 0.3 * Math.min(1, Math.max(0, (d - 60) / 260));   // the temple: the backdrop's tint + distance haze
+      this.temple.material.color.copy(this.tint.pano).lerp(this.templeHaze, haze).multiplyScalar(1 - 0.65 * f); }
+    { const dim = 1 - 0.65 * f; this.sunParts.forEach((sp, i) => { sp.material.opacity = Math.min(1, sp.userData.op * this.sunK * dim * (i ? 1 : 0.9 + 0.1 * Math.sin(t * 0.7))); }); }
     for (const pl of this.lights) if (pl.visible) { pl.userData.phase += dt * 9; pl.intensity = pl.userData.base * (0.85 + 0.15 * Math.sin(pl.userData.phase) * Math.sin(pl.userData.phase * 0.37)); }
     for (const w of this.waterMats) { w.tex.offset.x += dt * 0.012 * w.speed; w.tex.offset.y += dt * 0.008 * w.speed; }
     for (const h of this.hatches) if (h) h.ring.material.opacity = h.glow ? 0.45 + Math.sin(t * 3.2) * 0.25 : Math.max(0, h.ring.material.opacity - dt * 1.5);

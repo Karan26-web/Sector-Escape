@@ -67,6 +67,7 @@ export class Hero {
   update(dt) {
     const w = this.world, cam = w.camera;
     const lift = topDownLift(cam); this.front.sprite.position.y = lift; this.back.sprite.position.y = lift;   // visible from the puzzle camera
+    const ro = lift > 0 ? 16 : 0; this.front.sprite.renderOrder = ro; this.back.sprite.renderOrder = ro;           // ...and drawn over the floor overlays (the dim)
     // ---- movement
     let move = this._tmp.set(0, 0, 0); let moving = false;
     if (this.control && this.target && w.input.axis().active) { this.target = null; this.onArrive = null; } // player takes over from auto-run

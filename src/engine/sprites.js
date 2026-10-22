@@ -33,7 +33,7 @@ export class AnimatedSprite {
   play(name, { restart = false, speed = 1, onComplete = null } = {}) {
     if (!this.def.anims[name]) name = Object.keys(this.def.anims)[0];
     if (this.animName === name && !restart) { this.speed = speed; if (onComplete) this.onComplete = onComplete; return this; }
-    this.anim = this.def.anims[name]; this.animName = name; this.frame = 0; this.time = 0; this.speed = speed; this.finished = false; this.onComplete = onComplete;
+    this.anim = this.def.anims[name]; this.animName = name; this.frame = 0; this.time = 0; this.phase = 0; this.speed = speed; this.finished = false; this.onComplete = onComplete;
     this._apply(); return this;
   }
   setFlip(f) { if (this.flipX !== f) { this.flipX = f; this._apply(); } }
@@ -42,9 +42,9 @@ export class AnimatedSprite {
   update(dt) {
     if (!this.anim || this.finished) return;
     const fps = (this.anim.fps ?? 8) * this.speed;
-    this.time += dt;
+    this.time += dt; this.phase = (this.phase ?? this.time * fps) + dt * fps;   // accumulate: speed may change every frame
     const total = this.anim.frames ?? 1;
-    const f = Math.floor(this.time * fps);
+    const f = Math.floor(this.phase);
     if (this.anim.loop === false) {
       if (f >= total) { this.frame = total - 1; this.finished = true; this._apply(); if (this.onComplete) { const cb = this.onComplete; this.onComplete = null; cb(); } return; }
       this.frame = f;
@@ -54,7 +54,7 @@ export class AnimatedSprite {
   _apply() {
     if (!this.anim) return;
     const cols = this.def.cols, rows = this.def.rows;
-    const col = (this.anim.col ?? 0) + this.frame, row = this.anim.row ?? 0;
+    const idx = (this.anim.col ?? 0) + this.frame, col = idx % cols, row = (this.anim.row ?? 0) + Math.floor(idx / cols);   // long anims wrap onto the next rows
     if (this.flipX) { this.tex.repeat.x = -1 / cols; this.tex.offset.x = (col + 1) / cols; }
     else { this.tex.repeat.x = 1 / cols; this.tex.offset.x = col / cols; }
     this.tex.offset.y = 1 - (row + 1) / rows;

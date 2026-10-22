@@ -86,19 +86,6 @@ export function groundJungle(size = 512) {
   return c;
 }
 
-export function pathDirt(w = 256, h = 512) {
-  const c = canvas(w, h), g = c.getContext('2d'); const img = g.createImageData(w, h), d = img.data;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const u = x / w, v = y / h, n = (fbm(u * 5, v * 10, 41, 4) + fbm(u * 5, (v + 1) * 10, 41, 4)) / 2, edge = Math.pow(Math.abs(u - 0.5) * 2, 3);
-    const i = (y * w + x) * 4, k = 0.7 + n * 0.6;
-    d[i] = (120 - edge * 60) * k; d[i + 1] = (92 - edge * 10) * k; d[i + 2] = (60 - edge * 20) * k; d[i + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  for (let i = 0; i < 90; i++) { const x = w * (0.1 + hash(i, 1) * 0.8), y = hash(i, 2) * h, r = 6 + hash(i, 3) * 14; circle(g, x, y, r); g.fillStyle = `rgb(${110 + hash(i, 4) * 50},${105 + hash(i, 4) * 40},${95 + hash(i, 4) * 30})`; g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(30,20,10,0.6)'; g.stroke(); }
-  return c;
-}
-
-/** 360° cylindrical jungle backdrop (4096x1024): sky → canopy → mist. */
 export function junglePanorama(w = 4096, h = 1024) {
   const c = canvas(w, h), g = c.getContext('2d');
   const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#5aa8d8'); sky.addColorStop(0.45, '#bfe3ee'); sky.addColorStop(0.6, '#e9d9b0'); sky.addColorStop(1, '#6f8a52'); g.fillStyle = sky; g.fillRect(0, 0, w, h);
@@ -154,18 +141,6 @@ export function gateDoor(w = 512, h = 1024, large = false) {
   else { for (let i = 0; i < 4; i++) { const x = 20 + i * ((w - 40) / 4); g.fillStyle = i % 2 ? '#7a5632' : '#5e4025'; g.fillRect(x, 16, (w - 40) / 4 - 6, h - 32); } for (const y of [h * 0.2, h * 0.5, h * 0.8]) { g.fillStyle = '#3b3f45'; g.fillRect(10, y - 20, w - 20, 40); g.strokeStyle = OUT; g.lineWidth = 6; g.strokeRect(10, y - 20, w - 20, 40); for (let k = 0; k < 4; k++) { circle(g, 40 + k * ((w - 80) / 3), y, 8); g.fillStyle = '#8d939c'; g.fill(); g.stroke(); } } }
   return c;
 }
-export function energyLock(size = 512) {
-  const c = canvas(size, size), g = c.getContext('2d'), cx = size / 2;
-  glow(g, cx, cx, size / 2, 'rgba(255,70,60,ALPHA)', 0.8);
-  circle(g, cx, cx, size * 0.34); g.lineWidth = 16; g.strokeStyle = '#ff5a4a'; g.stroke();
-  circle(g, cx, cx, size * 0.24); g.lineWidth = 8; g.stroke();
-  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * size * 0.24, cx + Math.sin(a) * size * 0.24); g.lineTo(cx + Math.cos(a) * size * 0.4, cx + Math.sin(a) * size * 0.4); g.lineWidth = 10; g.stroke(); }
-  // sector glyph in the middle
-  g.beginPath(); g.moveTo(cx, cx); g.arc(cx, cx, size * 0.17, -Math.PI / 2 - 0.8, -Math.PI / 2 + 0.8); g.closePath(); g.fillStyle = 'rgba(255,120,100,0.9)'; g.fill();
-  return c;
-}
-
-/* ---------------------------------------------------------------- props */
 export function torchSheet(fw = 128, fh = 256) {
   return sheet(4, 1, fw, fh, (g, c) => {
     const cx = fw / 2, t = (c / 4) * Math.PI * 2;
@@ -196,15 +171,6 @@ export function plantSheet(fw = 512, fh = 512) {
     for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + ((i / (n - 1)) - 0.5) * 2.2, len = fh * (0.45 + hash(c, i) * 0.35), col = ['#2f7f3a', '#3f9f4a', '#56b85e'][i % 3]; const x1 = cx + Math.cos(a) * len, y1 = base + Math.sin(a) * len; g.strokeStyle = OUT; g.lineWidth = 34; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx, base); g.quadraticCurveTo(cx + Math.cos(a) * len * 0.5, base + Math.sin(a) * len * 0.5 - 30, x1, y1); g.stroke(); g.strokeStyle = col; g.lineWidth = 24; g.stroke(); g.strokeStyle = shadeHex(col, 0.25); g.lineWidth = 6; g.stroke(); }
   });
 }
-export function stoneIdol(w = 512, h = 1024) {
-  const c = canvas(w, h), g = c.getContext('2d'), cx = w / 2;
-  g.fillStyle = '#6f7a6a'; rrect(g, cx - 160, h - 220, 320, 200, 20); g.fill(); g.lineWidth = 12; g.strokeStyle = OUT; g.stroke();
-  g.fillStyle = '#7f8a78'; rrect(g, cx - 130, 120, 260, 720, 60); g.fill(); g.stroke();
-  g.fillStyle = '#5b665a'; rrect(g, cx - 100, 240, 200, 90, 20); g.fill(); g.stroke(); rrect(g, cx - 60, 400, 120, 60, 12); g.fill(); g.stroke(); rrect(g, cx - 110, 540, 220, 70, 16); g.fill(); g.stroke();
-  glow(g, cx - 60, 285, 50, 'rgba(120,230,255,ALPHA)', 0.6); glow(g, cx + 60, 285, 50, 'rgba(120,230,255,ALPHA)', 0.6);
-  for (let i = 0; i < 20; i++) glow(g, hash(i, 1) * w, h - hash(i, 2) * 400, 20 + hash(i, 3) * 40, 'rgba(70,120,50,ALPHA)', 0.5);
-  return c;
-}
 export function cannonSprite(size = 1024) {
   const c = canvas(size, size), g = c.getContext('2d'), cx = size / 2, base = size * 0.93;
   // base plinth
@@ -226,12 +192,6 @@ export function cannonSprite(size = 1024) {
   poly(g, [[cx - 95, base - 600], [cx - 60, base - 450], [cx - 10, base - 520]]); g.fillStyle = 'rgba(0,80,140,0.35)'; g.fill();
   return c;
 }
-export function rubbleSheet(fw = 256, fh = 256) {
-  return sheet(4, 1, fw, fh, (g, c) => { for (let i = 0; i < 6 + c; i++) { const x = fw * 0.2 + hash(c, i) * fw * 0.6, y = fh * 0.55 + hash(c, i + 9) * fh * 0.35, r = 14 + hash(c, i + 19) * 30; poly(g, [[x - r, y + r * 0.6], [x - r * 0.6, y - r], [x + r * 0.5, y - r * 0.8], [x + r, y + r * 0.5]]); g.fillStyle = i % 2 ? '#7e8a74' : '#5e675a'; g.fill(); g.lineWidth = 6; g.strokeStyle = OUT; g.stroke(); } });
-}
-
-/* ---------------------------------------------------------------- chain world additions */
-/** Four jungle boulders (sheet 4×1). */
 export function rockSheet(fw = 512, fh = 512) {
   return sheet(4, 1, fw, fh, (g, c) => {
     const cx = fw / 2, base = fh - 30, n = 7 + c;

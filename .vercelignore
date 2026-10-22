@@ -1,12 +1,11 @@
-# keep the deployment small: screenshots and local test scripts are not part of the game
-playtest/screens
-playtest/*.py
+# Deploy only the game (index.html, vercel.json, src/, styles/, vendor/, assets/).
+# Docs, tools, tests and art sources stay in the repo but are not published.
+docs
+tools
+playtest
+README.md
 *.py
-.DS_Store
 art-source
-playtest/screens
 .DS_Store
-# design mockups (reference only, not loaded by the game)
-assets/newNumPad.png
 # dev-only tools (temporary skip button)
 src/dev
