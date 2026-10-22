@@ -55,26 +55,34 @@ export class ArenaScene {
     if (l > lim) { rel.multiplyScalar(lim / l); pos.x = this.C.x + rel.x; pos.z = this.C.z + rel.z; pos.y += (l - lim) * 0.75; }
     return pos;
   }
-  /** Dedicated puzzle camera: near top-down (85°), arc up, ring framed left of the panel (or above the sheet on phones). */
+  /** Puzzle camera: near top-down (85°), arc up, and the ring FITTED to the free part of the screen (left of the panel
+   *  on desktop, above the sheet on phones, below the HUD), so every ring, r 7 or r 21, fills the view the same way.
+   *  Real points are projected through a scratch camera and the pose is solved iteratively (distance + aim offset). */
   tacticalPose() {
-    const R = this.R, A = this.A, bay = A.bay ? A.bay.D : 0, u = this.dirDeg(A.exitDeg), right = new THREE.Vector3(-u.z, 0, u.x), up = new THREE.Vector3(0, 1, 0);
-    const aspect = window.innerWidth / window.innerHeight, narrow = window.innerWidth < 760, fov = 32, tanH = Math.tan((fov / 2) * DEG), WH = 6.6;
-    let D = 40, north, south, span, mid, latHalf;
-    for (let it = 0; it < 3; it++) {           // wall tops sit closer to the camera and project outward: frame those, not the floor
-      const k = D / (D - WH);
-      north = (R + bay + 1.0) * k + 1.5; south = (R + 1.0) * k + 0.8; span = north + south; mid = (north - south) / 2;
-      latHalf = Math.max(R + 1.0, (R + bay + 1.0) * Math.sin(Math.min(90, A.theta / 2) * DEG)) * k + 1.0;
-      D = narrow ? Math.max(span / (2 * tanH * 0.4), latHalf / (tanH * aspect * 0.94)) : Math.max(span / (2 * tanH * 0.88), latHalf / (0.34 * 2 * tanH * aspect));
+    const R = this.R, A = this.A, u = this.dirDeg(A.exitDeg), right = new THREE.Vector3(-u.z, 0, u.x), up = new THREE.Vector3(0, 1, 0);
+    const vw = window.innerWidth, vh = window.innerHeight, narrow = vw < 760, fov = 32, pitch = 85 * DEG, tanH = Math.tan((fov / 2) * DEG);
+    const panel = document.getElementById('cannon-panel'), pad = narrow ? 8 : 20;
+    const free = narrow
+      ? { x0: pad, x1: vw - pad, y0: 100, y1: vh * 0.42 - pad }   // the sheet can grow to 58vh once feedback shows
+      : { x0: pad, x1: vw - ((panel && panel.offsetWidth) || 370) - 22 - pad, y0: 88, y1: vh - pad };
+    // must be in frame: the ring floor plus a sliver of wall, and headroom above the arc (sprites stand toward screen-up)
+    const pts = [];
+    for (let a = 0; a < 360; a += 10) pts.push(this.C.clone().addScaledVector(this.dirDeg(a), R + 0.5));
+    pts.push(this.C.clone().addScaledVector(u, R + 1.9));
+    const cam = this._fitCam || (this._fitCam = new THREE.PerspectiveCamera(fov, 1, 0.5, 2000));
+    cam.aspect = vw / vh; cam.updateProjectionMatrix();
+    const target = this.C.clone(), v = new THREE.Vector3(); let D = 2.4 * R + 12;
+    const place = () => { cam.position.copy(target).addScaledVector(u, -D * Math.cos(pitch)).addScaledVector(up, D * Math.sin(pitch)); cam.lookAt(target); cam.updateMatrixWorld(); };
+    for (let it = 0; it < 6; it++) {
+      place();
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const p of pts) { v.copy(p).project(cam); const sx = ((v.x + 1) / 2) * vw, sy = ((1 - v.y) / 2) * vh; x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy); }
+      const mpp = (2 * D * tanH) / vh;   // metres per screen px at the aim point
+      target.addScaledVector(right, ((x0 + x1) / 2 - (free.x0 + free.x1) / 2) * mpp).addScaledVector(u, -((y0 + y1) / 2 - (free.y0 + free.y1) / 2) * mpp);
+      D *= Math.max((x1 - x0) / (free.x1 - free.x0), (y1 - y0) / (free.y1 - free.y0));
     }
-    let target;
-    if (!narrow) {
-      const halfW = D * tanH * aspect;
-      target = this.C.clone().addScaledVector(u, mid).addScaledVector(right, 0.16 * 2 * halfW);
-    } else {
-      target = this.C.clone().addScaledVector(u, mid).addScaledVector(u, -0.27 * 2 * D * tanH);
-    }
-    const pitch = 85 * DEG, pos = target.clone().addScaledVector(u, -D * Math.cos(pitch)).addScaledVector(up, D * Math.sin(pitch));
-    return { pos, target, fov };
+    place();
+    return { pos: cam.position.clone(), target, fov };
   }
   /** Pose (inside the ring) that frames Karan low and the guarded arc high, verified by projecting both. */
   solveTwoShot(arc, look) {

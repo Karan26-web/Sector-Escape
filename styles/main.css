@@ -178,18 +178,18 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 .panel.open { transform: none; opacity: 1; }
 .panel > * { flex: none; }
 .panel .panel-info { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -4px; padding: 0 4px; scrollbar-width: thin; }
-.panel header { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
-.panel header .icon { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff, var(--cyan) 35%, #1f6f6b 75%); box-shadow: 0 0 16px rgba(82, 222, 216, 0.6); flex: none; }
+.panel header { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+.panel header h2 { flex: 1; }
+.panel header #attempts { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #f08b7f; }
+.panel header #attempts:empty { display: none; }
 .panel h2 { font-family: var(--font-head); font-weight: 800; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; color: var(--ivory); }
-.panel header p { margin: 1px 0 0; font-size: 12.5px; color: var(--muted); }
-.formula { background: rgba(243, 235, 216, 0.04); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 21px; font-weight: 600; text-align: center; margin: 6px 0; display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; }
+.formula { background: rgba(243, 235, 216, 0.035); border-radius: 12px; padding: 10px 12px; font-size: 21px; font-weight: 600; text-align: center; margin: 6px 0; display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; }
 .formula .sub { font-size: 17px; color: var(--cyan); }
 .formula .hidden-f { color: var(--muted); font-size: 13px; font-weight: 500; }
 .frac { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: 1.05; margin: 0 4px; font-size: 0.78em; text-align: center; }
 .frac span:first-child { border-bottom: 2px solid currentColor; padding: 0 3px; }
-.values { list-style: none; padding: 0; margin: 8px 0; display: flex; gap: 6px; flex-wrap: wrap; }
-.values li { background: rgba(243, 235, 216, 0.05); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 14px; }
-.values li b { color: var(--ivory); } .values li.theta b { color: var(--cyan); } .values li.pi { border-color: rgba(82, 222, 216, 0.4); }
+.formula .givens { font-size: 15px; font-weight: 500; color: var(--muted); } .formula .givens b { color: var(--ivory); font-weight: 700; } .formula .givens b.cy { color: var(--cyan); }
+.formula .givens i { font-style: normal; margin: 0 9px; opacity: 0.45; }
 .muted-small { font-size: 11px; color: var(--muted); font-weight: 500; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* stone keypad (theme from the newNumPad mockup): mossy stone frame carved from the wall-top texture, cyan crest gem,
@@ -200,16 +200,12 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 .numpad.ready .np-crest { animation: gempulse 1.2s ease-in-out infinite alternate; }
 @keyframes gempulse { to { filter: drop-shadow(0 0 12px rgba(120, 255, 248, 0.95)); } }
 .np-vine { position: absolute; width: 42px; height: 63px; pointer-events: none; z-index: 2; }
-.np-vine.v-tl { left: -34px; top: -30px; } .np-vine.v-l { left: -35px; top: 42%; transform: scale(0.85) rotate(8deg); }
-.np-vine.v-tr { right: -33px; top: -24px; transform: scaleX(-1) scale(0.85); } .np-vine.v-br { right: -33px; bottom: -34px; transform: scaleX(-1) rotate(-10deg); }
-.np-vine.v-bl { left: -32px; bottom: -36px; transform: scale(0.75) rotate(-6deg); }
+.np-vine.v-tl { left: -34px; top: -30px; } .np-vine.v-br { right: -33px; bottom: -34px; transform: scaleX(-1) rotate(-10deg); }
 .np-display { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 14px; border-radius: 12px; background: linear-gradient(180deg, #051110, #0a1a18); border: 2px solid var(--cyan); box-shadow: 0 0 12px rgba(82, 222, 216, 0.5), inset 0 0 14px rgba(82, 222, 216, 0.2); cursor: text; }
 .np-display input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--ivory); font-family: var(--font-head); font-weight: 700; font-size: 34px; letter-spacing: 0.05em; caret-color: var(--cyan); padding: 0; }
-.np-display input::placeholder { color: rgba(82, 222, 216, 0.5); font-size: 19px; font-weight: 600; letter-spacing: 0.08em; }
+.np-display input::placeholder { color: rgba(82, 222, 216, 0.5); font-size: 19px; font-weight: 600; letter-spacing: 0.04em; }
 .np-display .unit { color: var(--muted); font-weight: 600; font-size: 15px; }
-.keypad { display: none; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
-.panel.show-keypad .keypad { display: grid; }
-.panel.show-keypad #btn-fire { display: none; }   /* the green ✓ key is the trigger when the keypad is out */
+.keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
 .keypad .k { --ch: 10px; position: relative; height: 50px; padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 3px 0 #040807); transition: transform 0.06s, filter 0.15s; }
 .keypad .k-face { position: absolute; inset: 0; display: grid; place-items: center; clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch)); background: linear-gradient(180deg, #e3c47c 0%, #a9c9b0 28%, #4fd8d0 62%, #2aa6a1 100%); }
 .keypad .k-face::before { content: ''; position: absolute; inset: 2.5px; --c2: calc(var(--ch) - 1px); clip-path: polygon(var(--c2) 0, calc(100% - var(--c2)) 0, 100% var(--c2), 100% calc(100% - var(--c2)), calc(100% - var(--c2)) 100%, var(--c2) 100%, 0 calc(100% - var(--c2)), 0 var(--c2)); background: radial-gradient(90% 70% at 28% 18%, rgba(255, 255, 255, 0.13), transparent 60%), linear-gradient(180deg, #56645f 0%, #404c48 55%, #313b38 100%); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25); }
@@ -218,7 +214,7 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 .keypad .k-sym .k-glyph { color: #8ff7f2; font-size: 27px; }
 .keypad .k-del .k-face { background: linear-gradient(180deg, #ffc0ad 0%, #f07b67 45%, #c8473a 100%); }
 .keypad .k-del .k-face::before { background: radial-gradient(90% 70% at 28% 18%, rgba(255, 255, 255, 0.16), transparent 60%), linear-gradient(180deg, #e2654f 0%, #c0412f 55%, #9c3024 100%); }
-.keypad .k-ok { grid-column: span 2; }
+.keypad .k-ok, .keypad .k-zero { grid-column: span 2; }
 .keypad .k-ok .k-face { background: linear-gradient(180deg, #e2ffee 0%, #8af0bf 40%, #3fc98c 100%); }
 .keypad .k-ok .k-face::before { background: radial-gradient(90% 70% at 28% 18%, rgba(255, 255, 255, 0.18), transparent 60%), linear-gradient(180deg, #56d396 0%, #31a56b 55%, #247f53 100%); }
 .keypad .k-ok .k-glyph svg { width: 38px; }
@@ -227,13 +223,6 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 .keypad .k:hover { filter: drop-shadow(0 3px 0 #040807) brightness(1.08); }
 .keypad .k:active, .keypad .k.press { transform: translateY(2px); filter: drop-shadow(0 1px 0 #040807) brightness(1.18); }
 .keypad .k:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 6px; }
-button.fire { width: 100%; margin-top: 10px; font-family: var(--font-head); font-weight: 800; font-size: 28px; letter-spacing: 0.24em; text-transform: uppercase; padding: 12px; border-radius: 12px; border: none; background: var(--amber); color: #23180a; cursor: pointer; transition: box-shadow 0.3s, transform 0.08s, filter 0.2s; }
-button.fire.ready { animation: fireglow 1.2s ease-in-out infinite alternate; }
-@keyframes fireglow { to { box-shadow: 0 0 26px 2px rgba(244, 191, 85, 0.5); } }
-button.fire:active { transform: translateY(2px); }
-button.fire:disabled { filter: grayscale(0.7) brightness(0.6); cursor: default; animation: none; }
-.panel-foot { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
-.panel-foot #attempts { margin-left: auto; }
 .feedback { margin: 6px 0 2px; border-radius: 12px; padding: 0 12px; max-height: 0; overflow: hidden; transition: max-height 0.4s, padding 0.3s; background: rgba(243, 235, 216, 0.04); border: 1px solid transparent; font-size: 13px; line-height: 1.45; }
 .feedback.show { max-height: 320px; padding: 10px 12px; border-color: var(--line); }
 .feedback:not(.show) { display: none; }
@@ -254,7 +243,7 @@ button.fire:disabled { filter: grayscale(0.7) brightness(0.6); cursor: default; 
 
 /* ---------- responsive ---------- */
 @media (max-height: 800px) and (min-width: 761px) {
-  .panel { padding-top: 14px; } .panel header { margin-bottom: 6px; } .panel header p { display: none; }
+  .panel { padding-top: 14px; } .panel header { margin-bottom: 6px; }
   .np-display { height: 48px; } .np-display input { font-size: 29px; }
   .numpad { padding: 9px 9px; } .keypad { gap: 7px; margin-top: 9px; } .keypad .k { height: 42px; } .keypad .k-glyph { font-size: 27px; }
 }
@@ -264,12 +253,11 @@ button.fire:disabled { filter: grayscale(0.7) brightness(0.6); cursor: default; 
   .title-btns, .title-foot { margin-left: 0; align-items: center; }
   .panel { right: 0; left: 0; top: auto; bottom: 0; width: 100%; max-height: 58vh; border-radius: 18px 18px 0 0; transform: translateY(110%); padding: 12px 14px 0; }
   .panel.open { transform: none; }
-  .panel header p { display: none; } .panel h2 { font-size: 20px; }
+  .panel h2 { font-size: 20px; }
   .formula { font-size: 17px; padding: 6px 10px; } .formula .sub { font-size: 14px; }
-  .panel button.fire { position: sticky; bottom: 0; margin-bottom: 10px; z-index: 2; }
   /* phone sheet: Hint / Keypad move up beside the title, the keypad trims a little → more room for feedback */
-  .panel { padding-bottom: 10px; } .panel header { margin-bottom: 4px; min-height: 34px; } .panel header .icon { width: 26px; height: 26px; } .panel h2 { font-size: 18px; }
-  .panel-foot { position: absolute; top: 10px; right: 12px; margin: 0; } .panel-foot #attempts { display: none; } .panel-foot .btn.small { padding: 7px 10px; font-size: 13px; }
+  .panel { padding-bottom: 10px; } .panel header { margin-bottom: 4px; min-height: 34px; } .panel h2 { font-size: 18px; } .panel header .btn.small { padding: 7px 12px; font-size: 13px; }
+  .formula .givens { font-size: 14px; }
   .numpad { margin-top: 16px; padding: 8px 7px; } .np-display { height: 44px; } .np-display input { font-size: 26px; } .np-display input::placeholder { font-size: 16px; }
   .keypad { gap: 5px; margin-top: 8px; } .keypad .k { height: 40px; --ch: 8px; } .keypad .k-glyph { font-size: 25px; } .keypad .k-glyph svg { width: 30px; }
   .hud-left { width: 52vw; } .hud-title { font-size: 17px; } .shields img { width: 32px; height: 32px; }

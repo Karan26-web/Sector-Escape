@@ -8,3 +8,5 @@ playtest/screens
 .DS_Store
 # design mockups (reference only, not loaded by the game)
 assets/newNumPad.png
+# dev-only tools (temporary skip button)
+src/dev

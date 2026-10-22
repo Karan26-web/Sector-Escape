@@ -236,6 +236,9 @@ export class Cannon {
     const cam = this.world.camera.position, elev = Math.atan2(cam.y - this.lift.position.y, Math.hypot(cam.x - this.C.x, cam.z - this.C.z)) / DEG;
     const w = Math.min(1, Math.max(0, (elev - 52) / 16)); this.topW += (w - this.topW) * Math.min(1, dt * 8);
     const k = this.topW;
+    // the ring floors' depth offsets (they stop overlapping rings flickering) grow with camera distance: from a far puzzle
+    // camera (phones, big rings) they swallowed the sector overlays lying a few cm above the floor. Lift the overlays with it.
+    this.overlays.position.y = Math.min(0.3, cam.distanceTo(this.C) * 0.0015);
     this.body.material.opacity = 1 - k; this.body.visible = k < 0.98; this.shadow.visible = k < 0.98;
     if (this.body.visible) {
       // a flat card at the drum centre leaves the painted pedestal hovering behind an empty disc. Stand the card toward

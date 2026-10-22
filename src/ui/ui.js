@@ -182,12 +182,13 @@ export const ui = {
   panel: {
     cfg: null, hintLevel: 0, locked: false,
     init() {
-      // stone keypad: digits, a column of maths keys (π / .), red delete (hold = clear), green ✓ = FIRE
+      // stone keypad, calculator layout: digit block, a right column (red delete · π · decimal point), wide 0, wide green ✓ = FIRE
+      // (fractions can still be typed on a keyboard; every answer in the game is a clean decimal or a …π form)
       const ICON = {
         del: '<svg viewBox="0 0 44 30" aria-hidden="true"><path d="M14 3 H40 Q42 3 42 5 V25 Q42 27 40 27 H14 L3 15 Z" fill="#fff6ec" stroke="#3a0f0a" stroke-width="2.6" stroke-linejoin="round"/><path d="M21 10 L31 20 M31 10 L21 20" stroke="#d2402f" stroke-width="3.6" stroke-linecap="round"/></svg>',
         ok: '<svg viewBox="0 0 44 34" aria-hidden="true"><path d="M7 18 L17 27 L37 6" fill="none" stroke="#0d3a24" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 18 L17 27 L37 6" fill="none" stroke="#fbfff8" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       };
-      const keys = [['7'], ['8'], ['9'], ['π', 'sym'], ['4'], ['5'], ['6'], ['/', 'sym'], ['1'], ['2'], ['3'], ['.', 'sym'], ['⌫', 'del'], ['0'], ['✓', 'ok']];
+      const keys = [['7'], ['8'], ['9'], ['⌫', 'del'], ['4'], ['5'], ['6'], ['π', 'sym'], ['1'], ['2'], ['3'], ['.', 'sym'], ['0', 'zero'], ['✓', 'ok']];
       const pad = $('#keypad'); pad.innerHTML = ''; this.keyEls = {};
       for (const [k, kind] of keys) {
         const b = document.createElement('button'); b.className = `silent k${kind ? ' k-' + kind : ''}`; b.dataset.k = k;
@@ -208,26 +209,21 @@ export const ui = {
         if (el) { el.classList.add('press'); setTimeout(() => el.classList.remove('press'), 120); }   // typing lights the stone key too
         if (e.key === 'Enter') { e.preventDefault(); this.fire(); }
       });
-      $('#btn-fire').addEventListener('click', () => this.fire());
       $('#btn-hint').addEventListener('click', () => this.hint());
+      // the stone keypad is the input on every device (a physical keyboard still types into the display)
       const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      // the stone keypad is the primary input on every device (new storage key, so an old "hidden" choice doesn't hide it)
-      let pref = null; try { pref = localStorage.getItem('se_keypad2'); } catch {}
-      $('#cannon-panel').classList.toggle('show-keypad', pref === null ? true : pref === '1');
       if (coarse) { $('#answer').setAttribute('inputmode', 'none'); $('#answer').setAttribute('readonly', ''); }
-      $('#btn-keypad').addEventListener('click', () => { const on = $('#cannon-panel').classList.toggle('show-keypad'); try { localStorage.setItem('se_keypad2', on ? '1' : '0'); } catch {} });
     },
     key(k) {
       const inp = $('#answer'); audio.play('ui.type', { minGap: 0.02 });
       if (k === '⌫') inp.value = inp.value.slice(0, -1); else if (k === 'C') inp.value = ''; else if (inp.value.length < 10) inp.value += k;
       this.refresh();
     },
-    refresh() { const on = $('#answer').value.trim().length > 0 && !this.locked; $('#btn-fire').classList.toggle('ready', on); $('#numpad').classList.toggle('ready', on); },
+    refresh() { $('#numpad').classList.toggle('ready', $('#answer').value.trim().length > 0 && !this.locked); },
     open(cfg) {
       this.cfg = cfg; this.hintLevel = cfg.hintLevel ?? 0; this.locked = false;
       $('#cannon-panel').classList.add('open'); $('#cannon-panel').classList.remove('locked'); audio.play('ui.panel');
-      $('#values').innerHTML = `<li>r = <b>${cfg.r} m</b></li><li class="theta">θ = <b>${cfg.theta}°</b></li><li>π = <b>${PI.label}</b> <span class="muted-small">or type …π</span></li>`;
-      $('#answer').value = ''; $('#btn-fire').disabled = false; this.setFeedback(null); this.setAttempts(cfg.attempts > 1 ? `Attempt ${cfg.attempts}` : '');
+      $('#answer').value = ''; this.setFeedback(null); this.setAttempts(cfg.attempts > 1 ? `Attempt ${cfg.attempts}` : '');
       this.renderFormula(); this.refresh();
       if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 350);
     },
@@ -235,8 +231,10 @@ export const ui = {
     effectiveLevel() { const s = this.cfg?.scaffold; return Math.max(this.hintLevel, s === 'full' ? 2 : s === 'formula' ? 1 : 0); },
     renderFormula() {
       const lvl = this.effectiveLevel(), box = $('#formula-box'), c = this.cfg; if (!c) return;
-      if (lvl === 0) box.innerHTML = `<span class="hidden-f">Formula hidden — press 💡 Hint if you need it</span>`;
-      else box.innerHTML = `<div>${FORMULA_HTML}</div>${lvl >= 2 ? `<div class="sub">${substituted(c.r, c.theta)}</div>` : ''}`;
+      // one brief: the formula (or a note that it is hidden) + the givens; the substituted line already contains the givens
+      const givens = `<div class="givens">r = <b>${c.r} m</b><i>·</i>θ = <b class="cy">${c.theta}°</b><i>·</i>π = <b>${PI.label}</b></div>`;
+      if (lvl === 0) box.innerHTML = `<span class="hidden-f">Formula hidden · tap Hint</span>${givens}`;
+      else box.innerHTML = `<div>${FORMULA_HTML}</div>${lvl >= 2 ? `<div class="sub">${substituted(c.r, c.theta)}</div>` : givens}`;
       if (lvl >= 3) { const steps = hintSteps(c.r, c.theta); this.setFeedback({ type: 'hint', title: 'Step by step', html: `<ol>${steps.slice(0, 3).map((s) => `<li><b>${s.label}:</b> ${s.text}</li>`).join('')}<li><b>${steps[3].label}:</b> ${steps[3].text}</li></ol>` }); }
       else { const e = $('#feedback'); e.className = 'feedback'; e.innerHTML = ''; }
       $('#btn-hint').style.visibility = lvl >= 3 ? 'hidden' : 'visible';
@@ -249,8 +247,8 @@ export const ui = {
       setTimeout(() => { try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {} }, 420);
     },
     setAttempts(t) { $('#attempts').textContent = t; },
-    lock() { this.locked = true; $('#cannon-panel').classList.add('locked'); $('#btn-fire').disabled = true; $('#btn-fire').classList.remove('ready'); $('#numpad').classList.remove('ready'); },
-    unlock() { this.locked = false; $('#cannon-panel').classList.remove('locked'); $('#btn-fire').disabled = false; $('#answer').value = ''; this.refresh(); if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 50); },
+    lock() { this.locked = true; $('#cannon-panel').classList.add('locked'); $('#numpad').classList.remove('ready'); },
+    unlock() { this.locked = false; $('#cannon-panel').classList.remove('locked'); $('#answer').value = ''; this.refresh(); if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 50); },
     setValue(v) { $('#answer').value = String(v); this.refresh(); },
     fire() { if (this.locked || !this.cfg) return; const v = $('#answer').value.trim(); if (!v) { audio.play('ui.error'); $('#answer').focus(); return; } audio.play('ui.confirm'); this.cfg.onFire && this.cfg.onFire(v); },
   },
