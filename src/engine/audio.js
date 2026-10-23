@@ -1,8 +1,6 @@
 // ---------------------------------------------------------------------------
 // Sector Escape – procedural audio (Web Audio API)
-// Every SFX is synthesised so the game is fully playable without audio files.
-// Drop real files into assets/sfx and list them in assets/manifest.json
-// ("sfx": { "cannon.fire": "sfx/cannon_fire.mp3" }) to override any sound.
+// Every sound is synthesised: there are no audio files to download.
 // ---------------------------------------------------------------------------
 
 const SFX = {};
@@ -18,10 +16,8 @@ export class AudioEngine {
     this.ctx = null;
     this.muted = safeStorage('se_muted', '0') === '1';
     this.volumes = { master: 0.9, sfx: 0.85, music: 0.26, ambient: 0.4 };
-    this.buffers = new Map();
     this.music = new MusicPlayer(this);
     this.ambient = new AmbientPlayer(this);
-    this.loops = new Map();
     this.lastPlayed = new Map();
   }
 
@@ -65,18 +61,6 @@ export class AudioEngine {
   }
   toggleMute() { this.setMuted(!this.muted); return this.muted; }
 
-  async loadFiles(map, base = '') {
-    if (!map) return;
-    const ctx = this.ensure(); if (!ctx) return;
-    await Promise.all(Object.entries(map).map(async ([name, url]) => {
-      try {
-        const res = await fetch(base + url); if (!res.ok) return;
-        const buf = await ctx.decodeAudioData(await res.arrayBuffer());
-        this.buffers.set(name, buf);
-      } catch { /* keep synth fallback */ }
-    }));
-  }
-
   /* ----------------------------------------------------------- playback */
   play(name, o = {}) {
     if (!this.ctx) return null;
@@ -84,19 +68,10 @@ export class AudioEngine {
     const minGap = o.minGap ?? 0.03, last = this.lastPlayed.get(name) ?? -1;
     if (this.now - last < minGap) return null;
     this.lastPlayed.set(name, this.now);
-    if (this.buffers.has(name)) return this._playBuffer(name, o);
     const fn = SFX[name];
     if (!fn) { console.warn('[audio] unknown sfx:', name); return null; }
     try { return fn(this, o) ?? null; } catch (e) { console.warn('[audio]', name, e); return null; }
   }
-  _playBuffer(name, o) {
-    const src = this.ctx.createBufferSource(); src.buffer = this.buffers.get(name);
-    src.playbackRate.value = o.rate ?? 1;
-    const g = this.gain(o.vol ?? 1); src.connect(g); src.start(this.now + (o.delay ?? 0));
-    return { stop: (fade = 0.1) => { g.gain.setTargetAtTime(0, this.now, fade / 3); src.stop(this.now + fade + 0.05); } };
-  }
-  startLoop(name, o = {}) { if (this.loops.has(name)) return this.loops.get(name); const h = this.play(name, o); if (h) this.loops.set(name, h); return h; }
-  stopLoop(name, fade = 0.3) { const h = this.loops.get(name); if (h) { h.stop(fade); this.loops.delete(name); } }
 
   /* ----------------------------------------------------------- node helpers */
   gain(v = 1, dest) { const g = this.ctx.createGain(); g.gain.value = v; g.connect(dest || this.sfxBus); return g; }
@@ -151,7 +126,6 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 SFX['ui.hover'] = (A) => A.tone({ f0: 1200, f1: 1500, dur: 0.05, vol: 0.025, env: { a: 0.003, d: 0.02, s: 0.2, r: 0.03 } });
 SFX['ui.click'] = (A) => { A.tone({ type: 'square', f0: 700, f1: 380, dur: 0.07, vol: 0.08, env: { a: 0.002, d: 0.03, s: 0.2, r: 0.04 } }); A.burst({ dur: 0.03, vol: 0.12, type: 'highpass', f0: 2500 }); };
 SFX['ui.confirm'] = (A) => A.seq([[72, 0, 0.09, 1], [79, 0.08, 0.16, 1]], { vol: 0.14 });
-SFX['ui.back'] = (A) => A.seq([[71, 0, 0.08, 1], [64, 0.07, 0.14, 0.8]], { vol: 0.12 });
 SFX['ui.error'] = (A) => { const t = A.now; A.tone({ type: 'square', f0: 190, dur: 0.14, vol: 0.12, t0: t }); A.tone({ type: 'square', f0: 150, dur: 0.22, vol: 0.12, t0: t + 0.14 }); };
 SFX['ui.type'] = (A) => A.burst({ dur: 0.025, vol: 0.14, type: 'bandpass', f0: rnd(1800, 2600), Q: 2, env: { a: 0.001, d: 0.015, s: 0.1, r: 0.01 } });
 SFX['ui.panel'] = (A) => A.burst({ dur: 0.28, vol: 0.14, type: 'bandpass', f0: 400, f1: 2400, Q: 1.5, env: { a: 0.05, d: 0.12, s: 0.4, r: 0.1 } });
@@ -172,29 +146,8 @@ SFX['gate.open'] = (A) => {
   A.tone({ t0: t + 1.45, f0: 90, f1: 40, dur: 0.25, vol: 0.4, env: { a: 0.003, d: 0.1, s: 0.3, r: 0.15 } });
   A.burst({ t0: t + 1.45, dur: 0.15, vol: 0.3, f0: 2500, f1: 150 });
 };
-SFX['gate.close'] = (A) => {
-  const t = A.now;
-  A.burst({ t0: t, dur: 0.8, vol: 0.2, type: 'bandpass', f0: 900, f1: 500, Q: 2, env: { a: 0.05, d: 0.5, s: 0.5, r: 0.25 } });
-  A.tone({ t0: t + 0.75, f0: 70, f1: 32, dur: 0.4, vol: 0.6, env: { a: 0.003, d: 0.15, s: 0.3, r: 0.25 } });
-  A.burst({ t0: t + 0.75, dur: 0.25, vol: 0.45, f0: 1200, f1: 80 });
-};
 SFX['gate.unlock'] = (A) => { A.seq([[76, 0, 0.3, 1], [80, 0.12, 0.3, 1], [83, 0.24, 0.5, 1], [88, 0.36, 0.9, 1]], { type: 'sine', vol: 0.16 }); A.burst({ t0: A.now + 0.3, dur: 0.8, vol: 0.08, type: 'highpass', f0: 5000, env: { a: 0.2, d: 0.3, s: 0.5, r: 0.3 } }); };
-SFX['breach.open'] = (A) => {
-  const t = A.now;
-  A.burst({ t0: t, dur: 2.2, vol: 0.5, f0: 110, Q: 0.8, env: { a: 0.15, d: 1.2, s: 0.6, r: 0.9 } });
-  for (let i = 0; i < 9; i++) A.burst({ t0: t + 0.15 + Math.random() * 1.6, dur: 0.07, vol: rnd(0.15, 0.3), f0: rnd(900, 2600), f1: 200, pan: rnd(-0.6, 0.6) });
-  A.tone({ t0: t, type: 'sawtooth', f0: 60, f1: 35, dur: 1.8, vol: 0.12, env: { a: 0.3, d: 0.8, s: 0.5, r: 0.7 } });
-};
 SFX['alarm'] = (A) => { const t = A.now; for (let i = 0; i < 4; i++) { A.tone({ type: 'triangle', f0: i % 2 ? 587 : 784, dur: 0.17, vol: 0.11, t0: t + i * 0.19, env: { a: 0.01, d: 0.05, s: 0.7, r: 0.05 } }); } };
-SFX['cannon.activate'] = (A) => {
-  const t = A.now;
-  A.burst({ t0: t, dur: 0.08, vol: 0.3, f0: 3000, f1: 300 });
-  const g = A.gain(0.0001); const f = A.filter('lowpass', 300, 4, g); const o = A.osc('sawtooth', 70, f); const sub = A.osc('sine', 70, g);
-  o.frequency.exponentialRampToValueAtTime(230, t + 1.2); sub.frequency.exponentialRampToValueAtTime(115, t + 1.2);
-  f.frequency.exponentialRampToValueAtTime(2600, t + 1.2);
-  A.env(g.gain, t, { a: 0.2, d: 0.8, s: 0.7, hold: 0.2, r: 0.5, peak: 0.16 });
-  o.start(t); sub.start(t); o.stop(t + 2); sub.stop(t + 2);
-};
 SFX['scan.sweep'] = (A) => { const t = A.now; const r = A.tone({ f0: 380, f1: 1700, dur: 1.1, vol: 0.09, t0: t, env: { a: 0.05, d: 0.4, s: 0.7, r: 0.5 } }); const lfo = A.osc('sine', 14); const lg = A.gain(0.05, r.gain.gain); lfo.connect(lg); lfo.start(t); lfo.stop(t + 1.3); };
 SFX['scan.ping'] = (A) => { const t = A.now; A.tone({ f0: 1400, dur: 0.25, vol: 0.12, t0: t, env: { a: 0.003, d: 0.1, s: 0.2, r: 0.15 } }); A.tone({ f0: 1400, dur: 0.2, vol: 0.05, t0: t + 0.17, env: { a: 0.003, d: 0.08, s: 0.2, r: 0.12 } }); };
 SFX['label.pop'] = (A) => { A.tone({ f0: 800, f1: 1300, dur: 0.05, vol: 0.09, env: { a: 0.003, d: 0.02, s: 0.3, r: 0.03 } }); A.burst({ dur: 0.02, vol: 0.1, type: 'highpass', f0: 3000 }); };
@@ -215,23 +168,6 @@ SFX['seal.slam'] = (A) => {
   A.burst({ t0: t + 0.75, dur: 0.4, vol: 0.6, f0: 2000, f1: 60, env: { a: 0.002, d: 0.18, s: 0.3, r: 0.22 } });
   for (let i = 0; i < 6; i++) A.burst({ t0: t + 0.85 + Math.random() * 0.5, dur: 0.06, vol: 0.12, f0: rnd(900, 2200), f1: 200, pan: rnd(-0.5, 0.5) });
 };
-SFX['hatch.open'] = (A) => {
-  const t = A.now;
-  A.burst({ t0: t, dur: 0.12, vol: 0.3, f0: 2500, f1: 200 });
-  A.burst({ t0: t + 0.1, dur: 1.0, vol: 0.16, type: 'bandpass', f0: 600, f1: 900, Q: 1.5, env: { a: 0.05, d: 0.5, s: 0.6, r: 0.4 } });
-  A.burst({ t0: t + 0.1, dur: 0.9, vol: 0.1, type: 'highpass', f0: 3000, env: { a: 0.1, d: 0.4, s: 0.5, r: 0.3 } });
-  A.tone({ t0: t + 1.0, f0: 120, f1: 50, dur: 0.25, vol: 0.35, env: { a: 0.003, d: 0.1, s: 0.3, r: 0.15 } });
-};
-SFX['gun.rise'] = (A) => {
-  const t = A.now, D = 1.1;
-  const g = A.gain(0.0001); const f = A.filter('lowpass', 200, 1.5, g); const o = A.osc('sawtooth', 45, f);
-  o.frequency.exponentialRampToValueAtTime(110, t + D); f.frequency.exponentialRampToValueAtTime(900, t + D);
-  A.env(g.gain, t, { a: 0.1, d: D * 0.5, s: 0.8, hold: D * 0.4, r: 0.15, peak: 0.2 }); o.start(t); o.stop(t + D + 0.3);
-  A.burst({ t0: t, dur: D, vol: 0.14, f0: 400, f1: 1600, Q: 1, env: { a: 0.2, d: D * 0.5, s: 0.8, r: 0.1 } });
-  A.tone({ t0: t + D, f0: 160, f1: 60, dur: 0.3, vol: 0.5, env: { a: 0.003, d: 0.12, s: 0.3, r: 0.18 } });
-  A.burst({ t0: t + D, dur: 0.2, vol: 0.3, f0: 3000, f1: 200 });
-  A.seq([[76, D + 0.25, 0.25, 1], [83, D + 0.4, 0.5, 1]], { type: 'sine', vol: 0.12 });
-};
 SFX['bots.notice'] = (A) => {
   const t = A.now;
   for (let i = 0; i < 3; i++) A.tone({ t0: t + i * 0.09, type: 'square', f0: 520 + i * 120, dur: 0.08, vol: 0.06, env: { a: 0.003, d: 0.03, s: 0.4, r: 0.04 } });
@@ -239,15 +175,34 @@ SFX['bots.notice'] = (A) => {
   A.burst({ t0: t + 0.3, dur: 0.5, vol: 0.1, type: 'bandpass', f0: 300, f1: 1500, Q: 1, env: { a: 0.05, d: 0.25, s: 0.4, r: 0.2 } });
 };
 
-SFX['bots.stasis'] = (A) => {   // the guardians lock in a cyan stasis field when the camera goes top-down
+
+// --- The barrier across the gap (LXD 2026-10-23) ------------------------
+SFX['barrier.form'] = (A) => {   // it shimmers up out of the floor
   const t = A.now;
-  A.burst({ t0: t, dur: 0.5, vol: 0.12, type: 'bandpass', f0: 4200, f1: 600, Q: 4, env: { a: 0.01, d: 0.2, s: 0.4, r: 0.25 } });
-  A.tone({ t0: t, type: 'sine', f0: 1600, f1: 420, dur: 0.45, vol: 0.08, env: { a: 0.005, d: 0.2, s: 0.3, r: 0.2 } });
-  A.seq([[88, 0.06, 0.3, 1], [93, 0.14, 0.45, 1]], { type: 'triangle', vol: 0.05 });
+  A.burst({ t0: t, dur: 0.6, vol: 0.12, type: 'bandpass', f0: 500, f1: 5200, Q: 3, env: { a: 0.08, d: 0.3, s: 0.4, r: 0.2 } });
+  A.seq([[76, 0.05, 0.5, 0.8], [83, 0.14, 0.6, 0.7], [88, 0.24, 0.7, 0.6]], { type: 'sine', vol: 0.05 });
+};
+SFX['barrier.hit'] = (A, o) => {   // a guardian's fist on the barrier: a dull thud and a short glassy ring
+  const t = A.now, v = o.vol ?? 1, pan = o.pan ?? 0;
+  A.tone({ t0: t, f0: 120, f1: 55, dur: 0.16, vol: 0.32 * v, pan, env: { a: 0.002, d: 0.07, s: 0.3, r: 0.08 } });
+  A.burst({ t0: t, dur: 0.07, vol: 0.18 * v, type: 'lowpass', f0: 900, pan, env: { a: 0.002, d: 0.04, s: 0.2, r: 0.03 } });
+  A.tone({ t0: t + 0.01, type: 'sine', f0: rnd(1250, 1500), dur: 0.35, vol: 0.05 * v, pan, env: { a: 0.002, d: 0.12, s: 0.2, r: 0.2 } });
+};
+SFX['barrier.shatter'] = (A) => {   // the charge breaks it: a crack, then glass raining down
+  const t = A.now;
+  A.burst({ t0: t, dur: 0.12, vol: 0.45, type: 'highpass', f0: 2500, env: { a: 0.001, d: 0.05, s: 0.3, r: 0.06 } });
+  A.tone({ t0: t, f0: 90, f1: 35, dur: 0.5, vol: 0.4, env: { a: 0.003, d: 0.2, s: 0.3, r: 0.25 } });
+  for (let i = 0; i < 18; i++) A.burst({ t0: t + 0.03 + Math.random() * 0.75, dur: 0.05 + Math.random() * 0.06, vol: rnd(0.05, 0.14), type: 'bandpass', f0: rnd(2600, 7000), Q: 6, pan: rnd(-0.7, 0.7), env: { a: 0.001, d: 0.03, s: 0.2, r: 0.03 } });
+  A.seq([[95, 0.02, 0.4, 0.6], [100, 0.1, 0.5, 0.5]], { type: 'sine', vol: 0.04 });
+};
+SFX['hero.fall'] = (A) => {   // Karan hits the floor after the reflected charge
+  const t = A.now;
+  A.tone({ t0: t, f0: 95, f1: 38, dur: 0.28, vol: 0.5, env: { a: 0.002, d: 0.1, s: 0.3, r: 0.15 } });
+  A.burst({ t0: t, dur: 0.22, vol: 0.25, type: 'lowpass', f0: 700, f1: 200, env: { a: 0.002, d: 0.09, s: 0.3, r: 0.1 } });
 };
 
 // --- Combat -------------------------------------------------------------
-SFX['cannon.charge'] = (A) => {
+SFX['charge.build'] = (A) => {
   const t = A.now, D = 1.35;
   const g = A.gain(0.0001); const f = A.filter('lowpass', 250, 2, g); const o = A.osc('sawtooth', 100, f);
   o.frequency.exponentialRampToValueAtTime(380, t + D); f.frequency.exponentialRampToValueAtTime(3200, t + D);
@@ -258,7 +213,7 @@ SFX['cannon.charge'] = (A) => {
   am.frequency.exponentialRampToValueAtTime(26, t + D); A.env(sg.gain, t, { a: 0.1, d: D * 0.5, s: 1, hold: D * 0.4, r: 0.1, peak: 0.3 });
   sub.start(t); am.start(t); sub.stop(t + D + 0.3); am.stop(t + D + 0.3);
 };
-SFX['cannon.fire'] = (A) => {
+SFX['charge.fire'] = (A) => {
   const t = A.now;
   A.burst({ t0: t, dur: 0.7, vol: 0.55, f0: 9000, f1: 180, Q: 0.7, env: { a: 0.004, d: 0.35, s: 0.3, r: 0.35 } });
   A.tone({ t0: t, f0: 900, f1: 110, dur: 0.4, vol: 0.4, env: { a: 0.003, d: 0.15, s: 0.3, r: 0.25 } });
@@ -304,20 +259,12 @@ SFX['shield.break'] = (A) => {
   A.tone({ t0: t, f0: 120, f1: 50, dur: 0.2, vol: 0.3 });
 };
 SFX['pulse'] = (A) => { const t = A.now; A.tone({ t0: t, f0: 50, f1: 20, dur: 0.6, vol: 0.5, env: { a: 0.003, d: 0.25, s: 0.4, r: 0.35 } }); A.burst({ t0: t, dur: 0.55, vol: 0.35, f0: 2200, f1: 100, env: { a: 0.003, d: 0.25, s: 0.3, r: 0.3 } }); A.tone({ t0: t, f0: 200, f1: 950, dur: 0.3, vol: 0.12, env: { a: 0.01, d: 0.12, s: 0.5, r: 0.17 } }); };
-SFX['lock.break'] = (A) => {
-  const t = A.now;
-  const g = A.gain(0.0001); const f = A.filter('lowpass', 1500, 3, g); const o = A.osc('sawtooth', 420, f);
-  o.frequency.exponentialRampToValueAtTime(55, t + 0.9); A.env(g.gain, t, { a: 0.01, d: 0.5, s: 0.5, r: 0.4, peak: 0.14 }); o.start(t); o.stop(t + 1);
-  setTimeout(() => SFX['shield.break'](A), 600);
-  setTimeout(() => SFX['gate.unlock'](A), 950);
-};
 SFX['boss.roar'] = (A) => {
   const t = A.now; const g = A.gain(0.0001); const d = A.dist(g); const f = A.filter('lowpass', 500, 2, d);
   const o1 = A.osc('sawtooth', 68, f), o2 = A.osc('sawtooth', 72, f); const vib = A.osc('sine', 6); const vg = A.gain(5, o1.frequency); vib.connect(vg);
   A.env(g.gain, t, { a: 0.15, d: 0.6, s: 0.7, hold: 0.3, r: 0.5, peak: 0.35 }); [o1, o2, vib].forEach((o) => { o.start(t); o.stop(t + 1.8); });
   A.burst({ t0: t, dur: 1.4, vol: 0.2, f0: 800, f1: 200, env: { a: 0.1, d: 0.6, s: 0.5, r: 0.5 } });
 };
-SFX['boss.shield.break'] = (A) => { SFX['shield.break'](A); A.tone({ f0: 520, f1: 60, dur: 0.8, vol: 0.2, type: 'sawtooth', env: { a: 0.01, d: 0.4, s: 0.4, r: 0.4 } }); A.burst({ dur: 0.6, vol: 0.3, f0: 3000, f1: 200 }); };
 SFX['boss.defeat'] = (A) => { const t = A.now; for (let i = 0; i < 6; i++) SFX['bot.explode'](A, { delay: i * 0.22, vol: 1.1, pan: rnd(-0.7, 0.7) }); A.burst({ t0: t + 1.2, dur: 1.4, vol: 0.55, f0: 6000, f1: 100, env: { a: 0.01, d: 0.6, s: 0.4, r: 0.8 } }); A.tone({ t0: t + 1.2, f0: 80, f1: 25, dur: 1.2, vol: 0.5 }); A.seq([[74, 2.0, 0.3], [78, 2.15, 0.3], [81, 2.3, 0.3], [86, 2.45, 1.2]], { vol: 0.16 }); };
 
 // --- Stingers -----------------------------------------------------------
@@ -325,8 +272,6 @@ SFX['sting.perfect'] = (A) => { A.seq([[72, 0, 0.12], [76, 0.1, 0.12], [79, 0.2,
 SFX['sting.fail'] = (A) => { A.seq([[63, 0, 0.18], [62, 0.17, 0.18], [61, 0.34, 0.18], [60, 0.51, 0.6]], { type: 'sawtooth', vol: 0.08, env: { a: 0.01, d: 0.1, s: 0.6, r: 0.2 } }); A.tone({ f0: 55, dur: 0.9, vol: 0.14, type: 'sine', env: { a: 0.05, d: 0.4, s: 0.5, r: 0.4 } }); };
 SFX['sting.clear'] = (A) => { const t = A.now; A.seq([[67, 0, 0.15], [72, 0.15, 0.15], [76, 0.3, 0.15], [79, 0.45, 0.5], [84, 0.9, 1.1]], { type: 'sawtooth', vol: 0.07, env: { a: 0.02, d: 0.1, s: 0.7, r: 0.3 } }); A.seq([[55, 0.45, 0.6, 1], [60, 0.9, 1.2, 1]], { type: 'triangle', vol: 0.14 }); A.tone({ t0: t + 0.45, f0: 90, f1: 50, dur: 0.4, vol: 0.3 }); A.tone({ t0: t + 0.9, f0: 90, f1: 50, dur: 0.6, vol: 0.3 }); };
 SFX['sting.gameover'] = (A) => { A.seq([[57, 0, 0.5], [53, 0.45, 0.5], [50, 0.9, 1.6]], { type: 'triangle', vol: 0.16 }); A.burst({ dur: 2.2, vol: 0.2, f0: 150, Q: 0.7, env: { a: 0.3, d: 1, s: 0.5, r: 0.9 } }); };
-SFX['sting.wave'] = (A) => { const t = A.now; A.tone({ t0: t, type: 'square', f0: 440, dur: 0.12, vol: 0.09 }); A.tone({ t0: t + 0.15, type: 'square', f0: 440, dur: 0.12, vol: 0.09 }); A.tone({ t0: t + 0.3, type: 'sawtooth', f0: 220, f1: 660, dur: 0.5, vol: 0.08 }); };
-SFX['sting.boss'] = (A) => { SFX['boss.roar'](A); A.seq([[38, 0, 0.6], [44, 0.5, 0.6], [37, 1.0, 1.2]], { type: 'sawtooth', vol: 0.1, env: { a: 0.02, d: 0.2, s: 0.7, r: 0.3 } }); };
 
 /* ======================================================================= */
 /* Ambient: jungle wind, insects and birds                                 */
@@ -456,4 +401,3 @@ class MusicPlayer {
 }
 
 export const audio = new AudioEngine();
-export const SFX_NAMES = Object.keys(SFX);

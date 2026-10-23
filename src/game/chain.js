@@ -47,7 +47,7 @@ export class ChainWorld {
     this.world = world; this.fx = fx; this.group = new THREE.Group(); world.add(this.group);
     this.H = WALL_HEIGHT; this.rng = mulberry32(4242);
     this.causewayTorches = []; this.titleOn = 0;
-    this.rings = []; this.seals = []; this.hatches = []; this.animTorches = []; this.lights = []; this.pillarMeshes = []; this.waterMats = []; this.wallPieces = []; this.cutRing = -1; this.keepSeals = false; this.fadeOff = false;
+    this.rings = []; this.seals = []; this.animTorches = []; this.lights = []; this.pillarMeshes = []; this.waterMats = []; this.wallPieces = []; this.cutRing = -1; this.keepSeals = false; this.fadeOff = false;
     this.skyName = null; this.fogDensity = 0.0034; this.activeIndex = -1; this.focusIndex = -1;
     this.tint = { pano: new THREE.Color(0xffffff), sky: new THREE.Color(0xffffff), foliage: new THREE.Color(0xffffff) };
     this.build();
@@ -163,9 +163,7 @@ export class ChainWorld {
         const lp = polar(deg, R - 1.4); torchPos.push(new THREE.Vector3(ring.center.x + lp.x, H * 0.55, ring.center.z + lp.z));
       }
     }
-    let hatch = null;
-    if (ring.level) { hatch = this.buildHatch(floorY); g.add(hatch.group); this.hatches[ring.index] = hatch; }
-    this.rings[ring.index] = { group: g, torchPos, floorY, hatch, arena: ring, wallColor: col };
+    this.rings[ring.index] = { group: g, torchPos, floorY, arena: ring, wallColor: col };
   }
 
   buildBay(a) {
@@ -247,24 +245,6 @@ export class ChainWorld {
     }
   }
 
-  /* ---------------------------------------------------------------- hatch (buried gun cap) */
-  buildHatch(floorY) {
-    const g = new THREE.Group(); g.rotation.x = -Math.PI / 2; g.position.y = floorY + 0.03;
-    const shaft = new THREE.Mesh(new THREE.CircleGeometry(1.6, 40), new THREE.MeshBasicMaterial({ color: 0x050807, polygonOffset: true, polygonOffsetFactor: -20, polygonOffsetUnits: -3 })); shaft.position.z = -0.01; g.add(shaft);
-    const tex = assets.texture('floor_hatch', { wrap: false });
-    const mk = (start) => new THREE.Mesh(new THREE.CircleGeometry(1.66, 40, start, Math.PI), new THREE.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -30, polygonOffsetUnits: -4 }));
-    const a = mk(-Math.PI / 2), b = mk(Math.PI / 2); g.add(a, b);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(1.76, 1.92, 64), new THREE.MeshBasicMaterial({ color: 0x52ded8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); ring.position.z = 0.02; g.add(ring);
-    return { group: g, halves: [a, b], ring, shaft, open: false, glow: 0 };
-  }
-  async openHatch(i, dur = 1.0) {
-    const h = this.hatches[i]; if (!h || h.open) return; h.open = true; audio.play('hatch.open');
-    const C = this.rings[i].arena.center; this.fx.dust(new THREE.Vector3(C.x, 0, C.z), 4, 0xd8d0b8, 1.1);
-    await Promise.all(h.halves.map((m, k) => tweenTo(m.position, { x: (k === 0 ? 1 : -1) * 2.2, z: -0.22 }, { duration: dur, ease: Ease.inOutCubic })));
-    h.halves.forEach((m) => (m.visible = false));
-  }
-  closeHatch(i) { const h = this.hatches[i]; if (!h) return; h.open = false; h.halves.forEach((m) => { m.visible = true; m.position.set(0, 0, 0); }); h.glow = 0; h.ring.material.opacity = 0; }
-  setHatchGlow(i, on) { const h = this.hatches[i]; if (h) h.glow = on ? 1 : 0; }
 
   /* ---------------------------------------------------------------- gate of ring 1 */
   /** Ring 1's gate as a real archway: carved frame on both faces, a stone passage through the wall thickness, and an
@@ -559,7 +539,6 @@ export class ChainWorld {
     { const dim = 1 - 0.65 * f; this.sunParts.forEach((sp, i) => { sp.material.opacity = Math.min(1, sp.userData.op * this.sunK * dim * (i ? 1 : 0.9 + 0.1 * Math.sin(t * 0.7))); }); }
     for (const pl of this.lights) if (pl.visible) { pl.userData.phase += dt * 9; pl.intensity = pl.userData.base * (0.85 + 0.15 * Math.sin(pl.userData.phase) * Math.sin(pl.userData.phase * 0.37)); }
     for (const w of this.waterMats) { w.tex.offset.x += dt * 0.012 * w.speed; w.tex.offset.y += dt * 0.008 * w.speed; }
-    for (const h of this.hatches) if (h) h.ring.material.opacity = h.glow ? 0.45 + Math.sin(t * 3.2) * 0.25 : Math.max(0, h.ring.material.opacity - dt * 1.5);
     if (this.templeGlow) { this.templeGlow.material.opacity = 0.5 + Math.sin(t * 2) * 0.12; this.templeLight.intensity = 30 + Math.sin(t * 2) * 6; }
     // camera rule: walls of the current ring between the camera and the ring cut away; pillars also fade when the camera brushes past
     const cr = this.fadeOff ? null : CHAIN.all[this.cutRing]; let camB = 0, cutOn = false;

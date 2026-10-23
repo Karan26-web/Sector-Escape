@@ -8,14 +8,18 @@ import { tweens, tweenValue } from '../engine/tween.js';
 import { audio } from '../engine/audio.js';
 
 export class Boss {
-  constructor(world, fx, position) {
+  /** light: a point light that is already in the scene (the game keeps one for the Warden). Adding a NEW light mid-arena
+   *  changes the light count and recompiles every lit material, a visible stall, so the Warden borrows that one. */
+  constructor(world, fx, position, light = null) {
     this.world = world; this.fx = fx;
     this.group = new THREE.Group(); this.group.position.copy(position); this.group.position.y = 0;
     this.spr = new AnimatedSprite('boss_warden', { worldHeight: 6.5 });
     this.shadow = makeShadow(2.2, 0.9);
     this.glow = makeBillboard('fx_glow', 7, { additive: true, tint: 0xa050ff, centerY: 0.5 }); this.glow.position.y = 3.2; this.glow.material.opacity = 0.3;
-    this.light = new THREE.PointLight(0xa050ff, 30, 25, 2); this.light.position.y = 4;
-    this.group.add(this.spr.sprite, this.shadow, this.glow, this.light);
+    this.group.add(this.spr.sprite, this.shadow, this.glow);
+    this.ownLight = !light; this.light = light || new THREE.PointLight(0xa050ff, 30, 25, 2);
+    this.light.color.setHex(0xa050ff); this.light.intensity = 30; this.light.distance = 25;
+    if (this.ownLight) { this.light.position.y = 4; this.group.add(this.light); } else this.light.position.copy(position).setY(4);
     world.add(this.group); this.t = 0; this.alive = true;
   }
   get position() { return this.group.position; }
@@ -35,5 +39,5 @@ export class Boss {
     this.t += dt; this.spr.update(dt);
     if (this.alive) { this.spr.sprite.position.y = 0.3 + Math.sin(this.t * 1.5) * 0.25; this.glow.material.opacity = 0.25 + Math.sin(this.t * 2) * 0.1; }
   }
-  dispose() { this.world.remove(this.group); this.spr.dispose(); }
+  dispose() { this.world.remove(this.group); this.spr.dispose(); if (!this.ownLight) this.light.intensity = 0; }
 }

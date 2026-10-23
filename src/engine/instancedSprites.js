@@ -62,5 +62,4 @@ export class SpriteCloud {
     return true;
   }
   commit() { this.geo.instanceCount = this.count; for (const a of [this.aOffset, this.aScale, this.aUv, this.aShade]) a.needsUpdate = true; }
-  setTint(hex) { this.material.uniforms.tint.value.setHex(hex); }
 }

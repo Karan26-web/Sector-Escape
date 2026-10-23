@@ -14,6 +14,7 @@ export class FX {
     this._sparkMat = null; this._smokeMat = null;
     // warm-up: invisible instances of every material type used later (shaders compile on the first frame instead of mid-fight)
     for (const [name, additive] of [['fx_explosion', false], ['fx_glow', true], ['fx_smoke', false], ['fx_spark', true]]) { const sp = new THREE.Sprite(this._mat(name, additive)); sp.material.opacity = 0; sp.scale.setScalar(0.01); sp.position.y = -5; this.group.add(sp); }
+    { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.01, 0.01), new THREE.MeshBasicMaterial({ map: assets.texture('fx_shockwave', { wrap: false }), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 })); m.position.y = -5; this.group.add(m); }   // (the floor shockwave)
   }
   _mat(name, additive = true, color = 0xffffff) {
     return new THREE.SpriteMaterial({ map: assets.texture(name, { wrap: false }), transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, color });
@@ -68,8 +69,6 @@ export class FX {
     m.rotation.x = -Math.PI / 2; m.position.copy(pos); m.position.y += 0.08; m.renderOrder = 15; this.group.add(m);
     tweens.add({ duration: dur, ease: Ease.outCubic, onUpdate: (e) => { m.scale.setScalar(Math.max(0.01, maxRadius * e)); m.material.opacity = 1 - e; }, onComplete: () => { this.group.remove(m); m.geometry.dispose(); m.material.dispose(); } });
   }
-  /** Click-to-move marker. */
-  marker(pos) { this.shockwave(pos, 1.2, 0.5, 0x7fe6ff); }
   /** Full-screen style damage vignette is CSS; this is a 3D red burst at a point. */
   hit(pos) { this.flash(pos, 0xff3030, 3.5, 0.4); this.sparks(pos, 16, 0xff6040, 6, 0.6); }
 

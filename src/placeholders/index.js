@@ -6,20 +6,16 @@ import * as U from './ui.js';
 
 export const PLACEHOLDERS = {
   hero_front: () => heroSheet(false),
-  hero_back: () => heroSheet(true),
-  enemy_bot: () => botSheet(),
+  hero_back: (def) => heroSheet(true, 8, (def.sheet && def.sheet.rows) || 2),   // follow the manifest grid (the cast row)
+  enemy_bot: (def) => botSheet(8, (def.sheet && def.sheet.rows) || 4, 256, 296, def.baseline),   // follow the manifest grid (pound row, 296 px cells)
   boss_warden: () => bossSheet(),
   torch: () => T.torchSheet(),
-  cannon: () => T.cannonSprite(),
   jungle_tree: () => T.treeSheet(),
   jungle_plant: () => T.plantSheet(),
   jungle_rocks: () => T.rockSheet(),
   water: () => T.waterTex(),
   causeway_stone: () => T.causewayStone(),
   causeway_side: () => T.causewaySide(),
-  floor_hatch: () => T.floorHatch(),
-  cannon_top: () => T.floorHatch(),
-  cannon_top_charge: () => { const c = document.createElement('canvas'); c.width = 1280; c.height = 256; const g = c.getContext('2d'); const h = T.floorHatch(256); for (let i = 0; i < 5; i++) { g.drawImage(h, i * 256, 0); g.globalAlpha = 0.25 + i * 0.15; g.drawImage(F.glowTex(256), i * 256, 0); g.globalAlpha = 1; } return c; },
   cannon_orbs: () => { const c = document.createElement('canvas'); c.width = 768; c.height = 192; const g = c.getContext('2d'); for (let i = 0; i < 4; i++) { const s = 80 + i * 36; g.drawImage(F.glowTex(256), i * 192 + (192 - s) / 2, (192 - s) / 2, s, s); } return c; },
   seal_slab: () => T.sealSlab(),
   wall_pillar: () => T.wallPillar(),

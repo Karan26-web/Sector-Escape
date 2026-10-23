@@ -24,7 +24,7 @@ async def main():
         ctx = await b.new_context(viewport={"width": 1280, "height": 720}); pg = await ctx.new_page(); hook(pg, "late")
         async def shot(n): await pg.screenshot(path=f"{OUT}late_{n}.png"); print("📸", n)
         try:
-            await pg.goto(BASE + "index.html?level=6&skip=1&auto=1&mute=1&reset=1", wait_until="load", timeout=180000)
+            await pg.goto(BASE + "index.html?level=6&skip=1&mute=1&reset=1", wait_until="load", timeout=180000)
             await wait_phase(pg, "inside", 150); await pg.wait_for_timeout(3200); await shot("01_a6_reveal")
             await wait_phase(pg, "input", 150); await pg.wait_for_timeout(1200); await shot("02_a6_input")
             await pg.evaluate("__se.fire('231')"); await wait_phase(pg, "cleared", 60); await pg.evaluate("document.getElementById('btn-ar-next').click()"); await wait_phase(pg, "exit", 60); await pg.wait_for_timeout(2500); await shot("03_a6_exit")
@@ -43,7 +43,7 @@ async def main():
         await pg.close()
         pg2 = await ctx.new_page(); hook(pg2, "gameover")
         try:
-            await pg2.goto(BASE + "index.html?level=2&skip=1&auto=1&mute=1&reset=1", wait_until="load", timeout=180000)   # software rendering: boot takes ~25–30 s
+            await pg2.goto(BASE + "index.html?level=2&skip=1&mute=1&reset=1", wait_until="load", timeout=180000)   # software rendering: boot takes ~25–30 s
             for i, a in enumerate(["346.5", "999", "10"]):
                 if not await wait_phase(pg2, "input", 150): break
                 await pg2.wait_for_timeout(400); await pg2.evaluate(f"__se.fire('{a}')"); await wait_phase(pg2, "result", 40); await pg2.wait_for_timeout(800)
@@ -61,7 +61,7 @@ async def main():
             await pm.goto(BASE + "index.html?mute=1&reset=1", wait_until="load", timeout=120000); await pm.wait_for_selector("#screen-title.active", timeout=120000)
             await pm.tap("#btn-play"); await pm.wait_for_timeout(500); await pm.tap("#screen-story", position={"x": 40, "y": 40}); await pm.wait_for_timeout(300); await pm.tap("#btn-start-journey")
             await pm.wait_for_selector("#screen-map.active", timeout=30000); await settle(pm); await pm.wait_for_timeout(500); await pm.screenshot(path=f"{OUT}late_15_mobile_overview.png"); print("📸 mobile overview")
-            await pm.goto(BASE + "index.html?level=1&skip=1&auto=1&mute=1", wait_until="load", timeout=120000)
+            await pm.goto(BASE + "index.html?level=1&skip=1&mute=1", wait_until="load", timeout=120000)
             await wait_phase(pm, "input", 150); await pm.wait_for_timeout(1200); await pm.screenshot(path=f"{OUT}late_16_mobile_input.png"); print("📸 mobile input")
         except Exception as e:
             print("❌ mobile:", repr(e))

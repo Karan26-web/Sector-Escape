@@ -64,10 +64,10 @@ export function drawBot(g, cx, baseY, s, p = {}) {
   g.restore();
 }
 
-export function botSheet(cols = 8, rows = 4, fw = 256, fh = 256) {
+export function botSheet(cols = 8, rows = 4, fw = 256, fh = 256, baseline = null) {
   const s = fw / 128; // figure ~124 units tall → ~2px per unit at 256
   return sheet(cols, rows, fw, fh, (g, c, r) => {
-    const cx = fw / 2, base = fh - 10;
+    const cx = fw / 2, base = baseline ? Math.round(fh * baseline) : fh - 10;   // feet on the manifest's ground line
     if (r === 0) { // idle 4
       const t = (c / 4) * Math.PI * 2; drawBot(g, cx, base, s, { bob: Math.sin(t) * 1.4, eye: 0.6 + 0.4 * Math.sin(t), armL: Math.sin(t) * 0.05, armR: -Math.sin(t) * 0.05 });
     } else if (r === 1) { // walk 8
@@ -76,6 +76,8 @@ export function botSheet(cols = 8, rows = 4, fw = 256, fh = 256) {
       const k = c / 5;
       if (c < 2) drawBot(g, cx, base, s, { crouch: 0.5 + c * 0.4, lean: -0.08, armL: 0.4, armR: -0.4, eye: 1 });
       else drawBot(g, cx, base, s, { lift: (c - 1) * 9, lean: 0.25 * k, armsFwd: Math.min(1, (c - 1) / 2.5), legL: 0.6, legR: -0.3, eye: 1 });
+    } else if (r === 4) { // pound 6: wind up, slam forward, recoil
+      const f = [0.2, 0.6, 1, 0.75, 0.4, 0.2][c] ?? 0.2; drawBot(g, cx, base, s, { armsFwd: f, lean: f * 0.14 - 0.03, crouch: f * 0.3, eye: 1 });
     } else { // death 8
       if (c === 0) drawBot(g, cx, base, s, { flash: 0.8, eye: 1 });
       else if (c === 1) drawBot(g, cx + 6, base, s, { lean: 0.1, eye: 1, flash: 0.2 });

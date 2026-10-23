@@ -4,46 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Sector Escape – The Lost Jungle</title>
-<meta name="description" content="Calculate the exact sector area, charge the cannon, destroy the guardians and escape the jungle arenas.">
+<meta name="description" content="Work out the exact area of a sector to break the barrier, stop the guardians and escape the jungle arenas.">
 <meta name="theme-color" content="#0a1410">
 <meta property="og:title" content="Sector Escape – The Lost Jungle">
-<meta property="og:description" content="A math adventure: read the radius and angle off the battlefield, compute the sector area, charge the Sector Cannon and escape.">
+<meta property="og:description" content="A maths adventure: watch the sector being drawn, read its radius and angle, compute its area and break through the guardians' barrier.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='29' fill='%230c1820' stroke='%2315111a' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='23' fill='none' stroke='%237fe6ff' stroke-width='4'/%3E%3Cpath d='M32 32 L32 9 A23 23 0 0 1 55 32 Z' fill='%237fe6ff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- the font stylesheet does not hold up the first paint (the loading screen shows at once); the game waits for the fonts
+     themselves before the title (main.js loadFonts), so no screen after loading ever swaps fonts -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Poppins:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'; this.dataset.done = 1" onerror="this.dataset.done = 1" id="font-css">
 <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
 <div id="game"></div>
 <div id="labels"></div>
 <div id="ui">
-  <!-- HUD -->
+  <!-- HUD: the shields only (user, 2026-10-23: no arena number / name, star counter, speaker or pause button) -->
   <div id="hud" class="layer">
-    <div class="hud-left">
-      <div id="hud-arena" class="hud-card"><div class="hud-kicker">Arena <span id="hud-num">1</span> / 7</div><div class="hud-title" id="hud-title">The Mossy Gate</div><div class="hud-dots" id="hud-dots"></div></div>
-      <div id="threat" class="threat"><span class="lbl">Guardians</span><div class="bar"><div id="threat-fill"></div></div></div>
-    </div>
     <div class="hud-right">
       <div id="hud-shields" class="shields"></div>
-      <div class="hud-btns">
-        <button id="btn-mute" class="icon-btn" title="Sound (M)"></button>
-        <button id="btn-pause" class="icon-btn" title="Pause (Esc)"></button>
-      </div>
     </div>
   </div>
-  <div id="objective" class="pill"></div>
-  <div id="banner"></div>
-  <div id="caption"></div>
   <div id="stamp"></div>
   <div id="damage"></div>
   <div id="skip" class="pill small">Skip ›</div>
-  <div id="toast"><div class="t-title"></div><div class="t-stars stars"></div><div class="t-points"></div></div>
 
   <!-- Answer dock, right-centre: the formula (it substitutes, crosses out and simplifies on a wrong shot), the
        one-line misconception tip, the answer bar and a compact keypad. The beam feedback stays in the arena. -->
-  <section id="cannon-panel" class="dock" aria-label="Sector Cannon answer">
+  <section id="answer-dock" class="dock" aria-label="Sector area answer">
     <div id="formula" class="dock-formula" aria-live="polite"></div>
     <div id="tip" class="dock-tip" role="status" aria-live="polite"></div>
     <label class="np-display"><span class="sr-only">Area in square metres</span><input id="answer" type="text" inputmode="decimal" autocomplete="off" placeholder="Area"><span class="unit">m²</span></label>
@@ -59,7 +49,7 @@
   </div>
 
   <!-- Screens -->
-  <section id="screen-loading" class="screen active"><div class="loader"><div class="logo-wrap"><img id="loading-logo" alt=""></div><div class="progress"><div id="progress-fill"></div></div><div id="loading-text">Loading the jungle…</div></div></section>
+  <section id="screen-loading" class="screen active"><div class="loader"><div class="logo-wrap"><img id="loading-logo" alt=""></div><div id="loading-bar" class="progress" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-fill"></div></div><div id="loading-text">Loading the jungle…</div></div></section>
 
   <section id="screen-title" class="screen">
     <div class="title-birds" aria-hidden="true"><i class="bird b1"></i><i class="bird b2"></i><i class="bird b3"></i></div>
@@ -83,12 +73,10 @@
 
   <section id="screen-map" class="screen">
     <canvas id="map-canvas" aria-label="Map of the seven rings"></canvas>
-    <!-- slim top bar (LXD): back to the title · total stars · sound + settings -->
+    <!-- slim top bar: back to the title · settings (sound, how to play, reset); no star counter or speaker (user, 2026-10-23) -->
     <div class="map-top">
       <button id="btn-map-back" class="icon-btn svg" aria-label="Back to the title screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div id="map-stars" class="map-stars">★ 0 / 21</div>
       <div class="map-top-r">
-        <button id="btn-map-sound" class="icon-btn" aria-label="Sound"></button>
         <button id="btn-map-settings" class="icon-btn svg" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zm8.2 4.6.1-1.2-.1-1.2 2-1.6-2-3.4-2.4 1a8 8 0 0 0-2.1-1.2L15.4 2h-3.9l-.4 2.6A8 8 0 0 0 9 5.8l-2.4-1-2 3.4 2 1.6L6.5 12l.1 1.2-2 1.6 2 3.4 2.4-1a8 8 0 0 0 2.1 1.2l.4 2.6h3.9l.4-2.6a8 8 0 0 0 2.1-1.2l2.4 1 2-3.4z" fill="currentColor"/></svg></button>
       </div>
     </div>
@@ -111,10 +99,9 @@
 
   <section id="screen-results" class="screen">
     <div class="card results">
-      <h2 id="res-title">You escaped the jungle!</h2>
+      <h2>You escaped the jungle!</h2>
       <table id="res-rows"></table>
       <div class="total"><span>This run</span><span id="res-total">0</span></div>
-      <div id="res-stars" class="stars big"></div>
       <button id="btn-next" class="btn primary">Back to the jungle ›</button>
     </div>
   </section>
@@ -133,9 +120,9 @@
       <div class="hw-viewport"><div class="hw-track" id="hw-track">
         <article class="hw-card">
           <div class="hw-pic" id="hw-pic-0"></div>
-          <h3>Reach the cannon</h3>
-          <p>Run to the centre of the arena. The Sector Cannon rises from the ground.</p>
-          <p class="hw-small">Move with WASD or the arrow keys, or tap the floor.</p>
+          <h3>Watch the gap</h3>
+          <p>Guardians pound on the barrier across the gap. A point at the centre draws the radius and sweeps out the sector.</p>
+          <p class="hw-small">Karan watches from his spot behind the centre.</p>
         </article>
         <article class="hw-card">
           <div class="hw-pic" id="hw-pic-1"></div>
@@ -171,7 +158,7 @@
     document.addEventListener('DOMContentLoaded', function () {
       var t = document.getElementById('loading-text');
       if (t) t.innerHTML = 'Open this through a web server, not as a file.<br>Run <code>python3 -m http.server 8321</code> in the project folder and visit <code>http://localhost:8321/</code>, or use the deployed Vercel URL.';
-      var f = document.getElementById('progress-fill'); if (f) f.style.width = '100%';
+      var f = document.getElementById('progress-fill'); if (f) f.style.transform = 'none';
     });
   }
 </script>

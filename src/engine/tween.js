@@ -60,7 +60,6 @@ export class TweenManager {
     this.list = keep;
   }
   cancelTag(tag) { for (const tw of this.list) if (tw.tag === tag) tw.cancel(); }
-  cancelTarget(target) { for (const tw of this.list) if (tw.target === target) tw.cancel(); }
   clear() { for (const tw of this.list) tw.cancel(); this.list = []; }
 }
 

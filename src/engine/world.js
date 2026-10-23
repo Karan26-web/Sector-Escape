@@ -4,7 +4,6 @@
 import * as THREE from '../../vendor/three.module.js';
 import { CameraRig } from './camera.js';
 import { LabelLayer } from './labels.js';
-import { Input } from './input.js';
 import { tweens } from './tween.js';
 import { assets } from './assets.js';
 
@@ -21,7 +20,6 @@ export class World {
     this.camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.5, 900);
     this.rig = new CameraRig(this.camera);
     this.labels = new LabelLayer(labelHost, this.camera); this.labelLayers = [this.labels];
-    this.input = new Input(this.renderer.domElement);
     this.updatables = new Set();
     this.clock = new THREE.Clock();
     this.timeScale = 1; this.paused = false; this.elapsed = 0;
@@ -61,12 +59,5 @@ export class World {
       this.renderer.render(this.scene, this.camera);
     };
     requestAnimationFrame(loop);
-  }
-  addLabelLayer(container) { const l = new LabelLayer(container, this.camera); this.labelLayers.push(l); return l; }
-  /** Raycast NDC point against the y=0 floor plane. */
-  floorPoint(ndcX, ndcY, out = new THREE.Vector3()) {
-    const ray = new THREE.Raycaster(); ray.setFromCamera({ x: ndcX, y: ndcY }, this.camera);
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    return ray.ray.intersectPlane(plane, out) ? out : null;
   }
 }

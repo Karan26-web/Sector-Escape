@@ -6,6 +6,13 @@ playtest
 README.md
 *.py
 art-source
-.DS_Store
 # dev-only tools (temporary skip button)
 src/dev
+# repo housekeeping and editor / OS leftovers
+.gitignore
+__pycache__
+*.bak
+*.orig
+*.log
+.DS_Store
+Thumbs.db

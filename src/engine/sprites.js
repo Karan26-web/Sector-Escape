@@ -27,7 +27,6 @@ export class AnimatedSprite {
     this.anim = null; this.animName = ''; this.frame = 0; this.time = 0; this.speed = 1; this.flipX = false; this.onComplete = null; this.finished = false;
     this.play(o.anim ?? Object.keys(this.def.anims)[0]);
   }
-  get object() { return this.sprite; }
   get position() { return this.sprite.position; }
   hasAnim(name) { return !!this.def.anims[name]; }
   play(name, { restart = false, speed = 1, onComplete = null } = {}) {
@@ -36,9 +35,10 @@ export class AnimatedSprite {
     this.anim = this.def.anims[name]; this.animName = name; this.frame = 0; this.time = 0; this.phase = 0; this.speed = speed; this.finished = false; this.onComplete = onComplete;
     this._apply(); return this;
   }
+  /** Show one frame of an animation and keep it (no playback): poses held for a beat, e.g. Karan sitting after a fall. */
+  hold(name, frame) { this.play(name, { restart: true }); this.frame = Math.max(0, Math.min(frame, (this.anim.frames ?? 1) - 1)); this.finished = true; this._apply(); return this; }
   setFlip(f) { if (this.flipX !== f) { this.flipX = f; this._apply(); } }
   setScale(mul) { this.sprite.scale.set(this.baseScale.x * mul, this.baseScale.y * mul, 1); }
-  setOpacity(a) { this.material.opacity = a; }
   update(dt) {
     if (!this.anim || this.finished) return;
     const fps = (this.anim.fps ?? 8) * this.speed;

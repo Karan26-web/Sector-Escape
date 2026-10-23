@@ -4,14 +4,14 @@
 //   2. delete its <script> line at the bottom of index.html
 // (src/dev is also listed in .vercelignore, and the button only appears on localhost / 127.0.0.1 or with ?dev=1.)
 //
-// Skipping = the cannon is fired with the exact area for you, so the normal win path plays (laser, reward path,
-// progress save, walk into the next ring) and the game state stays consistent. Clicked before the question is up,
-// it waits for it; if Karan still has to reach the hatch, he runs there on his own.
+// Skipping = the exact area is fired for you, so the normal win path plays (the charge, the barrier breaking, the reward
+// path, progress save, walk into the next ring) and the game state stays consistent. Clicked before the question is up,
+// it waits for it.
 // ---------------------------------------------------------------------------
 import { sectorArea } from '../game/levels.js';
 
 const enabled = ['localhost', '127.0.0.1', ''].includes(location.hostname) || new URLSearchParams(location.search).has('dev');
-const ARENA_PHASES = ['gate', 'inside', 'alert', 'run', 'rise', 'tactical', 'scan', 'input', 'firing', 'result', 'cleared'];
+const ARENA_PHASES = ['gate', 'inside', 'arrive', 'observe', 'tactical', 'scan', 'input', 'firing', 'result', 'cleared'];
 
 if (enabled) {
   const btn = document.createElement('button');
@@ -25,10 +25,10 @@ if (enabled) {
   });
   document.body.appendChild(btn);
 
-  let queued = false, ranToHatch = false, pressNext = false;
+  let queued = false, pressNext = false;
   const label = () => { btn.textContent = queued ? 'DEV · skipping…' : 'DEV · Skip ring ⏭'; };
   label();
-  btn.addEventListener('click', () => { queued = true; ranToHatch = false; label(); });
+  btn.addEventListener('click', () => { queued = true; label(); });
 
   setInterval(() => {
     const se = window.__se, scene = se && se.scene, phase = se && se.phase;
@@ -36,7 +36,6 @@ if (enabled) {
     btn.style.display = inArena || queued ? 'block' : 'none';
     if (pressNext && phase === 'cleared') { const b = document.getElementById('btn-ar-next'); if (b) { pressNext = false; b.click(); } }   // past the results card
     if (!queued || !scene) return;
-    if (phase === 'run' && !ranToHatch && scene.hero && scene.C) { ranToHatch = true; scene.hero.control = false; scene.hero.runTo(scene.C, 7); }
     if (phase === 'input') {
       se.fire(String(sectorArea(scene.R, scene.A.theta)));
       queued = false; pressNext = true; label();

@@ -1,11 +1,12 @@
-"""Smoke test of the chain world: boot, overview, causeway, arena 1 to the exit, screenshots at each phase."""
+"""Smoke test of the chain world: boot, map, causeway, arena 1 (the gap, the guardians arriving at the barrier, Karan at his
+observation point, the top-view construction, too small / too wide / exact), the results card, into arena 2."""
 import asyncio, sys, time, os
 from playwright.async_api import async_playwright
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8321/"
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screens") + "/"; os.makedirs(OUT, exist_ok=True)
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 async def phase(pg): return await pg.evaluate("window.__se ? window.__se.phase : null")
-ORDER = ['causeway', 'gate', 'inside', 'alert', 'run', 'rise', 'tactical', 'scan', 'input']
+ORDER = ['causeway', 'gate', 'inside', 'arrive', 'observe', 'tactical', 'scan', 'input']
 NEXT = "document.getElementById('btn-ar-next').click()"   # the end-of-arena results card waits for Next
 async def wait_phase(pg, want, timeout=150, or_later=False):
     """Wait for a phase; with or_later, also accept any later phase of the same arena intro (screenshots can be slow)."""
@@ -32,19 +33,20 @@ async def main():
             await pg.click("#btn-enter")
             await wait_phase(pg, "causeway", 40); await pg.wait_for_timeout(2600); await shot("03_causeway")
             await wait_phase(pg, "gate", 60); await pg.wait_for_timeout(1200); await shot("04_gate_opening")
-            await wait_phase(pg, "inside", 60); await pg.wait_for_timeout(3200); await shot("05_inside_reveal")
-            await wait_phase(pg, "alert", 30, or_later=True); await pg.wait_for_timeout(1000); await shot("06_alert")
-            await wait_phase(pg, "run", 30, or_later=True); await pg.wait_for_timeout(1500); await shot("07_run")
-            await pg.keyboard.down("KeyW"); await wait_phase(pg, "rise", 60, or_later=True); await pg.keyboard.up("KeyW"); await pg.wait_for_timeout(1600); await shot("08_rise")
+            await wait_phase(pg, "inside", 60); await pg.wait_for_timeout(900); await shot("05_inside_gap")
+            await wait_phase(pg, "arrive", 30, or_later=True); await pg.wait_for_timeout(1500); await shot("06_guardians_pound")
+            await wait_phase(pg, "observe", 30, or_later=True); await pg.wait_for_timeout(500); await shot("07_to_observation_point")
+            await wait_phase(pg, "tactical", 40, or_later=True); await pg.wait_for_timeout(900); await shot("08_top_view")
             await wait_phase(pg, "scan", 40, or_later=True); await pg.wait_for_timeout(2600); await shot("09_scan")
             await wait_phase(pg, "input", 40); await pg.wait_for_timeout(1200); await shot("10_input")
             await pg.evaluate("__se.fire('30')"); await pg.wait_for_timeout(2300); await shot("11_under_fire")
-            await wait_phase(pg, "result", 40); await pg.wait_for_timeout(2500); await shot("12_under_lunge")
-            await wait_phase(pg, "input", 60); await pg.evaluate("__se.fire('50')"); await pg.wait_for_timeout(2400); await shot("13_over_fire")
+            await wait_phase(pg, "result", 40); await pg.wait_for_timeout(2000); await shot("12_under_breakthrough")
+            await wait_phase(pg, "input", 60); await pg.evaluate("__se.fire('50')")
+            await pg.wait_for_function("__se.scene && __se.scene.heroDown !== null", timeout=60000); await pg.wait_for_timeout(900); await shot("13_over_knockdown")
             await wait_phase(pg, "result", 40); await wait_phase(pg, "input", 60); await pg.evaluate("__se.fire('38.5')"); await pg.wait_for_timeout(2300); await shot("14_perfect")
             await wait_phase(pg, "cleared", 60); await pg.wait_for_timeout(1800); await shot("14b_results_card"); await pg.evaluate(NEXT)
             await wait_phase(pg, "exit", 60); await pg.wait_for_timeout(2600); await shot("15_reward_path")
-            await pg.wait_for_timeout(4200); await shot("16_seal")
+            await pg.wait_for_timeout(4200); await shot("16_through_the_gap")
             await wait_phase(pg, "inside", 90, or_later=True); await pg.wait_for_timeout(3200); await shot("17_arena2_reveal")
             await wait_phase(pg, "input", 120); await pg.wait_for_timeout(1200); await shot("18_arena2_input")
             print("✅ chain smoke flow reached arena 2")

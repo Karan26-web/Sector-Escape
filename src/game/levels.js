@@ -12,7 +12,6 @@ import { reduceFraction, formatNumber, DEG, polar, wrapDeg, degDiff, toDeg } fro
 export const PI = { num: 22, den: 7, value: 22 / 7, label: '22/7' };
 // LXD 2026-10-22: fractions and decimals are accepted, compared at 3 decimal places (38.5, 38.500, 77/2 are all right;
 // 38 is not). Every answer in the game is an exact decimal with π = 22/7, so no wider tolerance is needed.
-export const TOLERANCE = { dp: 3 };
 const round3 = (v) => Math.round(v * 1000) / 1000;
 /** LXD 2026-10-22: the passage you came through stays open (no seal rises behind Karan). */
 export const SEAL_BEHIND = false;
@@ -21,7 +20,6 @@ const round6 = (v) => Math.round(v * 1e6) / 1e6;
 export const sectorArea = (r, theta, pi = PI.value) => round6((theta / 360) * pi * r * r);
 export const sectorCoef = (r, theta) => round6((theta / 360) * r * r);
 export const arcLength = (r, theta, pi = PI.value) => (theta / 360) * 2 * pi * r;
-export const circleArea = (r, pi = PI.value) => pi * r * r;
 /** 22/7 gives a clean answer when 2r is a multiple of 7 (7, 10.5, 14, 17.5, 21 …). */
 export const isPiFriendly = (r) => Math.abs((r * 2) % 7) < 1e-9;
 export function formatArea(r, theta) {
@@ -30,6 +28,10 @@ export function formatArea(r, theta) {
 }
 /** Guardians per breach: ~1 per 1.6 m of arc, 6..30 (LXD: more of them). */
 export const botCountFor = (r, theta) => Math.max(6, Math.min(30, Math.round(arcLength(r, theta) / 1.6)));
+/** Karan's observation point (LXD 2026-10-23): this far behind the centre O, on the line from the gap through O. He
+ *  watches the action from there; from the top view his sprite stays clear of O, the radii, the sector and the labels
+ *  (they keep their size on screen, so a bigger ring needs a little more room). */
+export const watchR = (R) => Math.max(3, R * 0.2);
 
 /* ---------------------------------------------------------------------- */
 /* World constants                                                         */
@@ -59,8 +61,8 @@ const ENV = {
  * open arc (0° = east/right, 90° = north/up on the overview). The suggested
  * zig-zag is kept where the geometry allows it: a turn sharper than
  * 180° − (θ + φ)/2 would make the open arc overlap the entrance arc.
- * timeBudget = seconds until the first guardian reaches the gun; the arena
- * radius divided by it is the enemy speed, so larger arenas are faster.
+ * timeBudget = the seconds the time bonus is measured against (2026-10-23: the
+ * guardians wait behind the barrier, so it no longer sets their speed).
  */
 export const LEVELS = [
   { id: 1, name: 'The Mossy Gate', tagline: 'A small gate. A big trap.', radius: 7, theta: 90, exitDeg: 45, timeBudget: 60, speed: 'Slow', scaffold: 'full', env: ENV.day },
@@ -71,18 +73,17 @@ export const LEVELS = [
   { id: 6, name: 'Thunder Well', tagline: 'The largest ring in the jungle', radius: 21, theta: 60, exitDeg: 45, timeBudget: 38, speed: 'Faster', scaffold: 'hint', env: ENV.night2 },
   { id: 7, name: "The Warden's Court", tagline: 'The last ring before the temple', radius: 21, theta: 120, exitDeg: 0, timeBudget: 34, speed: 'Fastest', scaffold: 'hint', boss: true, env: ENV.storm },
 ];
-export const getLevel = (id) => LEVELS.find((l) => l.id === id) || null;
 export const TOTAL_LEVELS = LEVELS.length;
 
 /* ---------------------------------------------------------------------- */
 /* Chain geometry                                                          */
-/*  Ring i's wall is open over θ_i (the guardians' arc). The passage into  */
-/*  ring i+1 is the lens of the two circles, capped at LENS_MAX so          */
-/*  neighbours overlap by 7–15 % of a diameter. When θ is wider than the    */
-/*  lens, a BAY (annular sector R..R+D over θ) continues the arc outward:   */
-/*  its side walls extend the sector's radial lines and the guardians       */
-/*  stand in it. Every wall piece is derived from one boolean over disks    */
-/*  and bays (keepRanges), so junctions always close.                       */
+/*  Ring i's wall is open over θ_i (the gap, closed by the barrier). The    */
+/*  passage into ring i+1 is the lens of the two circles, capped at         */
+/*  LENS_MAX so neighbours overlap by 7–15 % of a diameter. When θ is wider */
+/*  than the lens, a BAY (annular sector R..R+D over θ) continues the arc   */
+/*  outward: its side walls extend the sector's radial lines and the        */
+/*  guardians stand in it, behind the barrier. Every wall piece is derived  */
+/*  from one boolean over disks and bays (keepRanges), so junctions close.  */
 /* ---------------------------------------------------------------------- */
 export const LENS_MAX = 64; // ≈15 % lens depth for equal radii
 const add = (a, b) => ({ x: a.x + b.x, z: a.z + b.z });
@@ -97,15 +98,6 @@ function lens(R, theta, nextR) {
   return { phi, c, h, hn, phiNext, d: h + hn, depth: R - h + (nextR - hn), bay: phi < theta - 1e-6 };
 }
 
-/** 2D map layout (fractions of the canvas): a serpentine route, content left of the docked panel. */
-export const MAP_LAYOUT = {
-  start: { x: 0.05, y: 0.87 }, temple: { x: 0.12, y: 0.17 },
-  arenas: [{ x: 0.13, y: 0.72 }, { x: 0.25, y: 0.80 }, { x: 0.37, y: 0.70 }, { x: 0.50, y: 0.77 }, { x: 0.57, y: 0.52 }, { x: 0.43, y: 0.41 }, { x: 0.28, y: 0.35 }],
-};
-export const MAP_LAYOUT_PORTRAIT = {
-  start: { x: 0.16, y: 0.55 }, temple: { x: 0.47, y: 0.085 },
-  arenas: [{ x: 0.27, y: 0.49 }, { x: 0.47, y: 0.53 }, { x: 0.67, y: 0.48 }, { x: 0.79, y: 0.385 }, { x: 0.61, y: 0.32 }, { x: 0.39, y: 0.29 }, { x: 0.23, y: 0.205 }],
-};
 
 export const insideDisk = (p, ring, m = 0.05) => Math.hypot(p.x - ring.center.x, p.z - ring.center.z) < ring.R - m;
 /** Is p inside arena a's bay (annular sector R..R+D over θ)? margin shrinks it. */
@@ -149,9 +141,7 @@ function buildChain() {
       bay: D ? { D, corners: [-1, 1].map((s) => ({ inner: add(center, polar(L.exitDeg + s * L.theta / 2, R)), outer: add(center, polar(L.exitDeg + s * L.theta / 2, R + D)) })) } : null,
       chord: { mid: add(center, polar(L.exitDeg, ln.h)), width: 2 * ln.c },
       spawn: add(center, polar(entranceDeg, R - (i === 0 ? 2.8 : 3.2))),
-      stand: add(center, polar(L.exitDeg + 180, 2.5)),
-      side: [add(center, polar(L.exitDeg + 90, 3.0)), add(center, polar(L.exitDeg - 90, 3.0))],
-      map: MAP_LAYOUT.arenas[i],
+      watchR: watchR(R), watch: add(center, polar(L.exitDeg + 180, watchR(R))),
     };
     arenas.push(a);
     center = nextCenter;
@@ -159,7 +149,7 @@ function buildChain() {
   const last = arenas[arenas.length - 1];
   const sEntrance = wrapDeg(last.exitDeg + 180);
   const sanctuary = { index: arenas.length, id: 'temple', name: SANCTUARY.name, R: SANCTUARY.radius, center, exitDeg: SANCTUARY.gateDeg, entrance: { deg: sEntrance },
-    gate: { deg: SANCTUARY.gateDeg, half: gateHalfDeg(GATE.templeWidth, SANCTUARY.radius), temple: true }, env: ENV.golden, spawn: add(center, polar(sEntrance, SANCTUARY.radius - 3.2)), map: MAP_LAYOUT.temple };
+    gate: { deg: SANCTUARY.gateDeg, half: gateHalfDeg(GATE.templeWidth, SANCTUARY.radius), temple: true }, env: ENV.golden, spawn: add(center, polar(sEntrance, SANCTUARY.radius - 3.2)) };
   sanctuary.gatePos = add(center, polar(SANCTUARY.gateDeg, SANCTUARY.radius));
   sanctuary.escape = add(center, polar(SANCTUARY.gateDeg, SANCTUARY.radius + 9));
   const all = [...arenas, sanctuary];
@@ -325,10 +315,6 @@ export function diagnose(entered, r, theta, exact = sectorArea(r, theta)) {
 /* ---------------------------------------------------------------------- */
 /* Scaffolding                                                             */
 /* ---------------------------------------------------------------------- */
-export const FORMULA_HTML = 'A = <span class="frac"><span>θ</span><span>360</span></span> × π r<sup>2</sup>';
-export function substituted(r, theta) {
-  return `A = <span class="frac"><span>${theta}</span><span>360</span></span> × <span class="frac"><span>22</span><span>7</span></span> × ${r} × ${r}`;
-}
 /** Numbers for the formula above the keypad (user, 2026-10-22). The formula A = θ/360 × π × r² is shown from the start;
  *  the 1st wrong shot substitutes the numbers (θ, π = 22/7, r), crosses out what cancels (θ/360 → n/d; one r against
  *  the 7 of 22/7 → k = r/7) and simplifies (A = n/d × 22 × k × r); the 2nd shows the answer as a fraction. Every LXD
@@ -364,17 +350,6 @@ export function tipLine(diag, r, theta) {
     'pi-as-3': `π was taken as 3 — use 22/7.`,
   };
   return lines[diag.code] || '';   // no generic advice: the solution line on the floor already shows the next step
-}
-export function hintSteps(r, theta) {
-  const [n, d] = reduceFraction(theta, 360);
-  const fracTxt = d === 1 ? `${n}` : `${n}/${d}`;
-  const whole = PI.value * r * r;
-  return [
-    { label: 'Fraction of the circle', text: `θ/360 = ${theta}/360 = ${fracTxt}` },
-    { label: 'Square the radius', text: `r² = ${r} × ${r} = ${formatNumber(r * r)}` },
-    { label: 'Whole circle area', text: `πr² = 22/7 × ${formatNumber(r * r)} = ${formatNumber(whole)}` },
-    { label: 'Sector area', text: `A = ${fracTxt} × ${formatNumber(whole)} = ?` },
-  ];
 }
 
 /* ---------------------------------------------------------------------- */

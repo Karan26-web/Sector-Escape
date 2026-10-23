@@ -6,19 +6,9 @@ export const DEG = Math.PI / 180;
 
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
-export const invLerp = (a, b, v) => (b === a ? 0 : (v - a) / (b - a));
-export const remap = (v, a, b, c, d) => lerp(c, d, clamp(invLerp(a, b, v), 0, 1));
-export const smoothstep = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
 
 /** Wrap an angle (radians) to [-PI, PI). */
-export function normAngle(a) {
-  a = a % TAU;
-  if (a < -Math.PI) a += TAU;
-  if (a >= Math.PI) a -= TAU;
-  return a;
-}
 /** Shortest signed delta from `from` to `to` (radians). */
-export const angleDiff = (from, to) => normAngle(to - from);
 /** Wrap degrees to [0, 360). */
 export const wrapDeg = (d) => ((d % 360) + 360) % 360;
 /** Signed shortest delta in degrees, result in [-180, 180). */
@@ -31,7 +21,6 @@ export function degDiff(from, to) {
 
 /** Frame-rate independent exponential smoothing. */
 export const damp = (cur, target, lambda, dt) => lerp(cur, target, 1 - Math.exp(-lambda * dt));
-export const dampAngle = (cur, target, lambda, dt) => cur + angleDiff(cur, target) * (1 - Math.exp(-lambda * dt));
 
 export const Ease = {
   linear: (t) => t,
@@ -69,12 +58,8 @@ export function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-export const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
-export const randInt = (a, b) => Math.floor(rand(a, b + 1));
-export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 /** Wall-clock wait (use tweens.delay for game-time waits). */
-export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Position on the arena circle. 0° = +X (east), 90° = -Z (north / "up" on the map). */
 export function polar(deg, radius, y = 0) {
@@ -91,5 +76,3 @@ export function formatNumber(n, maxDecimals = 2) {
 }
 export function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a || 1; }
 export function reduceFraction(n, d) { const g = gcd(n, d); return [n / g, d / g]; }
-export const pad2 = (n) => String(n).padStart(2, '0');
-export function formatTime(sec) { sec = Math.max(0, Math.ceil(sec)); return `${Math.floor(sec / 60)}:${pad2(sec % 60)}`; }

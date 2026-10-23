@@ -171,27 +171,6 @@ export function plantSheet(fw = 512, fh = 512) {
     for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + ((i / (n - 1)) - 0.5) * 2.2, len = fh * (0.45 + hash(c, i) * 0.35), col = ['#2f7f3a', '#3f9f4a', '#56b85e'][i % 3]; const x1 = cx + Math.cos(a) * len, y1 = base + Math.sin(a) * len; g.strokeStyle = OUT; g.lineWidth = 34; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx, base); g.quadraticCurveTo(cx + Math.cos(a) * len * 0.5, base + Math.sin(a) * len * 0.5 - 30, x1, y1); g.stroke(); g.strokeStyle = col; g.lineWidth = 24; g.stroke(); g.strokeStyle = shadeHex(col, 0.25); g.lineWidth = 6; g.stroke(); }
   });
 }
-export function cannonSprite(size = 1024) {
-  const c = canvas(size, size), g = c.getContext('2d'), cx = size / 2, base = size * 0.93;
-  // base plinth
-  g.beginPath(); g.ellipse(cx, base - 40, size * 0.42, size * 0.13, 0, 0, Math.PI * 2); g.fillStyle = '#4a4f55'; g.fill(); g.lineWidth = 14; g.strokeStyle = OUT; g.stroke();
-  g.beginPath(); g.ellipse(cx, base - 110, size * 0.42, size * 0.13, 0, Math.PI, 0); g.lineTo(cx + size * 0.42, base - 40); g.ellipse(cx, base - 40, size * 0.42, size * 0.13, 0, 0, Math.PI); g.closePath(); g.fillStyle = '#5c636b'; g.fill(); g.stroke();
-  g.beginPath(); g.ellipse(cx, base - 110, size * 0.42, size * 0.13, 0, 0, Math.PI * 2); g.fillStyle = '#6f777f'; g.fill(); g.stroke();
-  // glyph ring
-  g.strokeStyle = 'rgba(120,230,255,0.9)'; g.lineWidth = 10; g.beginPath(); g.ellipse(cx, base - 110, size * 0.33, size * 0.1, 0, 0, Math.PI * 2); g.stroke();
-  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * size * 0.3, base - 110 + Math.sin(a) * size * 0.09); g.lineTo(cx + Math.cos(a) * size * 0.37, base - 110 + Math.sin(a) * size * 0.115); g.stroke(); }
-  // column
-  g.fillStyle = '#3f454c'; rrect(g, cx - size * 0.13, base - 420, size * 0.26, 320, 30); g.fill(); g.lineWidth = 14; g.strokeStyle = OUT; g.stroke();
-  g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(cx - size * 0.1, base - 400, size * 0.05, 280);
-  // prongs
-  for (const s of [-1, 1]) { poly(g, [[cx + s * size * 0.11, base - 400], [cx + s * size * 0.26, base - 560], [cx + s * size * 0.2, base - 580], [cx + s * size * 0.06, base - 440]]); g.fillStyle = '#5c636b'; g.fill(); g.stroke(); }
-  // crystal
-  glow(g, cx, base - 560, 240, 'rgba(90,220,255,ALPHA)', 0.9);
-  poly(g, [[cx, base - 760], [cx + 95, base - 600], [cx + 60, base - 450], [cx - 60, base - 450], [cx - 95, base - 600]]); g.fillStyle = '#7fe6ff'; g.fill(); g.lineWidth = 14; g.strokeStyle = OUT; g.stroke();
-  poly(g, [[cx, base - 760], [cx + 95, base - 600], [cx + 20, base - 560]]); g.fillStyle = 'rgba(255,255,255,0.55)'; g.fill();
-  poly(g, [[cx - 95, base - 600], [cx - 60, base - 450], [cx - 10, base - 520]]); g.fillStyle = 'rgba(0,80,140,0.35)'; g.fill();
-  return c;
-}
 export function rockSheet(fw = 512, fh = 512) {
   return sheet(4, 1, fw, fh, (g, c) => {
     const cx = fw / 2, base = fh - 30, n = 7 + c;
@@ -233,19 +212,6 @@ export function causewaySide(w = 1024, h = 256) {
   return c;
 }
 /** Round stone hatch covering the buried gun (two halves split on the vertical seam). */
-export function floorHatch(size = 512) {
-  const c = canvas(size, size), g = c.getContext('2d'), cx = size / 2, R = size / 2 - 6;
-  circle(g, cx, cx, R); g.fillStyle = '#6d6a5c'; g.fill(); g.lineWidth = 12; g.strokeStyle = OUT; g.stroke();
-  circle(g, cx, cx, R * 0.78); g.lineWidth = 8; g.strokeStyle = 'rgba(20,15,10,0.7)'; g.stroke();
-  g.strokeStyle = 'rgba(120,230,255,0.9)'; g.lineWidth = 7; circle(g, cx, cx, R * 0.62); g.stroke();
-  for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * R * 0.62, cx + Math.sin(a) * R * 0.62); g.lineTo(cx + Math.cos(a) * R * 0.72, cx + Math.sin(a) * R * 0.72); g.stroke(); }
-  g.beginPath(); g.moveTo(cx, cx); g.arc(cx, cx, R * 0.4, -Math.PI / 2 - 0.7, -Math.PI / 2 + 0.7); g.closePath(); g.fillStyle = 'rgba(120,230,255,0.35)'; g.fill(); g.lineWidth = 5; g.stroke();
-  g.strokeStyle = OUT; g.lineWidth = 10; g.beginPath(); g.moveTo(cx, cx - R); g.lineTo(cx, cx + R); g.stroke(); // the seam
-  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + 0.2; circle(g, cx + Math.cos(a) * R * 0.9, cx + Math.sin(a) * R * 0.9, 9); g.fillStyle = '#8d939c'; g.fill(); g.lineWidth = 4; g.stroke(); }
-  for (let i = 0; i < 10; i++) glow(g, cx + (hash(i, 1) - 0.5) * R * 1.5, cx + (hash(i, 2) - 0.5) * R * 1.5, 14 + hash(i, 3) * 30, 'rgba(70,120,50,ALPHA)', 0.4);
-  return c;
-}
-/** Stone slab that seals the waist between two arenas. */
 export function sealSlab(w = 1024, h = 1024) {
   const c = canvas(w, h), g = c.getContext('2d'); g.fillStyle = '#5c655a'; g.fillRect(0, 0, w, h);
   for (let r = 0; r < 5; r++) for (let i = 0; i < 4; i++) { const x = i * (w / 4) + (r % 2) * (w / 8), y = r * (h / 5), k = 0.85 + hash(i, r + 7) * 0.3; g.fillStyle = `rgb(${Math.round(110 * k)},${Math.round(120 * k)},${Math.round(105 * k)})`; rrect(g, x + 8, y + 8, w / 4 - 16, h / 5 - 16, 14); g.fill(); g.lineWidth = 8; g.strokeStyle = 'rgba(20,20,15,0.75)'; g.stroke(); }

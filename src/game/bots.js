@@ -1,91 +1,93 @@
 // ---------------------------------------------------------------------------
-// Guardians (Sector Sentinels): stand in the open arc, notice Karan, march on
-// the gun, hold a ring around it, freeze in stasis while the player solves
-// (top-down view), die inside the laser sector, pounce when they survive.
+// Guardians (Sector Sentinels), LXD 2026-10-23: they are never inside the arena
+// to begin with. When Karan reaches it they charge in from beyond the gap in
+// the wall and pound on the barrier across it. The charge destroys those in
+// front of the part of the arc it covers; after an undercharged shot the
+// survivors walk in through the broken barrier and attack Karan.
 // All polar coordinates are relative to the current arena centre `C`.
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
 import { AnimatedSprite, makeShadow, topDownLift } from '../engine/sprites.js';
+import { assets } from '../engine/assets.js';
 import { audio } from '../engine/audio.js';
 import { polar, degDiff, clamp, Ease } from '../engine/util.js';
 import { tweens } from '../engine/tween.js';
 
-const ATTACK_R = 2.7;
-const PEDESTAL_R = 1.9;
-// The march: brisk and smooth (a light stride surge, no stop-start lurch), faster as they close in
-// (× 1 + ACCEL·p², p = progress from the arc to the halt line), then a short brake into two ranks around the gun.
-const ACCEL = 0.6, BRAKE = 1.4, RANK_GAP = 1.3;
-const STASIS = new THREE.Color(0x8ff0ff), WHITE = new THREE.Color(0xffffff);
-/** March speed (m/s) from the level's time budget: ring 1 (60 s) 1.7 m/s → ring 7 (34 s) ~2.5 m/s. */
-const marchSpeed = (timeBudget) => 1.7 + Math.max(0, 60 - timeBudget) * 0.03;
+const GAP = 1.0;     // guardians stand this far beyond the barrier (the arc, r = R)
+const WHITE = new THREE.Color(0xffffff);
 
 export class BotManager {
   constructor(world, fx) {
     this.world = world; this.fx = fx; this.group = new THREE.Group(); world.add(this.group);
-    this.bots = []; this.onReach = null; this.active = false; this.frozen = false; this.waveTime = 0; this.budget = 1; this.speedMul = 1; this.stepCooldown = 0;
-    this.C = new THREE.Vector3(); this.R = 14; this.scale = 1;
+    this.bots = []; this.C = new THREE.Vector3(); this.R = 14; this.scale = 1;
+    this.calm = false;     // false: every guardian hammers away (arrival); true: one blow every ~2–3 s (the learner is working)
+    this.calmT = 0;
+    this.onPound = null;   // (bot) => the barrier ripples and thuds where the blow lands
+    // the blow: the sheet's 'pound' row (fists up → slam → recoil → wind-up, impact on its 3rd frame); without that art,
+    // the start of the lunge (crouch → strike) stands in, with a bigger lunge to sell it
+    const def = assets.frames('enemy_bot');
+    if (!def.anims.pound && def.anims.lunge) def.anims.pound = { row: def.anims.lunge.row, col: def.anims.lunge.col ?? 0, frames: 3, fps: 10, loop: false };
+    const P = def.anims.pound || { frames: 3, fps: 10 }, real = P.frames >= 5;
+    this.blow = { impact: ((real ? 2 : P.frames - 1) + 0.5) / P.fps, total: P.frames / P.fps, reach: real ? 0.3 : 0.55 };
   }
   get alive() { return this.bots.filter((b) => b.state !== 'dead' && b.state !== 'dying'); }
-  get nearestR() { const a = this.alive; return a.length ? Math.min(...a.map((b) => b.r)) : Infinity; }
-  get threat() { const r = this.nearestR; if (!isFinite(r)) return 0; return clamp(1 - (r - ATTACK_R) / (this.R + 2 - ATTACK_R), 0, 1); }
 
-  /** Spawn the squad standing ON the open arc of the current ring (they trace the sector's curved edge), idle until alert(). */
-  spawnWave({ theta, breachDeg, count, R, timeBudget, center, tint = null, speedMul = 1, scale = 1 }) {
-    this.clear(); this.R = R; this.budget = timeBudget; this.waveTime = 0; this.active = false; this.theta = theta; this.breachDeg = breachDeg; this.speedMul = speedMul; this.stepCooldown = 0; this.scale = scale;
+  /** Line the squad up beyond the gap (hidden until arrive()): one rank along the arc, just behind the barrier.
+   *  maxR(deg): how far out the guardian ground reaches along deg (where an arriving guardian may start). */
+  spawnWave({ theta, breachDeg, count, R, center, maxR = null, tint = null, scale = 1 }) {
+    this.clear(); this.R = R; this.theta = theta; this.breachDeg = breachDeg; this.scale = scale;
     if (center) this.C.set(center.x, 0, center.z);
-    const marginDeg = Math.max(theta * 0.05, (1.7 / R) * 57.2958);   // keep clear of the junction pillars at the arc ends
-    const span = Math.max(0, theta - 2 * marginDeg), rArc = R - 0.55;
-    const halt = Math.max(3.8, R * 0.42), v0 = marchSpeed(timeBudget);   // halt line: a ring around the gun, clear of Karan's stand
+    const marginDeg = Math.max(theta * 0.05, (1.5 / R) * 57.2958);   // keep clear of the gateposts at the arc ends
+    const span = Math.max(0, theta - 2 * marginDeg), rStand = R + GAP;
     for (let i = 0; i < count; i++) {
       const deg = breachDeg + (count === 1 ? 0 : -span / 2 + (span * i) / (count - 1));
-      const spr = new AnimatedSprite('enemy_bot', { worldHeight: 2.1, anim: 'idle', tint });
-      spr.setScale(scale);
+      const spr = new AnimatedSprite('enemy_bot', { anim: 'idle', tint });   // size from the manifest (the sheet's cells are 296 px tall)
       const shadow = makeShadow(0.7, 0.8);
-      const g = new THREE.Group(); g.add(spr.sprite, shadow); this.group.add(g);
-      const rHalt = Math.min(rArc - 0.5, halt + (i % 3) * RANK_GAP);   // three ranks so the (bigger) squad never blobs together
+      const g = new THREE.Group(); g.add(spr.sprite, shadow); g.visible = false; this.group.add(g);
       // a little size and tone variety so a squad of 20+ does not read as one sprite copied
       const vary = 0.94 + Math.random() * 0.12; spr.setScale(scale * vary); if (!tint) spr.material.color.setScalar(0.9 + Math.random() * 0.1); spr.baseTone = spr.material.color.clone();
-      const bot = { g, spr, shadow, deg, r: rArc, r0: rArc, rHalt, speed: v0 * (0.92 + Math.random() * 0.16), state: 'walking', phase: Math.random() * Math.PI * 2, delay: Math.random() * 0.35, y: 0, walked: 0 };
+      const rFar = Math.max(rStand + 2.5, Math.min(rStand + 7.5, maxR ? maxR(deg) : rStand + 7));
+      const bot = { g, spr, shadow, deg, r: rFar, rStand, rFar, state: 'waiting', y: 0, cool: 0, speed: 4.6 + Math.random() * 1.2, delay: 0 };
       spr.time = Math.random() * 3;
       this.place(bot); this.bots.push(bot);
     }
   }
-  place(b) { const p = polar(b.deg, b.r); b.g.position.set(this.C.x + p.x, 0, this.C.z + p.z); b.spr.sprite.position.y = b.y + (this.lift || 0); }
-  /** The guardians notice Karan: eyes flash, then they advance. */
-  alert() {
-    this.active = true;
-    for (const b of this.bots) { b.spr.material.color.setHex(0xff6a5a); tweens.add({ duration: 0.6, delay: Math.random() * 0.3, onUpdate: (e) => b.spr.material.color.lerpColors(new THREE.Color(0xff6a5a), b.spr.baseTone || WHITE, e) }); }
+  place(b) { const p = polar(b.deg, b.r); b.g.position.set(this.C.x + p.x, 0, this.C.z + p.z); }
+  /** The squad charges in from beyond the gap and slams into the barrier. Resolves at the first blow. */
+  arrive({ stagger = 0.45 } = {}) {
     audio.play('bots.notice');
-  }
-  /** Stasis while the player solves (top-down view): every standing guardian holds its pose and frame under a cyan tint.
-   *  instant = no tween (a squad spawned straight into stasis). */
-  freeze(on, instant = false) {
-    if (this.frozen === on) return; this.frozen = on;
-    for (const b of this.alive) {
-      const c = b.spr.material.color, from = c.clone(), to = on ? STASIS : (b.spr.baseTone || WHITE);
-      if (instant) c.copy(to); else tweens.add({ duration: 0.3, delay: on ? Math.random() * 0.12 : 0, onUpdate: (e) => c.lerpColors(from, to, e) });
-    }
-    if (on && !instant && this.alive.length) audio.play('bots.stasis');
-  }
-  /** A fresh squad shimmers in (used for the retry squad, which arrives already frozen). */
-  appear(dur = 0.5) {
-    audio.play('bots.stasis', { vol: 0.6 });
-    for (const b of this.alive) { const m = b.spr.material; m.opacity = 0; tweens.add({ duration: dur, delay: Math.random() * 0.2, onUpdate: (e) => (m.opacity = e) }); }
+    return new Promise((res) => {
+      this._onFirstBlow = res;
+      for (const b of this.bots) {
+        b.state = 'arriving'; b.delay = Math.random() * stagger; b.r = b.rFar; b.g.visible = true; this.place(b);
+        const m = b.spr.material; m.opacity = 0; tweens.add({ duration: 0.35, delay: b.delay, onUpdate: (e) => (m.opacity = e) });
+      }
+      if (!this.bots.length) res();
+    });
   }
   inSector(b, centerDeg, halfTheta) { return Math.abs(degDiff(centerDeg, b.deg)) <= halfTheta; }
   pan(b) { return clamp((b.g.position.x - this.C.x) / (this.R || 14), -1, 1) * 0.6; }
 
-  killInSector(centerDeg, halfTheta, frontSpeed = 40) {
-    const survivors = [], hit = this.alive.filter((b) => this.inSector(b, centerDeg, halfTheta));
-    const vol = 1 / Math.sqrt(Math.max(1, hit.length / 3));
-    for (const b of this.alive) { if (this.inSector(b, centerDeg, halfTheta)) this.kill(b, Math.max(0.05, b.r / frontSpeed), vol); else survivors.push(b); }
-    return survivors;
+  /** One blow on the barrier: wind up, slam into it (the barrier ripples where it lands, on the impact frame), recoil. */
+  pound(b) {
+    b.state = 'striking';
+    const B = this.blow, r0 = b.rStand, r1 = b.rStand - B.reach, hit = Math.min(0.12, B.impact * 0.5), wind = B.impact - hit, back = Math.max(0.3, B.total - B.impact);
+    b.spr.play('pound', { restart: true, speed: 1 });
+    tweens.add({ duration: hit, delay: wind, ease: Ease.inQuad, onUpdate: (e) => { if (b.state === 'striking') { b.r = r0 + (r1 - r0) * e; this.place(b); } },
+      onComplete: () => {
+        if (b.state !== 'striking') return;
+        if (this.onPound) this.onPound(b);
+        if (this._onFirstBlow) { const cb = this._onFirstBlow; this._onFirstBlow = null; cb(); }
+        tweens.add({ duration: back, ease: Ease.outQuad, onUpdate: (e) => { if (b.state === 'striking') { b.r = r1 + (r0 - r1) * e; this.place(b); } },
+          onComplete: () => { if (b.state !== 'striking') return; b.state = 'pounding'; b.spr.play('idle'); b.cool = 0.5 + Math.random() * 1.1; } });
+      } });
   }
+
   kill(b, delayS = 0, vol = 1) {
     if (b.state === 'dying' || b.state === 'dead') return; b.state = 'dying';
     tweens.delay(delayS).promise.then(() => {
       if (!this.bots.includes(b)) return;
-      b.spr.material.color.copy(b.spr.baseTone || WHITE);   // the stasis shell shatters with it
+      b.spr.material.color.copy(b.spr.baseTone || WHITE);
       b.spr.play('death', { restart: true, onComplete: () => { b.state = 'dead'; this.group.remove(b.g); b.spr.dispose(); } });
       const p = b.g.position.clone(); p.y = 0.9;
       this.fx.explosion(p, 2.6); this.fx.smoke(p, 3);
@@ -93,51 +95,56 @@ export class BotManager {
       b.shadow.visible = false;
     });
   }
-  pulseKill() { const n = this.alive.length; for (const b of this.alive) this.kill(b, 0.1 + b.r / 25, 1 / Math.sqrt(Math.max(1, n / 3))); }
+  /** The centre O pulses after the survivors' attack and they fall (the board resets for the next try). */
+  pulseKill() { const n = this.alive.length; for (const b of this.alive) this.kill(b, 0.1 + b.g.position.distanceTo(this.C) / 25, 1 / Math.sqrt(Math.max(1, n / 3))); }
 
-  /** Survivors leap at Karan. Resolves true when the first one connects. */
-  lunge(targetPos, onHit, filter = null) {
-    let bots = this.alive; if (filter) { const f = bots.filter(filter); if (f.length) bots = f; }
-    if (!bots.length) return Promise.resolve(false);
-    this.active = false; this.freeze(false);   // stasis breaks: the survivors pounce
+  /** After an undercharged shot: the survivors step through the broken barrier, run at Karan and the first leap
+   *  connects. Resolves true at that hit (false if nobody survived). */
+  breakThrough(targetPos, onHit) {
+    const bots = this.alive; if (!bots.length) return Promise.resolve(false);
     return new Promise((res) => {
-      let hit = false;
+      let hit = false, longest = 0;
       bots.forEach((b, i) => {
-        b.state = 'lunging';
-        const from = b.g.position.clone(), to = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.4, 0, (Math.random() - 0.5) * 1.4));
-        const rel = to.clone().sub(this.C); if (rel.length() < PEDESTAL_R) { rel.setLength(PEDESTAL_R); to.copy(this.C).add(rel); }
-        const d = from.distanceTo(to), dur = clamp(d / 16, 0.4, 0.75), dl = i * 0.04;   // short attack, one clear impact (LXD)
-        tweens.delay(dl).promise.then(() => { b.spr.play('lunge', { restart: true }); audio.play('bot.lunge', { pan: this.pan(b), minGap: 0.05 }); });
-        tweens.add({ duration: dur, delay: dl, ease: Ease.linear, onUpdate: (e) => { b.g.position.lerpVectors(from, to, e); b.spr.sprite.position.y = Math.sin(e * Math.PI) * 2.2; b.shadow.material.opacity = 0.8 * (1 - Math.sin(e * Math.PI) * 0.5); },
-          onComplete: () => { if (!hit) { hit = true; onHit && onHit(b); res(true); } b.state = 'attacking'; b.spr.play('idle'); } });
+        b.state = 'charging';
+        const from = b.g.position.clone(), aim = targetPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.6, 0, (Math.random() - 0.5) * 1.6));
+        const toward = aim.clone().sub(from).setY(0), L = toward.length(); toward.normalize();
+        const leapAt = from.clone().addScaledVector(toward, Math.max(0, L - 2.6)), run = Math.max(0, L - 2.6) / 6.2, dl = i * 0.06 + Math.random() * 0.1;
+        longest = Math.max(longest, dl + run + 0.42);
+        tweens.delay(dl).promise.then(() => { if (b.state === 'charging') b.spr.play('walk', { speed: 2 }); });
+        tweens.add({ duration: run, delay: dl, ease: Ease.linear, onUpdate: (e) => { if (b.state === 'charging') b.g.position.lerpVectors(from, leapAt, e); },
+          onComplete: () => {
+            if (b.state !== 'charging') return;
+            b.spr.play('lunge', { restart: true }); audio.play('bot.lunge', { pan: this.pan(b), minGap: 0.05 });
+            tweens.add({ duration: 0.42, ease: Ease.linear, onUpdate: (e) => { if (b.state !== 'charging') return; b.g.position.lerpVectors(leapAt, aim, e); b.y = Math.sin(e * Math.PI) * 1.6; b.shadow.material.opacity = 0.8 * (1 - Math.sin(e * Math.PI) * 0.5); },
+              onComplete: () => { b.y = 0; if (b.state === 'charging') { b.state = 'attacking'; b.spr.play('idle'); } if (!hit) { hit = true; onHit && onHit(b); res(true); } } });
+          } });
       });
+      tweens.delay(longest + 1).promise.then(() => { if (!hit) { hit = true; res(false); } });   // watchdog: no leap ever landed
     });
   }
-  clear() { for (const b of this.bots) { this.group.remove(b.g); b.spr.dispose(); } this.bots = []; this.active = false; this.frozen = false; }
+  clear() { for (const b of this.bots) { this.group.remove(b.g); b.spr.dispose(); } this.bots = []; this._onFirstBlow = null; this.calm = false; }
 
   update(dt) {
-    if (this.active) this.waveTime += dt;
-    if (this.stepCooldown > 0) this.stepCooldown -= dt;
-    this.lift = topDownLift(this.world.camera);   // keep floor-level sprites visible from the puzzle camera
+    const lift = topDownLift(this.world.camera);   // keep floor-level sprites visible from the puzzle camera
+    let running = null; const ro = lift > 0 ? 16 : 0;   // from above, drawn after the floor overlays (the dim) like Karan
     for (const b of this.bots) {
-      const standing = b.state === 'walking' || b.state === 'holding';
-      if (b.state !== 'lunging') b.spr.sprite.position.y = b.y + this.lift;
-      if (this.frozen && standing) continue;                     // stasis: pose, frame and position all hold
+      b.spr.sprite.position.y = b.y + lift; b.spr.sprite.renderOrder = ro;
       b.spr.update(dt);
-      if (b.state !== 'walking') continue;
-      if (!this.active) { b.spr.play('idle'); continue; }
-      if (b.delay > 0) { b.delay -= dt; b.spr.play('idle'); continue; }
-      const prog = clamp(1 - (b.r - b.rHalt) / Math.max(0.01, b.r0 - b.rHalt), 0, 1), accel = 1 + ACCEL * prog * prog;   // faster near the gun
-      const brake = 0.3 + 0.7 * clamp((b.r - b.rHalt) / BRAKE, 0, 1);                                                   // ...then plant their feet
-      b.walked += dt; const start = Math.min(1, b.walked / 0.6), ease = start * start * (3 - 2 * start);   // ease into the march
-      const v = b.speed * accel * brake * this.speedMul * ease;
-      b.phase += dt * Math.PI * 2 * (v / 1.7);                    // footstep timing only: the march itself is perfectly smooth
-      const s = Math.sin(b.phase);
-      b.r -= v * dt;
-      b.spr.play('walk', { speed: clamp(v / 1.7, 0.7, 2.1) });
-      if (s > 0.97 && this.stepCooldown <= 0 && b.r < this.R) { this.stepCooldown = 0.22; audio.play('bot.step', { pan: this.pan(b), vol: clamp(0.85 - b.r / this.R, 0.12, 0.5), minGap: 0.18 }); }
-      if (b.r <= b.rHalt) { b.r = b.rHalt; b.state = 'holding'; b.spr.play('idle'); if (this.onReach) { const cb = this.onReach; this.onReach = null; cb(b); } }
-      this.place(b);
+      if (b.state === 'arriving') {
+        if (b.delay > 0) { b.delay -= dt; continue; }
+        b.r -= b.speed * dt; b.spr.play('walk', { speed: 1.9 }); running = b;
+        if (b.r <= b.rStand) { b.r = b.rStand; this.place(b); this.pound(b); continue; }   // straight into the first blow
+        this.place(b);
+      } else if (b.state === 'pounding' && !this.calm) {
+        b.cool -= dt;
+        if (b.cool <= 0) this.pound(b);
+      }
+    }
+    if (running && (this.stepT = (this.stepT || 0) - dt) <= 0) { this.stepT = 0.15; audio.play('bot.step', { pan: this.pan(running), vol: 0.45, minGap: 0.1 }); }   // the charge-in thunders
+    if (this.calm && (this.calmT -= dt) <= 0) {
+      const ready = this.bots.filter((b) => b.state === 'pounding');
+      if (ready.length) this.pound(ready[Math.floor(Math.random() * ready.length)]);
+      this.calmT = 1.8 + Math.random() * 1.4;
     }
   }
 }
