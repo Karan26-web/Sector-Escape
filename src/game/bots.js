@@ -122,7 +122,7 @@ export class BotManager {
       tweens.delay(longest + 1).promise.then(() => { if (!hit) { hit = true; res(false); } });   // watchdog: no leap ever landed
     });
   }
-  clear() { for (const b of this.bots) { this.group.remove(b.g); b.spr.dispose(); } this.bots = []; this._onFirstBlow = null; this.calm = false; }
+  clear() { for (const b of this.bots) { this.group.remove(b.g); b.spr.dispose(); } this.bots = []; this._onFirstBlow = null; this.calm = false; this.idle = false; }
 
   update(dt) {
     const lift = topDownLift(this.world.camera);   // keep floor-level sprites visible from the puzzle camera
@@ -135,13 +135,13 @@ export class BotManager {
         b.r -= b.speed * dt; b.spr.play('walk', { speed: 1.9 }); running = b;
         if (b.r <= b.rStand) { b.r = b.rStand; this.place(b); this.pound(b); continue; }   // straight into the first blow
         this.place(b);
-      } else if (b.state === 'pounding' && !this.calm) {
+      } else if (b.state === 'pounding' && !this.calm && !this.idle) {
         b.cool -= dt;
         if (b.cool <= 0) this.pound(b);
       }
     }
     if (running && (this.stepT = (this.stepT || 0) - dt) <= 0) { this.stepT = 0.15; audio.play('bot.step', { pan: this.pan(running), vol: 0.45, minGap: 0.1 }); }   // the charge-in thunders
-    if (this.calm && (this.calmT -= dt) <= 0) {
+    if (this.calm && !this.idle && (this.calmT -= dt) <= 0) {
       const ready = this.bots.filter((b) => b.state === 'pounding');
       if (ready.length) this.pound(ready[Math.floor(Math.random() * ready.length)]);
       this.calmT = 1.8 + Math.random() * 1.4;

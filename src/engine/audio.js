@@ -188,12 +188,37 @@ SFX['barrier.hit'] = (A, o) => {   // a guardian's fist on the barrier: a dull t
   A.burst({ t0: t, dur: 0.07, vol: 0.18 * v, type: 'lowpass', f0: 900, pan, env: { a: 0.002, d: 0.04, s: 0.2, r: 0.03 } });
   A.tone({ t0: t + 0.01, type: 'sine', f0: rnd(1250, 1500), dur: 0.35, vol: 0.05 * v, pan, env: { a: 0.002, d: 0.12, s: 0.2, r: 0.2 } });
 };
-SFX['barrier.shatter'] = (A) => {   // the charge breaks it: a crack, then glass raining down
+// The charge breaks it in two beats (user 2026-10-23): a glass CRACK (o.dur: how long, in real seconds, until it gives
+// way: the cracks keep running, faster and faster, right up to it), the SHATTER, then the pieces SETTLE on the stone.
+SFX['barrier.crack'] = (A, o) => {
+  const t = A.now, D = o.dur ?? 0.8, N = 18;
+  A.tone({ t0: t, f0: 170, f1: 55, dur: 0.16, vol: 0.42, env: { a: 0.002, d: 0.07, s: 0.3, r: 0.08 } });                   // the charge hits
+  A.burst({ t0: t, dur: 0.05, vol: 0.85, type: 'highpass', f0: 2600, env: { a: 0.001, d: 0.018, s: 0.25, r: 0.025 } });      // the snap
+  A.burst({ t0: t + 0.004, dur: 0.06, vol: 0.4, type: 'bandpass', f0: 4200, Q: 2.5, env: { a: 0.001, d: 0.02, s: 0.2, r: 0.03 } });
+  for (let k = 1; k <= N; k++) {                                                                                               // the cracks running
+    const tt = D * 0.94 * Math.pow(k / N, 0.62) + rnd(-0.008, 0.008);
+    A.burst({ t0: t + tt, dur: 0.01 + Math.random() * 0.022, vol: rnd(0.1, 0.24) * (0.7 + (0.5 * k) / N), type: 'bandpass', f0: rnd(2400, 8500), Q: 4, pan: rnd(-0.6, 0.6), env: { a: 0.001, d: 0.008, s: 0.2, r: 0.012 } });
+  }
+  for (const [f, v, d] of [[2350, 0.05, 0.7], [3710, 0.035, 0.5], [5230, 0.02, 0.35]]) A.tone({ t0: t + 0.005, type: 'sine', f0: f, dur: d, vol: v, env: { a: 0.002, d: d * 0.35, s: 0.25, r: d * 0.5 } });   // the glass rings
+};
+SFX['barrier.shatter'] = (A) => {   // it gives way: a bright crash and the glass breaking up
   const t = A.now;
-  A.burst({ t0: t, dur: 0.12, vol: 0.45, type: 'highpass', f0: 2500, env: { a: 0.001, d: 0.05, s: 0.3, r: 0.06 } });
-  A.tone({ t0: t, f0: 90, f1: 35, dur: 0.5, vol: 0.4, env: { a: 0.003, d: 0.2, s: 0.3, r: 0.25 } });
-  for (let i = 0; i < 18; i++) A.burst({ t0: t + 0.03 + Math.random() * 0.75, dur: 0.05 + Math.random() * 0.06, vol: rnd(0.05, 0.14), type: 'bandpass', f0: rnd(2600, 7000), Q: 6, pan: rnd(-0.7, 0.7), env: { a: 0.001, d: 0.03, s: 0.2, r: 0.03 } });
-  A.seq([[95, 0.02, 0.4, 0.6], [100, 0.1, 0.5, 0.5]], { type: 'sine', vol: 0.04 });
+  A.burst({ t0: t, dur: 0.28, vol: 0.5, type: 'highpass', f0: 1800, env: { a: 0.001, d: 0.09, s: 0.35, r: 0.16 } });
+  A.tone({ t0: t, f0: 90, f1: 35, dur: 0.5, vol: 0.36, env: { a: 0.003, d: 0.2, s: 0.3, r: 0.25 } });
+  for (let i = 0; i < 28; i++) {
+    const tt = 0.02 + Math.pow(Math.random(), 1.8) * 0.75, pan = rnd(-0.8, 0.8);   // densest at first
+    if (i % 2) A.burst({ t0: t + tt, dur: 0.03 + Math.random() * 0.05, vol: rnd(0.05, 0.13), type: 'bandpass', f0: rnd(2600, 8000), Q: 7, pan, env: { a: 0.001, d: 0.02, s: 0.2, r: 0.03 } });
+    else A.tone({ t0: t + tt, type: 'sine', f0: rnd(2800, 6600), dur: 0.12 + Math.random() * 0.16, vol: rnd(0.02, 0.05), dest: A.panner(pan, A.sfxBus), env: { a: 0.001, d: 0.05, s: 0.2, r: 0.08 } });
+  }
+};
+SFX['barrier.settle'] = (A) => {   // the pieces land on the stone: a light scatter of glassy ticks, then quiet
+  const t = A.now;
+  A.burst({ t0: t, dur: 0.55, vol: 0.045, type: 'bandpass', f0: 5200, Q: 1.5, env: { a: 0.02, d: 0.22, s: 0.3, r: 0.28 } });
+  for (let i = 0; i < 18; i++) {
+    const tt = Math.pow(Math.random(), 1.4) * 0.7, pan = rnd(-0.8, 0.8);
+    A.tone({ t0: t + tt, type: 'sine', f0: rnd(3200, 7400), dur: 0.05 + Math.random() * 0.08, vol: rnd(0.015, 0.04), dest: A.panner(pan, A.sfxBus), env: { a: 0.001, d: 0.025, s: 0.2, r: 0.04 } });
+    if (i % 3 === 0) A.burst({ t0: t + tt, dur: 0.02, vol: rnd(0.03, 0.06), type: 'highpass', f0: 4200, pan, env: { a: 0.001, d: 0.01, s: 0.2, r: 0.012 } });
+  }
 };
 SFX['hero.fall'] = (A) => {   // Karan hits the floor after the reflected charge
   const t = A.now;

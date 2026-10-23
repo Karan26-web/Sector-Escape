@@ -12,7 +12,7 @@
 // only moves through them.
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
-import { CHAIN, botCountFor, evaluateAnswer, computeScore, beamLine, tipLine, enemyMaxR, SEAL_BEHIND } from './levels.js';
+import { CHAIN, botCountFor, evaluateAnswer, computeScore, beamLine, tipLine, enemyMaxR, SEAL_BEHIND, WALL_HEIGHT } from './levels.js';
 import { Boss } from './boss.js';
 import { assets } from '../engine/assets.js';
 import { tweens, delay } from '../engine/tween.js';
@@ -62,9 +62,9 @@ export class ArenaScene {
   /** Near-top-down camera (85°, the open arc up) that FITS the given world points into the free part of the screen
    *  (left of the answer dock on desktop, above it on phones, below the shields). Real points are projected through a
    *  scratch camera and the pose is solved iteratively (distance + aim offset). margin < 1 leaves breathing room. */
-  fitPose(pts, margin = 1) {
+  fitPose(pts, margin = 1, pitchDeg = 85) {
     const u = this.dirDeg(this.A.exitDeg), right = new THREE.Vector3(-u.z, 0, u.x), up = new THREE.Vector3(0, 1, 0);
-    const vw = window.innerWidth, vh = window.innerHeight, narrow = vw < 760, fov = 32, pitch = 85 * DEG, tanH = Math.tan((fov / 2) * DEG);
+    const vw = window.innerWidth, vh = window.innerHeight, narrow = vw < 760, fov = 32, pitch = pitchDeg * DEG, tanH = Math.tan((fov / 2) * DEG);
     const dock = document.getElementById('answer-dock'), pad = narrow ? 8 : 20;
     const free = narrow
       ? { x0: pad, x1: vw - pad, y0: 64, y1: vh - ((dock && dock.offsetHeight) || 300) - 8 - 34 - pad }   // below the shields, above the answer dock (+ room for the tip line)
@@ -124,6 +124,18 @@ export class ArenaScene {
     ui.setArenaCentre(((v.x + 1) / 2) * p.vw, ((1 - v.y) / 2) * p.vh);
     return { pos: p.pos, target: p.target, fov: p.fov };
   }
+  /** The barrier breaking (user 2026-10-23: crack → fall to the floor → vanish): a lower camera from inside the ring
+   *  looking at the gap. From straight above the glass is edge-on and a fall is invisible; at 54° the cracks on the glass,
+   *  the pieces dropping to the floor and the guardians behind all read. (Below 55° the sprites draw before the glass.) */
+  breakPose() {
+    const A = this.A, pts = [];
+    for (let d = -A.theta / 2; d <= A.theta / 2 + 0.01; d += A.theta / 8) {
+      pts.push(this.W(A.exitDeg + d, this.R - 1.4), this.W(A.exitDeg + d, this.R, WALL_HEIGHT * 0.62));   // the floor where the pieces land; the visible glass
+    }
+    for (const b of this.bots.alive) pts.push(b.g.position.clone().setY(2.5));                               // the guardians behind it
+    const p = this.fitPose(pts, 0.9, 54);
+    return { pos: p.pos, target: p.target, fov: p.fov };
+  }
   /** Ring 7: the Warden stands beyond the arc and its 6.5 m sprite rises toward screen-up in the top view; this point keeps
    *  all of it in frame (a sliver of its glow at the screen edge reads as a framing mistake). */
   wardenTop() { return this.boss.position.clone().setY(0).addScaledVector(this.dirDeg(this.A.exitDeg), 7.4); }
@@ -161,7 +173,7 @@ export class ArenaScene {
   /** The squad lines up (hidden) beyond the gap, in the guardian ground (bay or next ring), ready to charge in. */
   spawnSquad() {
     this.bots.spawnWave({ theta: this.A.theta, breachDeg: this.A.exitDeg, count: botCountFor(this.R, this.A.theta), R: this.R, center: this.A.center, maxR: (deg) => enemyMaxR(this.A, deg), scale: 1.12 + Math.max(0, this.R - 14) / 45 });
-    this.bots.onPound = (b) => { this.barrier.impact(b.deg, 1.0 + Math.random() * 0.8); audio.play('barrier.hit', { pan: this.bots.pan(b), vol: this.bots.calm ? 0.5 : 0.85, minGap: 0.06 }); };
+    this.bots.onPound = (b) => { if (!this.barrier.up) return; this.barrier.impact(b.deg, 1.0 + Math.random() * 0.8); audio.play('barrier.hit', { pan: this.bots.pan(b), vol: this.bots.calm ? 0.5 : 0.85, minGap: 0.06 }); };
   }
   /** Squad charges in; the barrier flashes up across the gap just before the first one reaches it. Resolves at the first
    *  blow (~2 s), or at a watchdog if that blow never lands (game time, so a pause does not trip it): play never stalls. */
@@ -313,7 +325,11 @@ export class ArenaScene {
       await this.sector.charge();
       const covered = Math.min(res.firedTheta, A.theta);
       await this.sector.fire({ ...res, theta: A.theta, breachDeg: A.exitDeg }, {
-        onArc: () => this.barrier.shatter({ fromDeg: A.exitDeg - covered / 2, spanDeg: covered }),
+        onArc: () => {   // the charge hits the glass: the camera drops to see it crack, then give way and fall
+          this.bots.idle = true; this.rig.moveTo(this.breakPose(), 0.28, Ease.outCubic);
+          return this.barrier.breakAt({ fromDeg: A.exitDeg - covered / 2, spanDeg: covered });
+        },
+        onSlowEnd: () => this.rig.moveTo(this.tacticalPose(), 0.6, Ease.inOutCubic),
         targets: () => this.chargeTargets(res.status, covered),
         kill: (b) => this.bots.kill(b, 0, 0.7),
         reflectTo: () => this.hero.pos.clone(),

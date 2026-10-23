@@ -163,6 +163,8 @@
   }
 </script>
 <script type="module" src="src/main.js"></script>
-<script type="module" src="src/dev/skip-level.js"></script>   <!-- DEV ONLY: temporary skip button. Remove this line + src/dev/ before pushing -->
+<script>   // DEV ONLY: temporary skip button, loaded on localhost (or with ?dev=1) only, so a deploy never requests it (src/dev is not published). Remove this block + src/dev/ before pushing.
+  (function () { if (['localhost', '127.0.0.1', ''].indexOf(location.hostname) < 0 && !/[?&]dev\b/.test(location.search)) return; var s = document.createElement('script'); s.type = 'module'; s.src = 'src/dev/skip-level.js'; document.body.appendChild(s); })();
+</script>
 </body>
 </html>

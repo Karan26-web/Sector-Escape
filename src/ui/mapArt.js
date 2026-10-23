@@ -153,7 +153,7 @@ export class MapArt {
     x.drawImage(img, 0, 0, def.frameW, def.frameH, 0, 0, w, h); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(46,6,12,0.9)'; x.fillRect(0, 0, w, h);
     this.bossSil = c; this.bossBase = def.baseline ?? 1;
   }
-  mask(paint) { const c = document.createElement('canvas'); c.width = this.W; c.height = this.H; const m = c.getContext('2d'); m.fillStyle = '#fff'; paint(m); return c; }
+  mask(paint) { const c = document.createElement('canvas'); c.width = this.W; c.height = this.H; const m = c.getContext('2d', { willReadFrequently: true }); m.fillStyle = '#fff'; paint(m); return c; }   // read back several times (getImageData): kept CPU-side
   /** Extrude a mask into a cliff (rock band + shadow on the water) and paint its grassy top. */
   cliffs(g, mask) {
     const W = this.W, H = this.H, hc = this.cliff;

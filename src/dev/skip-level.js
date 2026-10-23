@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // DEV ONLY: temporary "Skip ring" button for playtesting. REMOVE BEFORE PUSHING:
 //   1. delete this file (src/dev/skip-level.js)
-//   2. delete its <script> line at the bottom of index.html
+//   2. delete the DEV <script> block at the bottom of index.html
 // (src/dev is also listed in .vercelignore, and the button only appears on localhost / 127.0.0.1 or with ?dev=1.)
 //
 // Skipping = the exact area is fired for you, so the normal win path plays (the charge, the barrier breaking, the reward

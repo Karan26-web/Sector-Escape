@@ -161,12 +161,14 @@ export class Sector {
   }
   /**
    * Fire (LXD): 1) the charge sweeps across exactly the wedge the student asked for, painting it (the arc's part cyan,
-   * any excess red); 2) slow motion: it reaches the arc and breaks the barrier, and radial bolts from O hit every
-   * guardian behind the covered part; 3) an overcharged excess hits the wall beside the gap and reflects back at Karan;
+   * any excess red); 2) slow motion: it reaches the arc and breaks the barrier (onArc: it cracks, then gives way), and
+   * radial bolts from O hit every guardian behind the covered part; 3) an overcharged excess hits the wall beside the
+   * gap and reflects back at Karan;
    * 4) a ghost comparison stays on the floor until releaseGhost(): the target wedge dashed over a smaller shot / the
    * excess in pulsing red / a gold snap when exact.
-   * r: { status, firedTheta, theta, breachDeg }.  cb: { onArc(), targets() → guardians behind the covered arc, kill(bot),
-   * reflectTo() → where Karan stands, onReflect() }
+   * r: { status, firedTheta, theta, breachDeg }.  cb: { onArc() → resolves when the barrier gives way, targets() →
+   * guardians behind the covered arc, kill(bot), onSlowEnd() → the camera back on the whole ring, reflectTo() → where
+   * Karan stands, onReflect() }
    */
   async fire(r, cb = {}) {
     const R = this.R, W = this.world, lw = Math.max(1, R / 9);
@@ -186,8 +188,7 @@ export class Sector {
     this.orb.visible = false; this.light.intensity = 40;
     // 2) slow motion: the charge reaches the arc and the barrier breaks; bolts from O to every guardian behind the covered part
     W.timeScale = 0.35;
-    if (cb.onArc) cb.onArc();
-    W.rig.shake(0.3, 0.4);
+    if (cb.onArc) await cb.onArc();   // the barrier cracks, then gives way: the bolts go through as it falls
     const targets = (cb.targets ? cb.targets() : []).slice().sort((a, b) => a.deg - b.deg);
     for (const b of targets) {
       const bolt = ribbon(b.r + 0.3, 0.26 * lw, b.deg, 0xe8ffff, { dashed: false, opacity: 1, y: 0.07, order: 14 }); this.overlays.add(bolt);
@@ -202,8 +203,10 @@ export class Sector {
       m.position.y = 0.7; this.overlays.add(m); tweenValue(1, 0, 0.9, (v) => (m.material.opacity = v)).then(() => this.overlays.remove(m));
     };
     if (half > 0.3) { impact(start, half, 0xff4f7a); impact(r.breachDeg + r.theta / 2, half, 0xff4f7a); }
-    await delay(0.45);
+    await delay(half > 0.3 ? 0.45 : 0.15);   // (the slow motion holds for the red excess; nothing more to see without one)
     W.timeScale = 1;
+    const back = cb.onSlowEnd && cb.onSlowEnd();
+    if (half > 0.3 && back) await back;      // the reflection must be seen from above: Karan in the frame
     // …and reflects back at Karan (he takes the hit where he stands)
     if (half > 0.3) {
       audio.play('reflect.zap');

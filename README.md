@@ -24,7 +24,7 @@ Karan walks by himself (LXD: he has a designated observation point); the learner
 ## Dev and QA
 - URL parameters: `?level=5` start at arena 5 · `?skip=1` skip the causeway · `?mute=1` · `?reset=1` wipe saved progress.
 - Console: `__se.phase` (inside → arrive → observe → tactical → scan → input → firing → result → cleared → exit), `__se.fire('38.5')`, `__se.scene`, `__se.CHAIN`.
-- **Temporary DEV skip button** (localhost only, or `?dev=1`): remove `src/dev/skip-level.js` and its `<script>` line at the end of `index.html` before pushing.
+- **Temporary DEV skip button** (localhost only, or `?dev=1`): remove `src/dev/skip-level.js` and the DEV `<script>` block at the end of `index.html` before pushing.
 
 ## Project layout
 ```
@@ -34,7 +34,7 @@ src/game/levels.js              the 7 arenas (LXD table), chain geometry, answer
 src/game/chain.js               the world: evening sky and panorama, the temple, causeway, rings, gates, columns, jungle
 src/game/arenaScene.js          one ring from entry to exit
 src/game/sector.js              the O / r / θ construction, the charge at O, the beam and the after-shot comparison
-src/game/barrier.js             the transparent barrier across the gap: ripples where the guardians pound, the shatter
+src/game/barrier.js             the transparent barrier across the gap: ripples where the guardians pound; the break (crack → fall → vanish)
 src/game/bots.js, hero.js, boss.js, save.js
 src/ui/ui.js, mapArt.js         screens, HUD, answer dock and formula, results card, how to play, the painted map
 src/engine/                     renderer, camera rig, sprites, assets, tweens, labels, effects, audio
