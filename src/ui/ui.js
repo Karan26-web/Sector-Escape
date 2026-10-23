@@ -224,12 +224,16 @@ export const ui = {
       let last = performance.now();
       const loop = (now) => { this.raf = requestAnimationFrame(loop); this.art.frame(Math.max(0, Math.min(0.05, (now - last) / 1000))); last = now; this.place(); };   // rAF stamps can precede the start time
       cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(loop);
-      // the unlock moment, then Karan walks the glowing path to the new ring (LXD)
+      // the unlock moment, then Karan walks the glowing path to the new ring (LXD). Back stays live meanwhile: a tap skips
+      // to the end and leaves (no control on screen is ever dead while an animation plays)
+      let left = false; const leaveEarly = () => { left = true; this.art.skipAnimations(); };
       if (frontier > seen) {
-        this.busy = true; $('#map-tag').classList.remove('show');
+        this.busy = true; $('#map-tag').classList.remove('show'); $('#btn-map-back').addEventListener('click', leaveEarly);
         audio.play('gate.unlock'); await this.art.playUnlock(frontier);   // one unlock moment, for the newest ring (rings opened on the way are simply open)
-        await this.art.walkTo(frontier);
+        if (!left) await this.art.walkTo(frontier);
+        $('#btn-map-back').removeEventListener('click', leaveEarly);
         saveData.mapUnlockSeen = frontier; save.write(); this.busy = false;
+        if (left) { this.art.skipAnimations(); this.closeSettings(); return null; }
       } else if (saveData.mapUnlockSeen !== frontier) { saveData.mapUnlockSeen = frontier; save.write(); }
       this.first = !saveData.mapHintSeen && !saveData.cleared[1];
       this.select(frontier, true);

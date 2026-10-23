@@ -301,6 +301,11 @@ export class MapArt {
   }
   /** Unlock moment (LXD): pan in to the ring, the mist clears, the vines fall away, the ring lights up, pan out. */
   playUnlock(id) { return new Promise((res) => { this.unlock = { id, t0: this.t, res }; }); }
+  /** Jump to the end of the unlock moment and of Karan's walk (a tap on Back while they play). */
+  skipAnimations() {
+    if (this.unlock) { const r = this.unlock.res; this.unlock = null; r(); }
+    if (this.hero.walk) { const w = this.hero.walk; this.hero.id = w.to; this.hero.walk = null; w.res(); }
+  }
   shake(id) { this.shakeT[id] = this.t; }
   static ease(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
   view() {
