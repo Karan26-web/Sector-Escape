@@ -14,8 +14,9 @@ export class Hero {
   constructor(world, fx) {
     this.world = world; this.fx = fx;
     this.group = new THREE.Group();
-    this.front = new AnimatedSprite('hero_front', { worldHeight: 1.75 });
-    this.back = new AnimatedSprite('hero_back', { worldHeight: 1.75 });
+    // he writes depth: the lake mist behind him in the opening, or the barrier glass he walks up to, used to paint over him
+    this.front = new AnimatedSprite('hero_front', { worldHeight: 1.75, depthWrite: true });
+    this.back = new AnimatedSprite('hero_back', { worldHeight: 1.75, depthWrite: true });
     this.shadow = makeShadow(0.6, 0.9);
     this.group.add(this.front.sprite, this.back.sprite, this.shadow);
     this.back.sprite.visible = false;
@@ -30,7 +31,7 @@ export class Hero {
     this.stepTimer = 0; this.surface = 'stone';
     this.onArrive = null;
     world.add(this.group);
-    this._tmp = new THREE.Vector3(); this._tmp2 = new THREE.Vector3(); this._prev = new THREE.Vector3();
+    this._tmp = new THREE.Vector3(); this._tmp2 = new THREE.Vector3(); this._tmp3 = new THREE.Vector3(); this._prev = new THREE.Vector3();
   }
   get visibleSprite() { return this.back.sprite.visible ? this.back : this.front; }
   setPosition(v) { this.pos.copy(v); this.pos.y = 0; }
@@ -155,8 +156,11 @@ export class Hero {
       // the camera's viewing direction (not its position): sprites face the camera plane, and from the near-vertical puzzle
       // camera (shifted sideways for the panel) the hero→camera vector is almost sideways and picked the wrong sheet
       const toCam = this._tmp2.set(0, 0, 1).applyQuaternion(cam.quaternion).setY(0).normalize();
-      const right = this._tmp.set(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();
-      const fc = this.facing.dot(toCam), lat = this.facing.dot(right), running = speedNow > 0.8;
+      const fc = this.facing.dot(toCam), running = speedNow > 0.8;
+      // left or right as it shows on screen (the sheets are drawn for the screen): measured on the floor, a heading that runs
+      // up and to the right from the walk camera (it stands off his right shoulder) came out as almost straight ahead
+      const s0 = this._tmp.copy(this.pos).setY(0.9).project(cam), s1 = this._tmp3.copy(this.pos).setY(0.9).add(this.facing).project(cam);
+      const sx = (s1.x - s0.x) * cam.aspect, lat = sx / (Math.hypot(sx, s1.y - s0.y) || 1);
       let view = this._view || 'front';
       if (running) {   // within ~45° of straight toward / away from the camera; a little hysteresis, so a diagonal never flickers
         if ((view === 'front' && fc < 0.55) || (view === 'back' && fc > -0.55)) view = 'side';
@@ -166,8 +170,8 @@ export class Hero {
       this.showFront(view !== 'back');
       const s = this.visibleSprite, anim = !running ? 'idle' : view === 'front' && s.hasAnim('runFront') ? 'runFront' : 'run';
       s.play(anim, { speed: running ? clamp(speedNow / 6, 0.7, 1.4) : 1 });
-      // mirror when he faces the camera's left
-      if (lat < -0.45) this._flip = true; else if (lat > 0.45) this._flip = false;
+      // mirror when he faces the screen's left
+      if (lat < -0.3) this._flip = true; else if (lat > 0.3) this._flip = false;
       s.setFlip(!!this._flip);
     } else if (this.special === 'knockdown' || this.special === 'hurt' || this.special === 'down') this.front.setFlip(false);
     this.front.update(dt); this.back.update(dt);

@@ -8,8 +8,8 @@
 //    the next ring, the temple court.
 //  * The goal lights up (highlight(k)) as he comes near it, and fully, with a
 //    soft chime, whenever the player stands still or keeps pushing into an edge.
-//  * The camera follows from behind at a fixed heading toward the goal, and the
-//    stick is camera-relative: up = ahead.
+//  * The camera follows from behind his right shoulder at a fixed heading
+//    toward the goal (SWING), and the stick follows that heading: up = ahead.
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
 import { controller } from '../engine/controller.js';
@@ -52,11 +52,18 @@ export const SDF = {
 /** The carved columns at the wall ends stand on the walkable edge: walk round them, not through them. */
 export const PILLARS = SDF.union(...CHAIN.pillars.map((p) => SDF.disk(p, 1.15)));
 
-/** The walk camera at rest: behind him at a fixed heading (yawDeg), farther and wider on a portrait phone. The opening
- *  ends on exactly this pose, so the hand-over to the player has no cut. */
+/** How far (degrees) the walk camera swings round to his right. His back sheet (idle, run, cast) is drawn three-quarter,
+ *  turned up and to the right: from straight behind, his run toward the goal read as running sideways (user 2026-10-27).
+ *  From here his heading runs up and to the right on screen, the way the art runs. Less on a portrait phone, whose narrow
+ *  frame must still hold the goal ahead. */
+export const SWING = { wide: 28, tall: 18 };
+
+/** The walk camera at rest: behind his right shoulder at a fixed heading (yawDeg), farther and wider on a portrait phone.
+ *  The opening ends on exactly this pose, so the hand-over to the player has no cut. */
 export function walkPose(at, yawDeg, v = {}, aspect = 1.6, out = { pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 52 }) {
-  const f = polar(yawDeg, 1), k = aspect < 0.8 ? 1.3 : 1, D = (v.dist ?? 7) * k, H = (v.height ?? 7.5) * k, A = v.ahead ?? 2.5;
-  out.pos.set(at.x - f.x * D, H, at.z - f.z * D); out.target.set(at.x + f.x * A, 0.9, at.z + f.z * A); out.fov = aspect < 0.8 ? 64 : (v.fov ?? 52);
+  const tall = aspect < 0.8, k = tall ? 1.3 : 1, D = (v.dist ?? 7) * k, H = (v.height ?? 7.5) * k, A = v.ahead ?? 2.5;
+  const f = polar(yawDeg, 1), b = polar(yawDeg + 180 + (tall ? SWING.tall : SWING.wide), D);   // behind him, swung to his right
+  out.pos.set(at.x + b.x, H, at.z + b.z); out.target.set(at.x + f.x * A, 0.9, at.z + f.z * A); out.fov = tall ? 64 : (v.fov ?? 52);
   return out;
 }
 
@@ -77,7 +84,7 @@ export class Roam {
   constructor(game) {
     this.game = game; this.world = game.world; this.hero = game.hero;
     this.cur = null;
-    this.autopilot = false;   // tests and the DEV skip: walk to the goal by itself (?auto=1, __se.walk(true))
+    this.autopilot = false;   // tests: walk to the goal by itself (?auto=1, __se.walk(true))
     this._v = new THREE.Vector3();
     game.world.addUpdatable(this);
   }

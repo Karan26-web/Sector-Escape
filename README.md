@@ -25,8 +25,7 @@ The player walks Karan between the action beats: along the causeway to ring 1's 
 
 ## Dev and QA
 - URL parameters: `?level=5` start at arena 5 · `?skip=1` skip the causeway · `?mute=1` · `?reset=1` wipe saved progress (the opening plays again) · `?auto=1` Karan walks each walk by himself (the playtests use it).
-- Console: `__se.phase` (opening.stranded → opening.temple → opening.path → causeway → gate → inside → arrive → observe → tactical → scan → input → solve (arenas 1–4: the working) → firing → result → cleared → exit), `__se.answer('correct' | 'under' | 'over')` (any arena, chosen or typed), `__se.walk(true)` (the autopilot), `__se.controller.read()`, `__se.scene`, `__se.CHAIN`.
-- **Temporary DEV skip button** (localhost only, or `?dev=1`): remove `src/dev/skip-level.js` and the DEV `<script>` block at the end of `index.html` before pushing.
+- Console: `__se.phase` (opening.stranded → opening.temple → opening.path → causeway → gate → inside → arrive → observe → tactical → scan → input → solve (arenas 1–4: the working) → firing → result → exit), `__se.answer('correct' | 'under' | 'over')` (any arena, chosen or typed), `__se.walk(true)` (the autopilot), `__se.controller.read()`, `__se.scene`, `__se.CHAIN`.
 
 ## Project layout
 ```
@@ -40,7 +39,7 @@ src/game/roam.js, markers.js    the player's walks (walkable floor as distance f
 src/game/sector.js              the O / r / θ construction, the charge at O, the beam and the after-shot comparison
 src/game/barrier.js             the transparent barrier across the gap: ripples where the guardians pound; the break (crack → fall → vanish)
 src/game/bots.js, hero.js, boss.js, save.js
-src/ui/ui.js, mapArt.js         screens, HUD, answer dock and formula, results card, how to play, the painted map
+src/ui/ui.js, mapArt.js         screens, HUD, answer dock and formula, how to play, the painted map
 src/engine/                     renderer, camera rig, the controller (stick + keys), sprites, assets, tweens, labels, effects, audio
 src/placeholders/               procedural stand-ins drawn if an asset fails to load
 assets/                         WebP art; assets/manifest.json lists every asset (sprite-sheet grids and ground baselines)
@@ -57,6 +56,7 @@ All art is GPT-generated, installed as WebP and registered in `assets/manifest.j
 - `tools/gif_to_sheet.py` — turns a GIF with a fake checkerboard background into a transparent sprite sheet.
 - `tools/gen_asset_docs.py` — writes a GPT prompt spec for every asset into `docs/` when new art is needed.
 - `tools/add_sheet_row.py` — appends a generated animation strip (PNG with real alpha) as a new row of an existing sprite sheet: one scale for every frame, feet on the sheet's ground line, taller cells when a pose needs headroom; prints the manifest changes.
+- `tools/harden_alpha.py` — tightens a sheet's soft, half-transparent edges in the rows you name, so the background stops showing through a character in close-ups (leave out rows that are meant to glow).
 - `tools/manifest_sizes.py` — writes every image's size on disk into the manifest (`bytes`); the loading bar weighs each download by it. **Run it after adding or replacing art** (and bump `version` when a file keeps its name).
 - `tools/sheet-viewer.html` — preview sprite sheets and their animations.
 

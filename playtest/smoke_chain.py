@@ -8,7 +8,6 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screens") + "/";
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 async def phase(pg): return await pg.evaluate("window.__se ? window.__se.phase : null")
 ORDER = ['opening.stranded', 'opening.temple', 'opening.path', 'causeway', 'gate', 'inside', 'arrive', 'observe', 'tactical', 'scan', 'input']
-NEXT = "document.getElementById('btn-ar-next').click()"   # the end-of-arena results card waits for Next
 async def wait_phase(pg, want, timeout=150, or_later=False):
     """Wait for a phase; with or_later, also accept any later phase of the same arena intro (screenshots can be slow)."""
     t0 = time.time(); last = None
@@ -46,8 +45,7 @@ async def main():
             await wait_phase(pg, "input", 60); await pg.evaluate("__se.answer('over')")
             await pg.wait_for_function("__se.scene && __se.scene.heroDown !== null", timeout=60000); await pg.wait_for_timeout(900); await shot("13_over_knockdown")
             await wait_phase(pg, "result", 40); await wait_phase(pg, "input", 60); await pg.evaluate("__se.answer('correct')"); await pg.wait_for_timeout(2300); await shot("14_perfect")
-            await wait_phase(pg, "cleared", 60); await pg.wait_for_timeout(1800); await shot("14b_results_card"); await pg.evaluate(NEXT)
-            await wait_phase(pg, "exit", 60); await pg.wait_for_timeout(2600); await shot("15_reward_path")
+            await wait_phase(pg, "exit", 60); await pg.wait_for_timeout(2600); await shot("15_reward_path")   # (no results card: straight on)
             await pg.wait_for_timeout(4200); await shot("16_through_the_gap")
             await wait_phase(pg, "inside", 90, or_later=True); await pg.wait_for_timeout(3200); await shot("17_arena2_reveal")
             await wait_phase(pg, "input", 120); await pg.wait_for_timeout(1200); await shot("18_arena2_input")

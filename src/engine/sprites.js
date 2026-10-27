@@ -7,7 +7,9 @@ import { assets } from './assets.js';
 export class AnimatedSprite {
   /**
    * @param {string} sheetName  manifest key
-   * @param {object} o { worldHeight, center:[x,y] (THREE sprite center; [0.5,0] = feet), tint, fps }
+   * @param {object} o { worldHeight, center:[x,y] (THREE sprite center; [0.5,0] = feet), tint, fps, depthWrite }
+   *   depthWrite: the sprite hides what is behind it from see-through layers drawn after it (lake mist, the barrier glass);
+   *   without it such a layer paints over the sprite even when it lies behind
    */
   constructor(sheetName, o = {}) {
     this.sheetName = sheetName;
@@ -16,7 +18,7 @@ export class AnimatedSprite {
     this.tex = base.clone(); this.tex.needsUpdate = true;
     this.tex.wrapS = this.tex.wrapT = THREE.ClampToEdgeWrapping;
     this.tex.repeat.set(1 / this.def.cols, 1 / this.def.rows);
-    this.material = new THREE.SpriteMaterial({ map: this.tex, transparent: true, alphaTest: 0.02, depthWrite: false, depthTest: true, color: o.tint ?? 0xffffff });
+    this.material = new THREE.SpriteMaterial({ map: this.tex, transparent: true, alphaTest: 0.02, depthWrite: !!o.depthWrite, depthTest: true, color: o.tint ?? 0xffffff });
     this.sprite = new THREE.Sprite(this.material);
     const c = o.center ?? [0.5, 1 - (this.def.baseline ?? 1)];   // anchor at the measured feet line, not the cell edge
     this.sprite.center.set(c[0], c[1]);

@@ -21,7 +21,7 @@ button { font-family: inherit; }
 #game canvas { display: block; }
 #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 #ui { position: fixed; inset: 0; pointer-events: none; }
-#ui button, #ui input, #ui .screen.active, #ui .dock.open, #ui .arena-result.show { pointer-events: auto; }
+#ui button, #ui input, #ui .screen.active, #ui .dock.open { pointer-events: auto; }
 .screen:not(.active) * { pointer-events: none !important; }
 
 /* ---------- buttons ---------- */
@@ -195,19 +195,6 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 @keyframes jsIn { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
 .joystick.reveal .js-base::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--cyan); animation: jsRing 1.1s ease-out 0.25s both; pointer-events: none; }
 @keyframes jsRing { 0% { transform: scale(0.9); opacity: 0.9; } 100% { transform: scale(1.7); opacity: 0; } }
-.move-hint { position: absolute; left: calc(env(safe-area-inset-left, 0px) + 186px); bottom: calc(env(safe-area-inset-bottom, 0px) + 72px); display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px; border-radius: 14px; background: rgba(9, 20, 18, 0.9); border: 1px solid rgba(244, 191, 85, 0.55); box-shadow: var(--shadow); color: var(--ivory); opacity: 0; transform: translateX(-8px); transition: opacity 0.35s, transform 0.35s, border-color 0.3s; }
-.move-hint.show { opacity: 1; transform: none; }
-.move-hint b { font-family: var(--font-head); font-weight: 800; font-size: 19px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
-.move-hint small { font-size: 12.5px; color: var(--muted); }
-.mh-keys { display: grid; grid-template-columns: repeat(3, 24px); grid-auto-rows: 24px; gap: 3px; }
-.mh-keys kbd:first-child { grid-column: 2; } .mh-keys kbd:not(:first-child) { grid-row: 2; }
-.mh-keys kbd { display: flex; align-items: center; justify-content: center; border-radius: 5px; font-family: var(--font-head); font-weight: 800; font-size: 13px; color: var(--ivory); background: rgba(243, 235, 216, 0.1); border: 1px solid rgba(243, 235, 216, 0.4); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }
-.mh-icon { position: relative; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--cyan); }
-.mh-icon::after { content: ''; position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--amber); animation: mhDot 2.6s ease-in-out infinite; }
-@keyframes mhDot { 0%, 100% { transform: none; } 18%, 34% { transform: translate(0, -7px); } 50% { transform: none; } 66%, 82% { transform: translate(7px, 0); } }
-.move-hint.done { border-color: var(--cyan); }
-.move-hint.done > * { display: none; }
-.move-hint.done::before { content: '✓'; font-family: var(--font-head); font-weight: 800; font-size: 24px; line-height: 1; color: var(--cyan); padding: 0 6px; }
 
 /* ---------- map: designed 2D route + docked panel ---------- */
 #screen-map { background: var(--jungle-2); }
@@ -319,7 +306,7 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 .pk-x { white-space: nowrap; }   /* one line of maths: its pieces sit as typeset, the ² against its bracket */
 .pk-formula { min-height: 76px; padding: 14px 4px; border-radius: 12px; background: rgba(243, 235, 216, 0.04); font-size: 20px; font-weight: 600; color: var(--ivory); white-space: nowrap; text-align: center; line-height: 1.2; overflow: hidden; }
 .pk-formula .frac > span:first-child { padding-bottom: 3px; }
-.pk-chip { display: inline-flex; flex: none; align-items: center; justify-content: center; vertical-align: middle; min-width: 2.3em; height: 1.75em; margin: 0 1px; padding: 0 0.35em; border-radius: 9px; border: 2px dashed var(--amber); background: rgba(244, 191, 85, 0.1); color: var(--amber); font-family: var(--font-body); font-weight: 700; font-size: 0.9em; cursor: pointer; animation: chipPulse 1.6s ease-in-out infinite; }
+.pk-chip { display: inline-flex; flex: none; align-items: center; justify-content: center; vertical-align: middle; min-width: 2.3em; min-height: 1.75em; margin: 0 1px; padding: 2px 0.35em; border-radius: 9px; border: 2px dashed var(--amber); background: rgba(244, 191, 85, 0.1); color: var(--amber); font-family: var(--font-body); font-weight: 700; font-size: 0.9em; cursor: pointer; animation: chipPulse 1.6s ease-in-out infinite; }
 .pk-chip::after { content: '▾'; margin-left: 3px; font-size: 0.55em; opacity: 0.8; }
 .pk-chip.set { border-style: solid; color: var(--ivory); background: rgba(243, 235, 216, 0.07); animation: none; }
 .pk-chip.open { border-color: var(--cyan); box-shadow: 0 0 10px rgba(82, 222, 216, 0.45); }
@@ -374,23 +361,7 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 .wlabel.beamline.under { border-color: rgba(255, 130, 110, 0.7); color: #ffd2c9; }
 .wlabel.beamline.over { border-color: rgba(255, 80, 140, 0.75); color: #ffd0e2; }
 .wlabel.beamline.correct { border-color: rgba(255, 211, 107, 0.8); color: #ffe7a8; }
-.wlabel.origin { font-family: var(--font-head); font-weight: 800; font-size: 18px; padding: 1px 8px; color: #ffffff; border-color: rgba(255, 255, 255, 0.5); }
 
-/* end-of-arena results card */
-.arena-result { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -44%) scale(0.96); opacity: 0; pointer-events: none; min-width: 360px; max-width: 92vw; background: var(--panel); border: 1px solid rgba(244, 191, 85, 0.45); border-radius: 18px; padding: 22px 28px 20px; text-align: center; box-shadow: var(--shadow); transition: opacity 0.35s, transform 0.45s cubic-bezier(0.2, 1.2, 0.3, 1); }
-.arena-result.show { opacity: 1; transform: translate(-50%, -50%); pointer-events: auto; }
-.ar-title { font-family: var(--font-head); font-weight: 800; font-size: 36px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ivory); line-height: 1; }
-.ar-stars { display: flex; gap: 10px; justify-content: center; margin: 14px 0 10px; }
-.ar-stars img { width: 52px; height: 52px; opacity: 0; transform: scale(0.3); }
-.ar-stars img.pop { animation: starpop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) forwards; }
-@keyframes starpop { to { opacity: 1; transform: none; } }
-.ar-criteria:empty { display: none; }
-.ar-criteria { list-style: none; padding: 0; margin: 0; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; font-size: 14.5px; font-weight: 600; }
-.ar-criteria li::before { margin-right: 6px; font-weight: 800; }
-.ar-criteria li.ok { color: var(--ivory); } .ar-criteria li.ok::before { content: '✓'; color: var(--cyan); }
-.ar-criteria li.miss { color: var(--muted); } .ar-criteria li.miss::before { content: '✗'; color: #f08b7f; }
-.ar-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
-.ar-btns .btn { font-size: 18px; padding: 12px 22px; }
 
 /* shields: a visible crack when one is lost, a refill pop at the start of each arena */
 .shields img.refill { animation: refill 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
@@ -411,12 +382,10 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
   .dock-formula .given { font-size: 14px; padding-left: 12px; }
   .keypad .k { height: 44px; }
   .wlabel.beamline { font-size: 13px; white-space: normal; max-width: 86vw; text-align: center; }
-  .arena-result { min-width: 0; width: 92vw; padding: 18px 16px; } .ar-title { font-size: 28px; }
   .shields img { width: 32px; height: 32px; }
   .hud-right { flex-direction: column; align-items: flex-end; gap: 6px; } button.icon-btn { width: 36px; height: 36px; }
   .mt-name { font-size: 21px; } .map-tag { min-width: 170px; padding: 10px 12px 12px; }
   .cine-dialog { gap: 10px; padding: 10px 28px 12px 10px; } .cine-dialog img { width: 50px; height: 50px; }
-  .move-hint { left: calc(env(safe-area-inset-left, 0px) + 16px); bottom: calc(env(safe-area-inset-bottom, 0px) + 178px); }
   .howto-deck { padding: 18px 14px 14px; } .hw-pic { height: 176px; } .hw-gap { width: 170px; height: 182px; } .hw-diagram { width: 190px; height: 176px; }
   .hw-card h3 { font-size: 26px; } .hw-card p { font-size: 15px; } .hw-card p.hw-formula { font-size: 18px; }
   .hw-three { gap: 4px; } .hw-out { width: 32%; } .hw-out svg { width: 84px; height: 84px; } .hw-out figcaption { font-size: 11.5px; } .hw-out figcaption b { font-size: 16px; }

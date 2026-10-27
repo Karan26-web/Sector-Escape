@@ -147,8 +147,7 @@ export class Sector {
     const glow = makeBillboard('fx_glow', 2.4 * lw, { additive: true, tint: 0x9ff4ff, centerY: 0.5 }); glow.position.y = 0.12; glow.material.opacity = 0; glow.renderOrder = 14; this.overlays.add(glow);
     audio.play('label.pop');
     await tweenValue(0, 1, 0.55, (v) => { dot.scale.setScalar(Math.max(0.001, v < 0.6 ? (v / 0.6) * 1.45 : 1.45 - ((v - 0.6) / 0.4) * 0.45)); glow.material.opacity = v < 0.4 ? v * 2.5 : 1 - (v - 0.4) * 0.9; });
-    this.oGlow = glow; this.oGlowBase = glow.scale.x;
-    W.labels.add('origin', 'O', { className: 'measure origin', worldPos: this.C.clone().setY(0.6), push: dirV(breachDeg + 225) });
+    this.oGlow = glow; this.oGlowBase = glow.scale.x;   // (no "O" label: the lit point is the centre, user 2026-10-27)
     await delay(0.4);
     // 2) one radius, from O out to the wall: r (the diameter: from O both ways, wall to wall)
     const radii = (diameter ? [a0, a0 + 180] : [a0]).map((d) => { const m = ribbon(R, 0.13 * lw, d, 0xf3ebd8, { dashed: false, opacity: 0.95, y: 0.07, order: 13 }); m.scale.x = 0.001; this.overlays.add(m); return m; });
@@ -171,14 +170,13 @@ export class Sector {
     // (a right angle is marked with a square, not an arc)
     const grow = (len) => { for (const m of [arc, arcEdge]) if (m) { this.overlays.remove(m); m.geometry.dispose(); m.material.dispose(); } arc = angle === 'right' ? null : band(ar, ar + 0.16 * lw, len, 0xffffff, 0.75); arcEdge = band(R - 0.16 * lw, R - 0.02, len, 0x9ff7f2, 0.7); };
     this._sweep = 0;
-    const inside = angle === 'value', text = (v) => (inside ? `${Math.round(v)}°` : `θ = ${Math.round(v)}°`);
-    if (angle !== 'right') W.labels.add('theta', text(0), { className: 'measure theta', push: inside ? null : dirV(a0 + 90),
-      worldPos: () => { const q = inside ? polar(a0 + this._sweep / 2, ar * 1.75) : polar(a0 + this._sweep, ar + 0.1 * lw); return this._tv.set(this.C.x + q.x, 0.6, this.C.z + q.z); } });   // the value alone sits inside the angle
+    const text = (v) => (angle === 'value' ? `${Math.round(v)}°` : `θ = ${Math.round(v)}°`);
+    if (angle !== 'right') W.labels.add('theta', text(0), { className: 'measure theta', worldPos: () => this.angleLabelPos(a0, this._sweep, theta, ar + 0.16 * lw) });
     const thLabel = W.labels.items.get('theta');
     audio.play('scan.sweep');
     await tweenValue(0, theta, 1.6, (v) => {
       this._sweep = v; sweeper.rotation.z = (a0 + v) * DEG; fu.reveal.value = v / theta; grow(v);
-      if (thLabel) { W.labels.set('theta', text(v)); if (!inside) thLabel.push = dirV(a0 + v + 90); }
+      if (thLabel) W.labels.set('theta', text(v));
     }, { ease: Ease.inOutSine });
     sweeper.material.color.setHex(0xf3ebd8); sweeper.material.opacity = 0.95;   // it stays as the second radius
     if (angle === 'right') {   // the right-angle square: two short sides from the radii to the far corner
@@ -192,8 +190,28 @@ export class Sector {
     dim.rotation.x = -Math.PI / 2; dim.position.y = 0.005; dim.renderOrder = 8; this.overlays.add(dim);
     await tweenValue(0, 0.46, 0.5, (v) => (dim.material.opacity = v));
   }
+  /** Where θ's label sits (user 2026-10-27: "on top, just adjacent to the angle"): on the angle's bisector just past its
+   *  arc (outer radius arcR), and only as far out as it must be to clear both radii, a narrow angle pushing it out a
+   *  little. Worked out on screen from the label's own size, so it holds at every zoom and on every screen. The distance
+   *  is the finished angle's (theta), so while the radius sweeps it the label circles O at that distance, counting up. */
+  angleLabelPos(a0, sweep, theta, arcR) {
+    const cam = this.world.camera, L = this.world.labels, el = L.get('theta'), w = L.container.clientWidth, h = L.container.clientHeight;
+    const scr = (deg, r) => { const p = polar(deg, r); return this._tv.set(this.C.x + p.x, 0, this.C.z + p.z).project(cam); };
+    const c = scr(0, 0), cx = c.x, cy = c.y;
+    const dir = (deg) => { const q = scr(deg, 1), x = (q.x - cx) * w / 2, y = (cy - q.y) * h / 2, l = Math.hypot(x, y) || 1; return { x: x / l, y: y / l, s: l }; };   // screen direction, px per m
+    const u0 = dir(a0), u1 = dir(a0 + theta), b = dir(a0 + theta / 2), mid = a0 + sweep / 2;
+    const hw = el ? el.offsetWidth / 2 : 0, hh = el ? el.offsetHeight / 2 : 0, ext = (nx, ny) => hw * Math.abs(nx) + hh * Math.abs(ny);
+    let t = arcR * b.s + 8 + ext(b.x, b.y);                                                      // just past the arc
+    for (const u of [u0, u1]) {                                                                  // clear of both radii
+      const s = Math.abs(b.x * u.y - b.y * u.x);   // how fast the bisector moves away from this radius
+      if (s > 0.05) t = Math.max(t, (ext(-u.y, u.x) + 8) / s);
+    }
+    t = Math.min(t, this.R * 0.8 * b.s);                                                         // (always inside the circle)
+    const p = polar(mid, t / b.s);
+    return this._tv.set(this.C.x + p.x, 0.6, this.C.z + p.z);
+  }
   clearOverlays(fade = true) {
-    for (const id of ['theta', 'radius', 'origin']) this.world.labels.remove(id, fade);
+    for (const id of ['theta', 'radius']) this.world.labels.remove(id, fade);
     this.pulsing = []; this.oGlow = null;
     const kids = [...this.overlays.children].filter((k) => k.position.y > -1);
     if (!fade) { kids.forEach((k) => this.overlays.remove(k)); this.fill = null; return; }

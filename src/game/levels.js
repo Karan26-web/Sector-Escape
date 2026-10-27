@@ -68,8 +68,9 @@ const ENV = {
  *    ('fraction'). Right or wrong, the game then works the chosen formula out on screen and fires what it gives.
  *  * Arenas 5–7 are typed in terms of π (piForm: the π is printed beside the field), always a whole number of π: r 20
  *    (80π), r 24 (96π: now truly the largest ring), r 21 (147π).
- *  * show: how the top view labels the sector: 'symbol' θ = 90° / r = 7 m (default) · 'value' just 120° (inside the
- *    sector) / 10.5 m · angle 'right': the right-angle square, no number · radius 'diameter': a diameter line, 28 m.
+ *  * show: how the top view labels the sector: 'symbol' θ = 90° / r = 7 m (default) · 'value' just 120° / 10.5 m (θ
+ *    always sits just above the angle's arc) · angle 'right': the right-angle square, no number · radius 'diameter': a
+ *    diameter line with its whole length (no arena uses it since the user's 2026-10-27 review: arena 4 shows r).
  * exitDeg = direction of the
  * open arc (0° = east/right, 90° = north/up on the overview). The suggested
  * zig-zag is kept where the geometry allows it: a turn sharper than
@@ -85,9 +86,10 @@ export const LEVELS = [
   { id: 3, name: 'Serpent Court', tagline: 'The guardians grow restless', radius: 14, theta: 90, exitDeg: 320, timeBudget: 50, speed: 'Moderate', scaffold: 'hint', env: ENV.dusk,
     ask: { kind: 'pick', form: 'fraction', a: [[1, 4], [1, 2], [1, 5]], r: [21, 7, 14] }, show: { angle: 'right', radius: 'value' } },
   // (arena 4's choices are ours: the LXD said "as in round 3". 3/4 = 135/180, the half-turn slip; 1/4 = arena 3's answer
-  // carried over; 28 m = the diameter as the radius, the slip this arena is about; 7 m = halved twice)
+  // carried over; 28 m = the diameter in place of the radius; 7 m = halved. The user (2026-10-27) had the radius shown, 14 m,
+  // instead of the LXD's diameter 28 m)
   { id: 4, name: 'Crimson Ruins', tagline: 'A wide breach, little time', radius: 14, theta: 135, exitDeg: 0, timeBudget: 46, speed: 'Moderate–Fast', scaffold: 'hint', env: ENV.dusk2,
-    ask: { kind: 'pick', form: 'fraction', a: [[3, 4], [3, 8], [1, 4]], r: [28, 14, 7] }, show: { angle: 'value', radius: 'diameter' } },
+    ask: { kind: 'pick', form: 'fraction', a: [[3, 4], [3, 8], [1, 4]], r: [28, 14, 7] }, show: { angle: 'value', radius: 'value' } },
   { id: 5, name: 'Twin Falls', tagline: 'Narrow arc, fast feet', radius: 20, theta: 72, piForm: true, exitDeg: 315, timeBudget: 42, speed: 'Fast', scaffold: 'hint', env: ENV.night },
   { id: 6, name: 'Thunder Well', tagline: 'The largest ring in the jungle', radius: 24, theta: 60, piForm: true, exitDeg: 45, timeBudget: 38, speed: 'Faster', scaffold: 'hint', env: ENV.night2 },
   { id: 7, name: "The Warden's Court", tagline: 'The last ring before the temple', radius: 21, theta: 120, piForm: true, exitDeg: 0, timeBudget: 34, speed: 'Fastest', scaffold: 'hint', boss: true, env: ENV.storm },

@@ -6,8 +6,6 @@ playtest
 README.md
 *.py
 art-source
-# dev-only tools (temporary skip button)
-src/dev
 # repo housekeeping and editor / OS leftovers
 .gitignore
 __pycache__

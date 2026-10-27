@@ -36,9 +36,8 @@
     <div id="cine-dialog" class="cine-dialog"><img id="cine-portrait" alt=""><div class="cd-body"><div class="cd-name">Karan</div><p id="cine-line"></p></div><i class="cd-more" aria-hidden="true">▾</i></div>
   </div>
   <!-- The controller (user 2026-10-27): the stick in its corner (a touch anywhere in the corner brings it under the thumb);
-       W A S D / the arrow keys on a keyboard. The walkthrough sits beside it the first time. -->
+       W A S D / the arrow keys on a keyboard. The first time, its knob shows the move (no text box: tablets). -->
   <div id="joystick" class="joystick" aria-hidden="true"><div class="js-base"><i class="js-ar n"></i><i class="js-ar e"></i><i class="js-ar s"></i><i class="js-ar w"></i><div class="js-knob"></div></div></div>
-  <div id="move-hint" class="move-hint" role="status"></div>
   <div id="skip" class="pill small">Skip ›</div>
 
   <!-- Answer dock, right-centre: the formula (it substitutes, crosses out and simplifies on a wrong shot), the
@@ -51,13 +50,6 @@
     <div id="keypad" class="keypad"></div>
   </section>
 
-  <!-- End-of-arena results card (LXD): which stars, why, and a way to retry for three -->
-  <div id="arena-result" class="arena-result" role="dialog" aria-labelledby="ar-title">
-    <div id="ar-title" class="ar-title">Arena 1 cleared</div>
-    <div id="ar-stars" class="ar-stars"></div>
-    <ul id="ar-criteria" class="ar-criteria"></ul>
-    <div class="ar-btns"><button id="btn-ar-next" class="btn primary">Next arena ▶</button><button id="btn-ar-retry" class="btn secondary">↻ Retry for ★★★</button></div>
-  </div>
 
   <!-- Screens -->
   <section id="screen-loading" class="screen active"><div class="loader"><div class="logo-wrap"><img id="loading-logo" alt=""></div><div id="loading-bar" class="progress" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-fill"></div></div><div id="loading-text">Loading the jungle…</div></div></section>
@@ -166,8 +158,5 @@
   }
 </script>
 <script type="module" src="src/main.js"></script>
-<script>   // DEV ONLY: temporary skip button, loaded on localhost (or with ?dev=1) only, so a deploy never requests it (src/dev is not published). Remove this block + src/dev/ before pushing.
-  (function () { if (['localhost', '127.0.0.1', ''].indexOf(location.hostname) < 0 && !/[?&]dev\b/.test(location.search)) return; var s = document.createElement('script'); s.type = 'module'; s.src = 'src/dev/skip-level.js'; document.body.appendChild(s); })();
-</script>
 </body>
 </html>

@@ -42,6 +42,12 @@ const TEMPLE = { x: 260, z: 8, h: 103, base: -10.3 };
 const SKY = { span: 35, glowU: 0.565 };
 const T = 1.0;          // wall thickness
 const WATER_Y = -0.7;
+// Floor layers (y, m), bottom to top. Flat surfaces that overlap must not share a height, and none may sit higher yet carry
+// a polygon offset that pushes it back (or the reverse): the two pulls trade places with the view angle and the screen's
+// pixel size, and the overlap flickers (user 2026-10-27: the causeway's end against ring 1's rim, its under-box against the
+// ground). Only the ring floors (0.003 × index, above all of these) carry offsets, forward ones that settle their overlaps
+// with each other; every layer here wins or loses by height alone.
+const FLOOR = { ground: -0.02, under: -0.016, sand: -0.012, grass: -0.006, bay: -0.006, deck: -0.002 };
 // The islet at the west end of the causeway, where the opening finds Karan stranded (user 2026-10-27): water all round
 // it (the lake opens into a wide pool there), the causeway his only way on. back: its centre this far behind the
 // causeway's start; r: its radius.
@@ -145,7 +151,7 @@ export class ChainWorld {
     shape.holes.push(new THREE.Path([...this.lakeOutline()].reverse()));
     const gTex = assets.texture('ground_jungle', { repeat: [1 / 12, 1 / 12] });
     const ground = new THREE.Mesh(new THREE.ShapeGeometry(shape, 4), new THREE.MeshLambertMaterial({ map: gTex, color: 0xc4ceb4 }));
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; this.group.add(ground);
+    ground.rotation.x = -Math.PI / 2; ground.position.y = FLOOR.ground; this.group.add(ground);
     // lake: base + additive shimmer, slightly larger than the hole
     const lakeShape = new THREE.Shape(this.lakeOutline().map((p) => new THREE.Vector2(p.x + Math.sign(p.x - CHAIN.causeway.start.x) * 0.0, p.y)));
     for (const [opacity, additive, speed] of [[1, false, 1], [0.2, true, -0.6]]) {
@@ -156,7 +162,8 @@ export class ChainWorld {
     // dark bank skirt so the ground edge reads as a shore, not a cut
     const skirtPts = []; for (const p of this.lakeOutline()) skirtPts.push(p);
     const skirtGeo = new THREE.BufferGeometry(); const pos = [];
-    for (let i = 0; i < skirtPts.length; i++) { const a = skirtPts[i], b = skirtPts[(i + 1) % skirtPts.length]; pos.push(a.x, -0.02, -a.y, b.x, -0.02, -b.y, b.x, WATER_Y - 0.1, -b.y, a.x, -0.02, -a.y, b.x, WATER_Y - 0.1, -b.y, a.x, WATER_Y - 0.1, -a.y); }
+    const G = FLOOR.ground;
+    for (let i = 0; i < skirtPts.length; i++) { const a = skirtPts[i], b = skirtPts[(i + 1) % skirtPts.length]; pos.push(a.x, G, -a.y, b.x, G, -b.y, b.x, WATER_Y - 0.1, -b.y, a.x, G, -a.y, b.x, WATER_Y - 0.1, -b.y, a.x, WATER_Y - 0.1, -a.y); }
     skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); skirtGeo.computeVertexNormals();
     this.group.add(new THREE.Mesh(skirtGeo, new THREE.MeshLambertMaterial({ color: 0x5a5340, side: THREE.DoubleSide })));
   }
@@ -165,10 +172,10 @@ export class ChainWorld {
   buildIslet() {
     const I = this.islet, outline = (k) => { const pts = []; for (let i = 0; i < 72; i++) { const a = (i / 72) * Math.PI * 2, r = I.r * k * (1 + 0.06 * Math.sin(a * 3 + 1.1) + 0.035 * Math.sin(a * 7 + 0.3)); pts.push(new THREE.Vector2(I.x + Math.cos(a) * r, -I.z + Math.sin(a) * r)); } return pts; };
     const lay = (pts, mat, y) => { const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts), 2), mat); m.rotation.x = -Math.PI / 2; m.position.y = y; this.group.add(m); return m; };
-    lay(outline(1), new THREE.MeshLambertMaterial({ map: assets.texture('ground_jungle', { repeat: [1 / 12, 1 / 12] }), color: 0xd9c49a }), -0.01);   // the sandy rim
-    lay(outline(0.84), new THREE.MeshLambertMaterial({ map: assets.texture('ground_jungle', { repeat: [1 / 12, 1 / 12] }), color: 0xc4ceb4, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 0);
-    const rim = outline(1), pos = [];   // the bank down into the water
-    for (let i = 0; i < rim.length; i++) { const a = rim[i], b = rim[(i + 1) % rim.length]; pos.push(a.x, -0.01, -a.y, b.x, -0.01, -b.y, b.x, WATER_Y - 0.1, -b.y, a.x, -0.01, -a.y, b.x, WATER_Y - 0.1, -b.y, a.x, WATER_Y - 0.1, -a.y); }
+    lay(outline(1), new THREE.MeshLambertMaterial({ map: assets.texture('ground_jungle', { repeat: [1 / 12, 1 / 12] }), color: 0xd9c49a }), FLOOR.sand);   // the sandy rim
+    lay(outline(0.84), new THREE.MeshLambertMaterial({ map: assets.texture('ground_jungle', { repeat: [1 / 12, 1 / 12] }), color: 0xc4ceb4 }), FLOOR.grass);   // (under the causeway's first stones)
+    const rim = outline(1), pos = [], S = FLOOR.sand;   // the bank down into the water
+    for (let i = 0; i < rim.length; i++) { const a = rim[i], b = rim[(i + 1) % rim.length]; pos.push(a.x, S, -a.y, b.x, S, -b.y, b.x, WATER_Y - 0.1, -b.y, a.x, S, -a.y, b.x, WATER_Y - 0.1, -b.y, a.x, WATER_Y - 0.1, -a.y); }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
     this.group.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x6a5f44, side: THREE.DoubleSide })));
   }
@@ -214,8 +221,8 @@ export class ChainWorld {
     const g = new THREE.Group(); g.position.set(a.center.x, 0, a.center.z); this.group.add(g);
     const tex = assets.texture('causeway_stone', { repeat: [Rb / 3, Rb / 3] });
     const floor = new THREE.Mesh(new THREE.RingGeometry(a.R - 0.1, Rb + 0.05, Math.max(12, Math.round(a.theta / 3)), 1, (a.exitDeg - a.theta / 2) * DEG, a.theta * DEG),
-      new THREE.MeshLambertMaterial({ map: tex, color: new THREE.Color(env.floor).multiplyScalar(1.05), polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
-    floor.rotation.x = -Math.PI / 2; floor.position.y = -0.006; g.add(floor);
+      new THREE.MeshLambertMaterial({ map: tex, color: new THREE.Color(env.floor).multiplyScalar(1.05) }));
+    floor.rotation.x = -Math.PI / 2; floor.position.y = FLOOR.bay; g.add(floor);   // (over the ground, under the ring floors)
     const at = (deg, r) => { const p = polar(deg, r); return [a.center.x + p.x, a.center.z + p.z]; };
     for (const [a0, a1] of this.splitArcs(a.bay.outerArcs, 24)) {
       const w = this.wallArc(Rb, a0, a1, col); g.add(w);
@@ -371,9 +378,9 @@ export class ChainWorld {
     const cw = CHAIN.causeway, L = Math.hypot(cw.gate.x - cw.start.x, cw.gate.z - cw.start.z) + 2, w = cw.width;
     const g = new THREE.Group(); g.position.set((cw.start.x + cw.gate.x) / 2, 0, (cw.start.z + cw.gate.z) / 2); g.rotation.y = cw.dirDeg * DEG; this.group.add(g);
     const deckGeo = new THREE.PlaneGeometry(w, L); deckGeo.rotateX(-Math.PI / 2); deckGeo.rotateY(-Math.PI / 2);   // V (the path direction in the texture) runs along the causeway
-    const top = new THREE.Mesh(deckGeo, new THREE.MeshLambertMaterial({ map: assets.texture('causeway_stone', { repeat: [1, L / 8] }), color: 0xffffff })); top.position.y = 0.005; g.add(top);
+    const top = new THREE.Mesh(deckGeo, new THREE.MeshLambertMaterial({ map: assets.texture('causeway_stone', { repeat: [1, L / 8] }), color: 0xffffff })); top.position.y = FLOOR.deck; g.add(top);   // (its far end runs on under ring 1's rim)
     const sideTex = assets.texture('causeway_side', { repeat: [L / 6, 1] });
-    const under = new THREE.Mesh(new THREE.BoxGeometry(L, 1.6, w + 1.0), new THREE.MeshLambertMaterial({ map: sideTex, color: 0x9aa094 })); under.position.y = -0.82; g.add(under);
+    const under = new THREE.Mesh(new THREE.BoxGeometry(L, 1.6, w + 1.0), new THREE.MeshLambertMaterial({ map: sideTex, color: 0x9aa094 })); under.position.y = FLOOR.under - 0.8; g.add(under);
     // parapets stop inside ring 1's wall thickness (they used to poke through into the ring beside the gate)
     const a0 = CHAIN.arenas[0], lat = w / 2 + 0.25, pEnd = L / 2 - 1 - (Math.sqrt((a0.R + T) ** 2 - lat * lat) - 0.08 - a0.R), pLen = pEnd + L / 2;
     for (const s of [-1, 1]) {

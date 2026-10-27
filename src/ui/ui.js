@@ -222,23 +222,6 @@ export const ui = {
       await delay(0.3);
     },
   },
-  /** The controller's walkthrough (the first walk only): beside the stick, "Drag to move" on a touch screen, the W A S D keys
-   *  on a keyboard; it ticks off once Karan has walked a few steps. */
-  moveHint: {
-    show(touch) {
-      const el = $('#move-hint');
-      el.innerHTML = touch ? '<span class="mh-icon" aria-hidden="true"></span><b>Drag to move</b>'
-        : '<span class="mh-keys" aria-hidden="true"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><b>Move</b><small>or drag the stick</small>';
-      clearTimeout(timers.mh); el.classList.remove('done'); el.classList.add('show');
-    },
-    done() {
-      const el = $('#move-hint'); if (!el.classList.contains('show') || el.classList.contains('done')) return;
-      el.classList.add('done'); audio.play('tutorial.done');
-      clearTimeout(timers.mh); timers.mh = setTimeout(() => el.classList.remove('show', 'done'), 1200);
-    },
-    hide() { clearTimeout(timers.mh); $('#move-hint').classList.remove('show', 'done'); },
-  },
-
   /* ---------------------------------------------------------- map: painted isometric miniature of the real chain */
   map: {
     selected: null, saveData: null, art: null, raf: 0, busy: false, first: false,
@@ -638,27 +621,5 @@ export const ui = {
   beamline: {
     show(text, status, worldPos, push) { game.world.labels.add('beamline', text, { className: `beamline ${status}`, worldPos, push, clampTop: window.innerWidth < 760 ? 64 : 16 }); },   // below the shields on phones
     hide(fade = true) { game.world.labels.remove('beamline', fade); },
-  },
-
-  /* ---------------------------------------------------------- end-of-arena results card */
-  result: {
-    async show({ level, score, last }) {
-      const el = $('#arena-result');
-      $('#ar-title').textContent = `Arena ${level.id} cleared`;
-      $('#ar-stars').innerHTML = [0, 1, 2].map((i) => `<img src="${frameUrl('ui_icons', i < score.stars ? 1 : 2)}" alt="${i < score.stars ? 'star' : 'empty star'}">`).join('');
-      // only the stars that were missed, and why (three stars need no explanation)
-      $('#ar-criteria').innerHTML = score.criteria.filter((c) => !c.ok).map((c) => `<li class="miss">${c.label}</li>`).join('');
-      $('#btn-ar-next').textContent = last ? 'To the temple ▶' : 'Next arena ▶';
-      $('#btn-ar-retry').style.display = score.stars < 3 ? '' : 'none';
-      el.classList.add('show'); audio.play('ui.panel');
-      const choice = waitClick({ '#btn-ar-next': 'next', '#btn-ar-retry': 'retry' });   // buttons work at once, even while the stars pop
-      let done = false; choice.then(() => { done = true; });
-      const imgs = [...el.querySelectorAll('.ar-stars img')];
-      for (let i = 0; i < imgs.length && !done; i++) { await sleep(260); imgs[i].classList.add('pop'); if (i < score.stars) audio.play('ui.star'); }
-      const c = await choice;
-      el.classList.remove('show'); audio.play('ui.confirm'); await sleep(250);
-      return c;
-    },
-    hide() { $('#arena-result').classList.remove('show'); },
   },
 };

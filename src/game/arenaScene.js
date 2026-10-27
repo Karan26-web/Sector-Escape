@@ -116,9 +116,9 @@ export class ArenaScene {
     const pts = [this.C.clone()];
     for (let d = a0; d <= a1 + 0.01; d += Math.max(2, A.theta / 24)) pts.push(at(d, R + 0.6));
     pts.push(...this.guardTops());
-    pts.push(at(a1, ar).addScaledVector(this.dirDeg(a1 + 90), 2.8 * lw));                   // θ beside the angle at O
+    pts.push(at(A.exitDeg, ar + 2.2 * lw));                                                 // θ just past the angle's arc, inside the sector
     pts.push(at(a0, R * 0.55).addScaledVector(this.dirDeg(a0 - 90), 2.6 * lw));             // r beside the first radius
-    pts.push(at(A.exitDeg + 180, Math.max(1.5 * lw, A.watchR + 0.45)));                     // O and its label, and Karan watching from his spot
+    pts.push(at(A.exitDeg + 180, Math.max(1.5 * lw, A.watchR + 0.45)));                     // O, and Karan watching from his spot
     if (this.level.show && this.level.show.radius === 'diameter') pts.push(at(a0 + 180, R * 0.42).addScaledVector(this.dirDeg(a0 + 90), 2.4 * lw));   // the diameter's length, past O
     if (this.boss && this.boss.alive) pts.push(this.wardenTop());
     const p = this.fitPose(pts, 0.94);
@@ -217,10 +217,7 @@ export class ArenaScene {
     this.game.lastShields = this.shields;
     if (!ok) { this.setPhase('gameover'); return { outcome: 'gameover' }; }
     const score = computeScore({ timeUsed: this.timeUsed, timeBudget: L.timeBudget, shieldsLost: this.maxShields - this.shields, firstTryCorrect: this.firstTry === true });
-    // results card (LXD): which stars, why, and Retry; the next arena only starts when the student presses Next
-    this.setPhase('cleared');
-    const choice = await this.s(ui.result.show({ level: L, score, last: this.index === CHAIN.arenas.length - 1 }));
-    if (choice === 'retry') { this.setPhase('done'); return { outcome: 'cleared', score, retry: true }; }
+    // cleared: straight on to the way out (user 2026-10-27: no results card; the stars are still kept for the map)
     await this.s(this.exitRun(score));
     this.setPhase('done');
     return { outcome: 'cleared', score };
@@ -261,15 +258,15 @@ export class ArenaScene {
     const open = () => g.leaf.position.y < g.openY * 0.55;                    // (not through the door while it is still sinking)
     const region = SDF.minus((x, z) => (open() ? through(x, z) : walk(x, z)), PILLARS);
     const first = this.opening || !save.load().moveTutorialSeen; let opened = false, taught = !first;   // (every start from the very beginning shows it)
-    ui.hud.show(); controller.reveal({ demo: first }); if (first) ui.moveHint.show(controller.touch);
+    ui.hud.show(); controller.reveal({ demo: first });   // (its knob shows the move: no text box, the game is played on tablets)
     await this.game.roam.run({
       region, yawDeg: cw.dirDeg, view: CAUSEWAY_VIEW,
       goal: { pos: this.V(A.spawn), reached: (p) => Math.hypot(p.x - A.center.x, p.z - A.center.z) < A.R - 1.5 },
       mark: door, near: 5, far: 16, highlight: (k, dt) => M.door(opened ? 0 : k, dt),
-      onMove: (m) => { if (!taught && m > 1.6) { taught = true; ui.moveHint.done(); const d = save.load(); d.moveTutorialSeen = true; save.write(); } },
+      onMove: (m) => { if (!taught && m > 1.6) { taught = true; audio.play('tutorial.done'); const d = save.load(); d.moveTutorialSeen = true; save.write(); } },
       onTick: (p) => { if (!opened && p.distanceTo(door) < 3.4) { opened = true; this.setPhase('gate'); M.doorOff(); this.chain.openStartGate(1.0); } },
     });
-    M.doorOff(); ui.moveHint.hide();
+    M.doorOff();
   }
   /** Inside the ring: Karan turns as the gate slams shut in front of him, seen from inside so nothing hides it. */
   async gateShut() {
@@ -409,7 +406,7 @@ export class ArenaScene {
       if (res.status === 'correct') {
         if (this.firstTry === null) this.firstTry = this.attempt === 1;
         audio.play('sting.perfect');
-        await delay(1.6);   // let the gold snap of the wedge read before the results card
+        await delay(1.6);   // let the gold snap of the wedge read before the way on lights up
         this.sector.releaseGhost(0.6); ui.panel.close(); ui.beamline.hide(); ui.setArenaCentre(null);
         this.sector.clearOverlays(true); await delay(0.3);
         return true;
@@ -561,7 +558,8 @@ export class ArenaScene {
       goal: { pos: stand, r: 1.4 }, mark: gate, near: 6, far: 20, highlight: (k) => M.templeGate(k),
     });
     M.templeGate(0);
-    rig.follow((out) => { const d = gate.clone().sub(hero.pos).setY(0).normalize(); out.pos.copy(hero.pos).addScaledVector(d, -7).add(new THREE.Vector3(0, 3.4, 0)); out.target.copy(hero.pos).addScaledVector(d, 8).add(new THREE.Vector3(0, 1.5, 0)); out.fov = 56; return out; }, 3);
+    // the run out, chased from behind his right shoulder like every walk (his back run is drawn three-quarter, up and to the right)
+    rig.follow((out) => { out.pos.copy(hero.pos).addScaledVector(dir, -7).add(new THREE.Vector3(-dir.z * 2.6, 3.4, dir.x * 2.6)); out.target.copy(hero.pos).addScaledVector(dir, 8).add(new THREE.Vector3(0, 1.5, 0)); out.fov = 56; return out; }, 3);
     audio.play('gate.unlock'); game.fx.flash(gate.clone().add(new THREE.Vector3(0, 2.5, 0)), 0xffe0a0, 12, 0.8);
     await hero.runTo(esc.clone().addScaledVector(dir, -1), 7);
     await hero.celebrate(1.4);
@@ -574,7 +572,7 @@ export class ArenaScene {
   dispose() {
     if (this.disposed) return; this.disposed = true; this.aborted = true;
     this.world.removeUpdatable(this); if (this.boss) { this.boss.dispose(); this.boss = null; } this.clearPath(0.01);
-    this.sector.clearOverlays(false); this.barrier.hide(); this.world.labels.clear(); ui.panel.close(); ui.result.hide(); ui.setArenaCentre(null);
-    this.game.roam.stop(); this.game.markers.clear(); ui.moveHint.hide(); ui.cine.end(); ui.skip.hide();   // (a walk or the opening cut short)
+    this.sector.clearOverlays(false); this.barrier.hide(); this.world.labels.clear(); ui.panel.close(); ui.setArenaCentre(null);
+    this.game.roam.stop(); this.game.markers.clear(); ui.cine.end(); ui.skip.hide();   // (a walk or the opening cut short)
   }
 }

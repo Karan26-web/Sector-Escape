@@ -145,7 +145,6 @@ class Game {
         save.clearedLevel(level.id, res.score.stars, res.score.total, TOTAL_LEVELS); this.sessionScore += res.score.total;
         this.runLog.push({ id: level.id, name: level.name, stars: res.score.stars, score: res.score.total });
         scene.dispose();
-        if (res.retry) { this.bots.clear(); this.resetWorldFor(index); scene = new ArenaScene(this, index, { mode: 'inside' }); continue; }   // results card → Retry
         if (index === CHAIN.arenas.length - 1) {
           this.scene = null; this.phase = 'finale';
           await ArenaScene.finale(this);
