@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Sector Escape – The Lost Jungle · bootstrap & meta-game flow
-// URL params: ?level=3  ?skip=1 (skip the causeway)  ?mute=1  ?reset=1
+// URL params: ?level=3  ?skip=1 (skip the causeway)  ?mute=1  ?reset=1  ?auto=1 (Karan walks to each goal by himself: tests)
 // ---------------------------------------------------------------------------
 import * as THREE from '../vendor/three.module.js';
 import { World } from './engine/world.js';
@@ -13,6 +13,9 @@ import { Sector } from './game/sector.js';
 import { Barrier } from './game/barrier.js';
 import { BotManager } from './game/bots.js';
 import { ArenaScene } from './game/arenaScene.js';
+import { Roam } from './game/roam.js';
+import { Markers } from './game/markers.js';
+import { controller } from './engine/controller.js';
 import { CHAIN, LEVELS, TOTAL_LEVELS, validateChain, SEAL_BEHIND } from './game/levels.js';
 import { save } from './game/save.js';
 import { ui } from './ui/ui.js';
@@ -29,7 +32,7 @@ class Game {
     if (params.get('mute') === '1') audio.setMuted(true);
   }
   async boot() {
-    ui.init(this);
+    ui.init(this); controller.init();
     const problems = validateChain(); if (problems.length) console.warn('[chain]', problems);
     // Everything is ready before the first screen (user, 2026-10-23): the art (downloaded and decoded), the fonts, then every
     // texture on the GPU and every shader compiled, so nothing pops in or stalls once the game is running.
@@ -46,6 +49,9 @@ class Game {
     this.sector = new Sector(this.world, this.fx); this.world.addUpdatable(this.sector);
     this.barrier = new Barrier(this.world, this.fx); this.world.addUpdatable(this.barrier);
     this.bots = new BotManager(this.world, this.fx); this.world.addUpdatable(this.bots);
+    // the player's walks (user 2026-10-27) and the goals they light up; the markers are built now so they compile with the rest
+    this.markers = new Markers(this.world, this.fx, this.chain); this.world.addUpdatable(this.markers);
+    this.roam = new Roam(this); this.roam.autopilot = params.get('auto') === '1';
     // the Warden's purple light exists from the start (unlit) and is lent to it: the light count never changes mid-game
     this.bossLight = new THREE.PointLight(0xa050ff, 0, 25, 2); this.bossLight.position.set(0, -40, 0); this.world.add(this.bossLight);
     this.showIdle();                                                                  // the title scene, with the lights the game plays with
@@ -57,15 +63,9 @@ class Game {
     this.world.start();
     const direct = parseInt(params.get('level') || '', 10);
     if (direct >= 1 && direct <= TOTAL_LEVELS) { ui.hideAll(); const r = await this.playFrom(direct); return this.mapLoop(r.lastId); }
-    const data = save.load();
-    for (;;) {
-      const c = await ui.title.show(this.resumeInfo());
-      if (c === 'howto') { await ui.howto.show(); continue; }
-      if (c === 'continue') { ui.hideAll(); const r = await this.playFrom(this.resumeInfo().id); return this.mapLoop(r.lastId); }   // straight back into the saved arena
-      if (c === 'play' && !data.seenStory) { await ui.story.show(); data.seenStory = true; save.write(); }
-      break;
-    }
-    return this.mapLoop();
+    while (await ui.title.show() === 'howto') await ui.howto.show();
+    ui.hideAll(); const r = await this.playFromStart();
+    return this.mapLoop(r.lastId);
   }
   /** Load the UI fonts, every weight the CSS uses, so no screen swaps fonts later. Their stylesheet loads without blocking
    *  the first paint (index.html), so it is awaited first. Boot caps the wait once the art is in. */
@@ -95,13 +95,12 @@ class Game {
     try { if (r.compileAsync && r.extensions.has('KHR_parallel_shader_compile')) await r.compileAsync(scene, cam); else r.compile(scene, cam); } catch (e) { console.warn('[warm-up]', e); }
     onProgress(1); await nextFrame();
   }
-  /** Where Continue resumes: the next arena to play (null for a brand-new player). */
-  resumeInfo() { const d = save.load(); const has = d.unlocked > 1 || Object.keys(d.cleared).length > 0; return has ? { id: Math.min(TOTAL_LEVELS, d.unlocked) } : null; }
   /* Title shot (LXD): dusk, low on the causeway and close to the gate; Karan stands with his back to us facing the gate;
      the temple glows with the low sun behind it; the camera drifts slowly toward the gate and back. */
   showIdle() {
     this.chain.setActiveArena(0); this.chain.applySky('evening', 1.2); this.chain.setFogDensity(0.0042); this.chain.setFocus(-1, false, 0.3); this.chain.setFireflies(true);
     this.chain.resetStartGate(false); this.chain.cutRing = -1; this.chain.fadeOff = true; this.bots.clear(); this.sector.reset(); this.barrier.hide();   // walls stay solid on the title
+    this.chain.setBeam(false);   // (the temple's beam belongs to the journey: the opening raises it)
     // camera on the left edge of the causeway: the bridge runs up the right of the frame to the gate, clear of the logo column
     const far = new THREE.Vector3(-37, 2.75, -1.6), near = new THREE.Vector3(-31.5, 2.55, -1.4), target = new THREE.Vector3(-8, 3.0, 1.2);
     this.chain.setTitleMode(true, { camPos: far });   // the evening sky itself is global (chain.js); this adds the lake mist + torch light
@@ -118,9 +117,8 @@ class Game {
       ui.map.hide();
       if (id == null) {
         this.showIdle();
-        let c = await ui.title.show(this.resumeInfo());
-        while (c === 'howto') { await ui.howto.show(); c = await ui.title.show(this.resumeInfo()); }
-        if (c === 'continue') { const r = await this.playFrom(this.resumeInfo().id); selectedId = r.lastId; }
+        while (await ui.title.show() === 'howto') await ui.howto.show();
+        const r = await this.playFromStart(); selectedId = r.lastId;
         continue;
       }
       const r = await this.playFrom(id);
@@ -128,13 +126,17 @@ class Game {
     }
   }
 
-  /** Play the chain from arena `startId` to the temple (or until game over / quit). */
-  async playFrom(startId) {
+  /** Play (user 2026-10-27: no Continue): every game starts from the very start, the opening and then arena 1. */
+  playFromStart() { return this.playFrom(1, { opening: true }); }
+  /** Play the chain from arena `startId` to the temple (or until game over / quit). opening: arena 1 starts with the opening. */
+  async playFrom(startId, { opening = false } = {}) {
     await this.ready;   // the start is guarded: never before everything is loaded
     ui.hideAll(); ui.hud.show(); this.sessionScore = 0; this.runLog = []; this.lastShields = null; this.chain.setFireflies(false); this.chain.setTitleMode(false, { dur: 0.6 }); this.chain.fadeOff = false; this.chain.setFogDensity(0.0034, 0.6);
     let index = startId - 1;
+    const causeway = index === 0 && !this.skipCutscenes;
+    if (!(opening && causeway)) this.chain.setBeam(true);   // the temple's beam marks the goal from everywhere (the opening raises it)
     this.resetWorldFor(index);
-    let scene = new ArenaScene(this, index, { mode: index === 0 && !this.skipCutscenes ? 'causeway' : 'inside' });
+    let scene = new ArenaScene(this, index, { mode: causeway ? 'causeway' : 'inside', opening: opening && causeway });
     for (;;) {
       this.scene = scene; this.nextScene = null;
       const res = await scene.run();
@@ -166,7 +168,7 @@ class Game {
     this.chain.resetStartGate(false);
     this.sector.reset(); this.barrier.hide();
   }
-  finish() { this.scene = null; this.nextScene = null; ui.hud.hide(); this.showIdle(); audio.music.setMode('title'); audio.ambient.setMode('jungle'); }
+  finish() { this.scene = null; this.nextScene = null; this.roam.stop(); this.markers.clear(); ui.hud.hide(); this.showIdle(); audio.music.setMode('title'); audio.ambient.setMode('jungle'); }
   onPhase(p) { this.phase = p; }
   async togglePause() {
     if (!this.scene || this.pausing || this.world.paused) return;
@@ -184,6 +186,11 @@ window.__se = {
   get scene() { return game.scene; },
   get phase() { return game.scene ? game.scene.phase : game.phase; },
   fire(v) { ui.panel.setValue(v); ui.panel.fire(); },
+  /** tests / DEV: answer the question with the wanted outcome ('correct' · 'under' · 'over'), chosen or typed */
+  answer(kind = 'correct') { return ui.panel.answer(kind); },
+  /** tests / DEV: Karan walks to each goal by himself (the same as ?auto=1) */
+  walk(on = true) { game.roam.autopilot = on; },
+  controller,
   assets, audio, THREE, ui,
 };
 game.boot().catch((e) => { console.error(e); document.getElementById('loading-text').textContent = 'Error: ' + e.message; });

@@ -146,9 +146,11 @@ export class Barrier {
     audio.play('barrier.form');
     await tweenValue(0, 1, dur, (v) => (this.uniforms.rise.value = v), { ease: Ease.outCubic });
   }
-  /** A guardian's blow at polar degree `deg`, height y: a ripple spreads from the spot. */
+  /** Is there glass across the gap to hit: formed, or cracking but not yet given way. */
+  get standing() { return !!this.mesh && this.mesh.visible && (this.up || (this.crackT >= 0 && this.breakT < 0)); }
+  /** A guardian's blow at polar degree `deg`, height y: a ripple spreads from the spot (also on the cracking glass). */
   impact(deg, y = 1.3, strength = 1) {
-    if (!this.up) return;
+    if (!this.standing) return;
     const along = clamp(degDiff(this.a0, deg), 0, this.theta) * DEG * this.R, h = this.uniforms.hits.value[this.next];
     h.set(along, y, 0, strength); this.next = (this.next + 1) % HITS;
   }

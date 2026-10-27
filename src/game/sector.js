@@ -2,15 +2,17 @@
 // The sector (LXD 2026-10-23): no weapon stands at the centre any more. In the
 // top view the centre point O lights up, a radius is drawn from it to the wall
 // and sweeps along the arc into the sector; the learner's answer charges O and
-// the charge sweeps exactly the wedge that area asks for, breaks the barrier
-// across the gap and hits the guardians behind it (overcharge: the excess
-// reflects off the wall at Karan). Positioned relative to the arena centre C.
+// O fires a volley of rays across exactly the wedge that area asks for, all at
+// once (user 2026-10-27): they break the barrier across the gap and strike the
+// guardians behind it; an overcharge's rays strike the wall beside the gap and
+// those same rays bounce back across the ring into Karan. Positioned relative
+// to the arena centre C.
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
 import { makeBillboard } from '../engine/sprites.js';
 import { assets } from '../engine/assets.js';
 import { tweens, tweenValue, delay } from '../engine/tween.js';
-import { DEG, polar, Ease, clamp } from '../engine/util.js';
+import { DEG, polar, Ease, clamp, degDiff } from '../engine/util.js';
 import { audio } from '../engine/audio.js';
 
 const SECTOR_VERT = `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
@@ -24,7 +26,7 @@ void main(){
   float f = clamp(a / thetaLength, 0.0, 1.0);
   float edge = smoothstep(0.0, edgeW, f) * smoothstep(0.0, edgeW, 1.0 - f);
   float edgeGlow = 1.0 - edge;
-  float front = smoothstep(progress, progress - 0.07, r);
+  float front = 1.0 - smoothstep(progress - 0.07, progress, r);
   float frontGlow = exp(-pow((r - progress) * 16.0, 2.0)) * step(r, progress + 0.08);
   float core = 0.3 + 0.7 * pow(1.0 - r, 1.3);
   float stripes = 0.86 + 0.14 * sin(r * 70.0 - time * 16.0);
@@ -56,6 +58,52 @@ function ribbon(length, width, deg, color, { dashed = true, opacity = 0.55, y = 
   const m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; m.rotation.z = deg * DEG; m.position.y = y; m.renderOrder = order; return m;
 }
 const dirV = (deg) => { const p = polar(deg, 1); return new THREE.Vector3(p.x, 0, p.z); };
+/** A flat line on the floor from a to b (overlay coordinates). */
+function segment(a, b, width, color, { opacity = 0.9, y = 0.06, order = 13 } = {}) {
+  const L = Math.hypot(b.x - a.x, b.z - a.z), geo = new THREE.PlaneGeometry(L, width); geo.translate(L / 2, 0, 0);
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  m.rotation.x = -Math.PI / 2; m.rotation.z = Math.atan2(-(b.z - a.z), b.x - a.x); m.position.set(a.x, y, a.z); m.renderOrder = order; return m;
+}
+
+const RAY_Y = 0.5;      // the rays fly at chest height (1 m: the overlays sit 0.5 m up): they strike the glass, the guardians, Karan
+const RAY_OUT = 0.22;   // s: every ray from O to the arc, all at once
+const RAY_BACK = 0.5;   // s of game time (≈1.4 s in the slow motion): a bounced ray back across the ring into Karan
+const UNIT = new THREE.PlaneGeometry(1, 1).translate(0.5, 0, 0);   // one ray segment, scaled to length × width (shared)
+/** One ray of the volley: a white-hot core in a coloured halo, flat at chest height, a glow riding its tip. Its path is a
+ *  polyline (O → the glass, the wall or a guardian; a bounced ray goes on from the wall to Karan) and grow(d) draws it up
+ *  to d m along that path, so a bounce is the SAME ray turning at the wall, never a new one. */
+class Ray {
+  constructor(parent, core, halo, lw) {
+    this.parent = parent; this.lw = lw; this.pts = []; this.segs = []; this.len = 0; this.g = new THREE.Group(); parent.add(this.g);
+    this.mats = [[core, 1], [halo, 0.45]].map(([c, o]) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    this.head = makeBillboard('fx_glow', 1.4 * lw, { additive: true, tint: halo, centerY: 0.5 }); this.head.renderOrder = 15; this.head.visible = false; this.g.add(this.head);
+  }
+  /** Extend the path to p (overlay coordinates, at chest height). */
+  to(p) {
+    const b = new THREE.Vector3(p.x, RAY_Y, p.z), a = this.pts[this.pts.length - 1];
+    if (a) {
+      const seg = { a, b, L: a.distanceTo(b), from: this.len, meshes: [] };
+      for (const [w, mat] of [[0.1, this.mats[0]], [0.42, this.mats[1]]]) {
+        const m = new THREE.Mesh(UNIT, mat); m.rotation.x = -Math.PI / 2; m.rotation.z = Math.atan2(-(b.z - a.z), b.x - a.x); m.position.copy(a);
+        m.scale.set(0.001, w * this.lw, 1); m.renderOrder = 14; m.visible = false; this.g.add(m); seg.meshes.push(m);
+      }
+      this.segs.push(seg); this.len += seg.L;
+    }
+    this.pts.push(b); return this;
+  }
+  /** Distance along the path to vertex i. */
+  at(i) { let d = 0; for (let k = 0; k < i && k < this.segs.length; k++) d += this.segs[k].L; return d; }
+  grow(d) {
+    this.head.visible = d > 0.01;
+    for (const s of this.segs) {
+      const v = clamp(d - s.from, 0, s.L);
+      for (const m of s.meshes) { m.visible = v > 0.001; m.scale.x = Math.max(0.001, v); }
+      if (v > 0 && s.L > 1e-6) this.head.position.lerpVectors(s.a, s.b, v / s.L);
+    }
+  }
+  fade(dur) { return tweenValue(1, 0, dur, (v) => { this.mats[0].opacity = v; this.mats[1].opacity = 0.45 * v; this.head.material.opacity = v; }).then(() => this.dispose()); }
+  dispose() { this.parent.remove(this.g); this.mats.forEach((m) => m.dispose()); this.head.material.dispose(); }
+}
 
 export class Sector {
   constructor(world, fx) {
@@ -86,9 +134,13 @@ export class Sector {
 
   /** The top-view construction, drawn the way a teacher draws it (LXD 2026-10-23): the centre point O lights up → one
    *  radius is drawn from O to the wall (r) → that radius sweeps through θ and paints the sector (the angle grows at O,
-   *  the arc is traced) → the rest of the circle dims. Labels sit beside their lines, never on them. */
-  async scan({ breachDeg, theta }) {
+   *  the arc is traced) → the rest of the circle dims. Labels sit beside their lines, never on them.
+   *  show (LXD 2026-10-27, per arena): angle 'symbol' θ = 90° · 'value' just the degrees, inside the angle · 'right' the
+   *  right-angle square at O, no number; radius 'symbol' r = 7 m · 'value' just the length · 'diameter' the radius drawn on
+   *  through O to the far wall with the whole length on it (the learner halves it). */
+  async scan({ breachDeg, theta, show = {} }) {
     const R = this.R, W = this.world, lw = Math.max(1, R / 9), a0 = breachDeg - theta / 2, a1 = breachDeg + theta / 2;   // line widths grow with the ring so they stay crisp from far
+    const angle = show.angle || 'symbol', radius = show.radius || 'symbol', diameter = radius === 'diameter';
     // 1) the centre O: a bright point with a soft highlight (a glow, not a ring outline)
     const dot = new THREE.Mesh(new THREE.CircleGeometry(0.2 * lw, 28), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false }));
     dot.rotation.x = -Math.PI / 2; dot.position.y = 0.09; dot.renderOrder = 15; dot.scale.setScalar(0.001); this.overlays.add(dot);
@@ -98,14 +150,16 @@ export class Sector {
     this.oGlow = glow; this.oGlowBase = glow.scale.x;
     W.labels.add('origin', 'O', { className: 'measure origin', worldPos: this.C.clone().setY(0.6), push: dirV(breachDeg + 225) });
     await delay(0.4);
-    // 2) one radius, from O out to the wall: r
-    const rad0 = ribbon(R, 0.13 * lw, a0, 0xf3ebd8, { dashed: false, opacity: 0.95, y: 0.07, order: 13 }); rad0.scale.x = 0.001; this.overlays.add(rad0);
+    // 2) one radius, from O out to the wall: r (the diameter: from O both ways, wall to wall)
+    const radii = (diameter ? [a0, a0 + 180] : [a0]).map((d) => { const m = ribbon(R, 0.13 * lw, d, 0xf3ebd8, { dashed: false, opacity: 0.95, y: 0.07, order: 13 }); m.scale.x = 0.001; this.overlays.add(m); return m; });
     audio.play('scan.ping');
-    await tweenValue(0, 1, 0.6, (v) => (rad0.scale.x = Math.max(0.001, v)), { ease: Ease.outCubic });
-    const tick = new THREE.Mesh(new THREE.PlaneGeometry(0.1 * lw, 0.8 * lw), new THREE.MeshBasicMaterial({ color: 0xf3ebd8, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    const tkp = polar(a0, R - 0.05); tick.position.set(tkp.x, 0.07, tkp.z); tick.rotation.x = -Math.PI / 2; tick.rotation.z = a0 * DEG; tick.renderOrder = 13; this.overlays.add(tick);
-    const lp = polar(a0, R * 0.55);
-    W.labels.add('radius', `r = ${R} m`, { className: 'measure radius', worldPos: new THREE.Vector3(this.C.x + lp.x, 0.6, this.C.z + lp.z), push: dirV(a0 - 90) });
+    await tweenValue(0, 1, 0.6, (v) => radii.forEach((m) => (m.scale.x = Math.max(0.001, v))), { ease: Ease.outCubic });
+    for (const d of diameter ? [a0, a0 + 180] : [a0]) {
+      const tick = new THREE.Mesh(new THREE.PlaneGeometry(0.1 * lw, 0.8 * lw), new THREE.MeshBasicMaterial({ color: 0xf3ebd8, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const tkp = polar(d, R - 0.05); tick.position.set(tkp.x, 0.07, tkp.z); tick.rotation.x = -Math.PI / 2; tick.rotation.z = d * DEG; tick.renderOrder = 13; this.overlays.add(tick);
+    }
+    const ld = diameter ? a0 + 180 : a0, lp = polar(ld, R * (diameter ? 0.42 : 0.55));   // (a diameter's length sits on its far half, clear of the sector)
+    W.labels.add('radius', diameter ? `${2 * R} m` : radius === 'value' ? `${R} m` : `r = ${R} m`, { className: 'measure radius', worldPos: new THREE.Vector3(this.C.x + lp.x, 0.6, this.C.z + lp.z), push: dirV(ld - 90) });
     audio.play('label.pop');
     await delay(0.5);
     // 3) the radius sweeps through θ, painting the sector: the second radius, the angle at O and the arc grow with it
@@ -114,16 +168,23 @@ export class Sector {
     const ar = Math.max(2.2, R * 0.18);
     const band = (r0, r1, len, color, op) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, Math.max(8, Math.round(len / 3)), 1, a0 * DEG, Math.max(0.01, len) * DEG), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.renderOrder = 13; this.overlays.add(m); return m; };
     let arc = null, arcEdge = null;
-    const grow = (len) => { for (const m of [arc, arcEdge]) if (m) { this.overlays.remove(m); m.geometry.dispose(); m.material.dispose(); } arc = band(ar, ar + 0.16 * lw, len, 0xffffff, 0.75); arcEdge = band(R - 0.16 * lw, R - 0.02, len, 0x9ff7f2, 0.7); };
+    // (a right angle is marked with a square, not an arc)
+    const grow = (len) => { for (const m of [arc, arcEdge]) if (m) { this.overlays.remove(m); m.geometry.dispose(); m.material.dispose(); } arc = angle === 'right' ? null : band(ar, ar + 0.16 * lw, len, 0xffffff, 0.75); arcEdge = band(R - 0.16 * lw, R - 0.02, len, 0x9ff7f2, 0.7); };
     this._sweep = 0;
-    W.labels.add('theta', 'θ = 0°', { className: 'measure theta', worldPos: () => { const q = polar(a0 + this._sweep, ar + 0.1 * lw); return this._tv.set(this.C.x + q.x, 0.6, this.C.z + q.z); }, push: dirV(a0 + 90) });
+    const inside = angle === 'value', text = (v) => (inside ? `${Math.round(v)}°` : `θ = ${Math.round(v)}°`);
+    if (angle !== 'right') W.labels.add('theta', text(0), { className: 'measure theta', push: inside ? null : dirV(a0 + 90),
+      worldPos: () => { const q = inside ? polar(a0 + this._sweep / 2, ar * 1.75) : polar(a0 + this._sweep, ar + 0.1 * lw); return this._tv.set(this.C.x + q.x, 0.6, this.C.z + q.z); } });   // the value alone sits inside the angle
     const thLabel = W.labels.items.get('theta');
     audio.play('scan.sweep');
     await tweenValue(0, theta, 1.6, (v) => {
       this._sweep = v; sweeper.rotation.z = (a0 + v) * DEG; fu.reveal.value = v / theta; grow(v);
-      W.labels.set('theta', `θ = ${Math.round(v)}°`); if (thLabel) thLabel.push = dirV(a0 + v + 90);
+      if (thLabel) { W.labels.set('theta', text(v)); if (!inside) thLabel.push = dirV(a0 + v + 90); }
     }, { ease: Ease.inOutSine });
     sweeper.material.color.setHex(0xf3ebd8); sweeper.material.opacity = 0.95;   // it stays as the second radius
+    if (angle === 'right') {   // the right-angle square: two short sides from the radii to the far corner
+      const sz = ar * 0.75, p0 = polar(a0, sz), p1 = polar(a1, sz), c = { x: p0.x + p1.x, z: p0.z + p1.z };
+      for (const [a, b] of [[p0, c], [c, p1]]) { const m = segment(a, b, 0.15 * lw, 0xffffff, { opacity: 0 }); this.overlays.add(m); tweenValue(0, 0.9, 0.3, (v) => (m.material.opacity = v)); }
+    }
     audio.play('label.pop');
     // 4) focus: the sector stays lit, the rest of the circle dims
     tweens.to(fu.opacity, { value: 0.18 }, { duration: 0.6 });
@@ -160,75 +221,50 @@ export class Sector {
     out.forEach((m) => { m.userData.ghost = true; this.overlays.add(m); }); return out;
   }
   /**
-   * Fire (LXD): 1) the charge sweeps across exactly the wedge the student asked for, painting it (the arc's part cyan,
-   * any excess red); 2) slow motion: it reaches the arc and breaks the barrier (onArc: it cracks, then gives way), and
-   * radial bolts from O hit every guardian behind the covered part; 3) an overcharged excess hits the wall beside the
-   * gap and reflects back at Karan;
-   * 4) a ghost comparison stays on the floor until releaseGhost(): the target wedge dashed over a smaller shot / the
-   * excess in pulsing red / a gold snap when exact.
-   * r: { status, firedTheta, theta, breachDeg }.  cb: { onArc() → resolves when the barrier gives way, targets() →
-   * guardians behind the covered arc, kill(bot), onSlowEnd() → the camera back on the whole ring, reflectTo() → where
-   * Karan stands, onReflect() }
+   * Fire (LXD; a volley since 2026-10-27): 1) every ray leaves O at the same instant, across exactly the wedge the student
+   * asked for (cyan over the arc's part, red for any excess), and the wedge lights up behind their fronts; 2) they land, in
+   * slow motion: the arc's rays strike the glass (onArc: it cracks, then gives way), an overcharge's rays strike the wall
+   * beside the gap and bounce straight back into Karan; 3) as the glass gives way the arc's rays go on through the gap,
+   * each guardian the shot covers struck by its own ray (onBreak: too small → the ones it missed storm in at once);
+   * 4) a comparison stays on the floor until releaseGhost(): the target wedge dashed around a narrower shot / the excess
+   * pulsing red / a gold snap when exact.
+   * r: { status, firedTheta, theta, breachDeg }.  cb: { targets() → the guardians the shot covers, onArc() → resolves as
+   * the glass gives way, kill(bot, delay), onBreak(), reflectTo() → where Karan stands, onReflect(), onSlowEnd() }
    */
   async fire(r, cb = {}) {
     const R = this.R, W = this.world, lw = Math.max(1, R / 9);
-    const fired = clamp(r.firedTheta, 2, 360), covered = Math.min(fired, r.theta), half = Math.max(0, (fired - r.theta) / 2), start = r.breachDeg - fired / 2;
-    audio.play('charge.fire'); const hum = audio.play('laser.loop');
-    W.rig.shake(0.35, 0.6); this.fx.flash(this.worldPos(0, 0, 1.2), 0xffffff, 10, 0.5);
-    const pieces = [];   // in sweep order: [excess] [the arc's part] [excess]
-    if (half > 0.3) pieces.push({ s: start, l: half, c: 0xff3b6b });
+    const fired = clamp(r.firedTheta, 2, 360), covered = Math.min(fired, r.theta), extra = Math.max(0, fired - r.theta) / 2;
+    const start = r.breachDeg - fired / 2, a1 = r.breachDeg + r.theta / 2;
+    const targets = cb.targets ? cb.targets() : [];
+    audio.play('charge.fire'); audio.play('ray.volley'); const hum = audio.play('laser.loop');
+    W.rig.shake(0.35, 0.6); this.fx.flash(this.worldPos(0, 0, 1.2), 0xdffcff, 6 * lw, 0.4);   // (the rays, not a white-out, carry the shot)
+    this.orb.visible = false; this.light.intensity = 60;
+    // the wedge the answer asks for, [excess] [the arc's part] [excess], lit out from O behind the rays' fronts
+    const pieces = [];
+    if (extra > 0) pieces.push({ s: start, l: extra, c: 0xff3b6b });
     pieces.push({ s: r.breachDeg - covered / 2, l: covered, c: 0x66ddff, main: true });
-    if (half > 0.3) pieces.push({ s: r.breachDeg + r.theta / 2, l: half, c: 0xff3b6b });
-    for (const p of pieces) { p.m = sectorMesh(R, p.s, p.l, p.c, 0.02); p.m.material.uniforms.progress.value = 1.1; p.m.material.uniforms.reveal.value = 0; this.overlays.add(p.m); this.lasers.push(p.m); }
-    // 1) the sweep: a white line crosses the fired wedge and paints it
-    const scanLine = ribbon(R, 0.22 * lw, start, 0xffffff, { dashed: false, opacity: 1, y: 0.05, order: 14 }); this.overlays.add(scanLine);
-    audio.play('scan.sweep');
-    await tweenValue(0, 1, 1.15, (v) => { const a = start + v * fired; scanLine.rotation.z = a * DEG; for (const p of pieces) p.m.material.uniforms.reveal.value = clamp((a - p.s) / p.l, 0, 1); }, { ease: Ease.inOutSine });
-    this.overlays.remove(scanLine);
-    this.orb.visible = false; this.light.intensity = 40;
-    // 2) slow motion: the charge reaches the arc and the barrier breaks; bolts from O to every guardian behind the covered part
+    if (extra > 0) pieces.push({ s: a1, l: extra, c: 0xff3b6b });
+    for (const p of pieces) { p.m = sectorMesh(R, p.s, p.l, p.c, 0.02); p.m.material.uniforms.progress.value = 0; this.overlays.add(p.m); this.lasers.push(p.m); }
+    // 1) the volley: every ray leaves O at once and they all land together
+    const rays = this.volley(r.breachDeg, r.theta, fired, covered, extra, targets, lw);
+    await tweenValue(0, 1, RAY_OUT, (e) => { for (const k of rays) k.ray.grow(k.ray.at(1) * e); for (const p of pieces) p.m.material.uniforms.progress.value = e * 1.08; }, { ease: Ease.outQuad });
+    // 2) they land, in slow motion: the glass cracks; an overcharge's rays strike the wall and bounce back (alongside)
     W.timeScale = 0.35;
-    if (cb.onArc) await cb.onArc();   // the barrier cracks, then gives way: the bolts go through as it falls
-    const targets = (cb.targets ? cb.targets() : []).slice().sort((a, b) => a.deg - b.deg);
-    for (const b of targets) {
-      const bolt = ribbon(b.r + 0.3, 0.26 * lw, b.deg, 0xe8ffff, { dashed: false, opacity: 1, y: 0.07, order: 14 }); this.overlays.add(bolt);
-      cb.kill && cb.kill(b);
-      tweenValue(1, 0, 0.3, (v) => (bolt.material.opacity = v)).then(() => this.overlays.remove(bolt));
-      await delay(Math.min(0.1, 0.8 / Math.max(1, targets.length)));
-    }
-    await delay(0.2);
-    // 3) any excess hits the wall beside the gap in red (still in slow motion so it can be SEEN)…
-    const impact = (startDeg, lenDeg, color) => {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.15, R - 0.15, 2.4, Math.max(8, Math.round(lenDeg / 2)), 1, true, startDeg * DEG + Math.PI / 2, lenDeg * DEG), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-      m.position.y = 0.7; this.overlays.add(m); tweenValue(1, 0, 0.9, (v) => (m.material.opacity = v)).then(() => this.overlays.remove(m));
-    };
-    if (half > 0.3) { impact(start, half, 0xff4f7a); impact(r.breachDeg + r.theta / 2, half, 0xff4f7a); }
-    await delay(half > 0.3 ? 0.45 : 0.15);   // (the slow motion holds for the red excess; nothing more to see without one)
-    W.timeScale = 1;
-    const back = cb.onSlowEnd && cb.onSlowEnd();
-    if (half > 0.3 && back) await back;      // the reflection must be seen from above: Karan in the frame
-    // …and reflects back at Karan (he takes the hit where he stands)
-    if (half > 0.3) {
-      audio.play('reflect.zap');
-      const to = cb.reflectTo ? cb.reflectTo().sub(this.C) : new THREE.Vector3();
-      const beams = [start + half / 2, r.breachDeg + r.theta / 2 + half / 2].map((deg) => {
-        const from = polar(deg, R - 0.3), a = new THREE.Vector3(from.x, 0.6, from.z), b = new THREE.Vector3(to.x, 0.6, to.z);
-        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 5, 10), new THREE.MeshBasicMaterial({ color: 0xff5a8a, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
-        rod.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
-        const head = makeBillboard('fx_glow', 2.4, { additive: true, tint: 0xff7aa8, centerY: 0.5 });
-        const g = new THREE.Group(); g.add(rod, head); g.position.copy(a); this.overlays.add(g);
-        return { g, a, b };
-      });
-      await tweenValue(0, 1, 0.5, (e) => beams.forEach((k) => k.g.position.lerpVectors(k.a, k.b, e)), { ease: Ease.inQuad });
-      beams.forEach((k) => this.overlays.remove(k.g));
-      cb.onReflect && cb.onReflect();
-    }
-    hum && hum.stop(0.5);
-    // 4) the ghost comparison (LXD): it stays until releaseGhost()
-    const main = pieces.find((p) => p.main).m;
-    if (r.status === 'under') this.dashedWedge(R, r.breachDeg - r.theta / 2, r.theta, 0xffd36b, lw);
+    if (r.status === 'under') this.dashedWedge(R, r.breachDeg - r.theta / 2, r.theta, 0xffd36b, lw);   // the sector it should have covered
     else if (r.status === 'over') this.pulsing = pieces.filter((p) => !p.main).map((p) => p.m);
-    else {
+    const bounced = this.bounce(rays.filter((k) => k.kind === 'wall'), extra > 0 ? [[start, extra], [a1, extra]] : [], cb, lw);
+    if (cb.onArc) await cb.onArc();
+    // 3) the glass gives way: the arc's rays run on through the gap, each covered guardian struck by its own ray
+    for (const k of rays) if (k.kind !== 'wall') { tweenValue(k.ray.at(1), k.ray.len, 0.08, (v) => k.ray.grow(v), { ease: Ease.linear }); if (k.bot && cb.kill) cb.kill(k.bot, 0.08); }
+    if (cb.onBreak) cb.onBreak();
+    if (!(await bounced)) await delay(0.3);
+    W.timeScale = 1;
+    if (cb.onSlowEnd) cb.onSlowEnd();
+    rays.forEach((k) => k.ray.fade(0.45));
+    hum && hum.stop(0.5);
+    // 4) the exact sector snaps gold (the dashed target and the red excess have been there since the rays landed)
+    if (r.status === 'correct') {
+      const main = pieces.find((p) => p.main).m;
       main.material.uniforms.color.value.set(0xffd36b); main.material.uniforms.opacity.value = 1.2;
       this.fx.flash(this.worldPos(r.breachDeg, R * 0.5, 1.0), 0xffe9a0, 14, 0.6);
       main.scale.setScalar(1.08); tweens.to(main.scale, { x: 1, y: 1, z: 1 }, { duration: 0.45, ease: Ease.outBack });
@@ -237,6 +273,42 @@ export class Sector {
     tweenValue(1, 0, 0.5, (v) => { this.orb.material.opacity = v; }).then(() => { this.orb.visible = false; });
     tweenValue(this.light.intensity, 0, 0.8, (v) => { this.light.intensity = v; });
     if (this.oGlow) { const g = this.oGlow, s0 = g.scale.x, s1 = this.oGlowBase; tweenValue(0, 1, 0.6, (e) => g.scale.setScalar(s0 + (s1 - s0) * e)); }
+  }
+  /** The rays of a shot: one at every guardian the shot covers (it is seen to strike it), more across the rest of the arc's
+   *  part so no stretch of it is bare, and across each overcharged side (at least one each: an overcharge must be seen to
+   *  bounce back). Every ring fills the view alike, so a step in degrees is a spacing on screen. */
+  volley(breachDeg, theta, fired, covered, extra, targets, lw) {
+    const R = this.R, step = clamp(fired / 10, 6, 10), c0 = breachDeg - covered / 2, list = targets.map((b) => ({ deg: b.deg, kind: 'bot', bot: b }));
+    const n = Math.max(1, Math.round(covered / step));
+    for (let i = 0; i < n; i++) { const d = c0 + ((i + 0.5) * covered) / n; if (!list.some((k) => Math.abs(degDiff(k.deg, d)) < step * 0.7)) list.push({ deg: d, kind: 'arc' }); }
+    if (extra > 0) for (const s0 of [breachDeg - fired / 2, breachDeg + theta / 2]) { const m = Math.max(1, Math.round(extra / step)); for (let i = 0; i < m; i++) list.push({ deg: s0 + ((i + 0.5) * extra) / m, kind: 'wall' }); }
+    for (const k of list) {
+      const wall = k.kind === 'wall';
+      k.ray = wall ? new Ray(this.overlays, 0xffe3ec, 0xff3b6b, lw) : new Ray(this.overlays, 0xf2ffff, 0x66ddff, lw);
+      k.ray.to(polar(k.deg, 0.35)).to(polar(k.deg, wall ? R - 0.15 : R - 0.05));    // O → the wall / the glass
+      if (k.bot) k.ray.to(polar(k.deg, k.bot.r)); else if (!wall) k.ray.to(polar(k.deg, R + 1.8));   // → on through the gap
+    }
+    return list;
+  }
+  /** An overcharge (LXD): its rays strike the wall beside the gap, the wall flares red there, and the SAME rays bounce off
+   *  it and run back across the ring, converging on Karan. Resolves true as they reach him (onReflect); false (at once)
+   *  when nothing was overcharged. */
+  async bounce(rays, arcs, cb, lw) {
+    if (!rays.length) return false;
+    const R = this.R, o = this.overlays.position;
+    for (const [s0, l] of arcs) {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(R - 0.15, R - 0.15, 2.4, Math.max(8, Math.round(l / 2)), 1, true, s0 * DEG + Math.PI / 2, l * DEG), new THREE.MeshBasicMaterial({ color: 0xff4f7a, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      m.position.y = 0.7; this.overlays.add(m); tweenValue(1, 0, 0.9, (v) => (m.material.opacity = v)).then(() => { this.overlays.remove(m); m.geometry.dispose(); m.material.dispose(); });
+    }
+    for (const k of rays) { const p = k.ray.pts[1].clone().add(o); p.y -= 0.6; this.fx.flash(p.clone().setY(1.0), 0xff4f7a, 2.4 * lw, 0.4); this.fx.sparks(p, 5, 0xff8ab0, 3.5, 0.5, 0.3 * lw); }
+    audio.play('ray.ricochet'); audio.play('reflect.zap');
+    const to = cb.reflectTo ? cb.reflectTo().sub(this.C) : new THREE.Vector3();
+    for (const k of rays) { const j = polar(Math.random() * 360, Math.random() * 0.35); k.ray.to({ x: to.x + j.x, z: to.z + j.z }); }
+    const d0 = rays.map((k) => k.ray.at(1));   // (from the wall on)
+    await tweenValue(0, 1, RAY_BACK, (e) => rays.forEach((k, i) => k.ray.grow(d0[i] + (k.ray.len - d0[i]) * e)), { ease: Ease.inQuad });
+    this.fx.flash(new THREE.Vector3(o.x + to.x, 1.0, o.z + to.z), 0xff5a8a, 4.5, 0.45);
+    if (cb.onReflect) cb.onReflect();
+    return true;
   }
   /** Fade the ghost comparison (the fired wedge, the dashed target, the red excess). The construction stays. */
   releaseGhost(dur = 0.6) {

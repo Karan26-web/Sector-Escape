@@ -1,6 +1,7 @@
 // Progress persistence (localStorage)
 const KEY = 'sector-escape-save-v1';
-const DEFAULT = () => ({ unlocked: 1, cleared: {}, clears: {}, stars: {}, best: {}, totalScore: 0, seenStory: false });
+// moveTutorialSeen: the controller's walkthrough is done (it shows again with every start from the very beginning)
+const DEFAULT = () => ({ unlocked: 1, cleared: {}, clears: {}, stars: {}, best: {}, totalScore: 0, moveTutorialSeen: false });
 export const save = {
   data: null,
   load() { if (this.data) return this.data; try { const raw = localStorage.getItem(KEY); this.data = raw ? { ...DEFAULT(), ...JSON.parse(raw) } : DEFAULT(); } catch { this.data = DEFAULT(); } return this.data; },

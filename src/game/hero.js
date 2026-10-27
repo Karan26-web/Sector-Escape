@@ -1,7 +1,8 @@
 // ---------------------------------------------------------------------------
-// Hero: billboard character with front/back sheets, scripted movement & footsteps.
-// Karan is never steered by the player (LXD 2026-10-23): he walks to his
-// observation point in each arena, watches, and moves on once it is cleared.
+// Hero: billboard character with front/back sheets, movement & footsteps.
+// The player walks him between the action beats (user 2026-10-27; Roam sets
+// `drive` and `bound`); scripted runs remain for the cutscenes and the action
+// (the opening, settling onto his spot, getting back to it after a hit).
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
 import { AnimatedSprite, makeShadow, topDownLift } from '../engine/sprites.js';
@@ -23,11 +24,13 @@ export class Hero {
     this.facing = new THREE.Vector3(0, 0, -1);
     this.speed = 6.5;
     this.target = null;          // where a scripted run is heading
+    this.drive = null;           // the player's wanted velocity (Roam): free walking instead of a scripted run
+    this.bound = null;           // while the player walks him: keeps him on the walkable floor (clamps a position in place)
     this.special = null;         // name of a non-locomotion anim currently playing
     this.stepTimer = 0; this.surface = 'stone';
     this.onArrive = null;
     world.add(this.group);
-    this._tmp = new THREE.Vector3(); this._tmp2 = new THREE.Vector3();
+    this._tmp = new THREE.Vector3(); this._tmp2 = new THREE.Vector3(); this._prev = new THREE.Vector3();
   }
   get visibleSprite() { return this.back.sprite.visible ? this.back : this.front; }
   setPosition(v) { this.pos.copy(v); this.pos.y = 0; }
@@ -80,6 +83,24 @@ export class Hero {
     pose(3); await tweens.delay(0.4).promise;
     if (this.special === 'knockdown') this.special = null;
   }
+  /** Swarmed after a too-small shot (user 2026-10-27): a flinch as the first one lands, then down under the pile until
+   *  recover(). The front sheet's hurt frames, as for the knock-down: from above he is seen face-up. */
+  async overwhelm() {
+    const s = this.front; this.stop(); this.flash(0xff4040, 0.6); this.showFront(true); this.special = 'down';
+    if (!s.hasAnim('hurt')) return;
+    s.hold('hurt', 0); await tweens.delay(0.12).promise; if (this.special !== 'down') return;
+    s.hold('hurt', 1); await tweens.delay(0.2).promise; if (this.special !== 'down') return;
+    s.hold('hurt', 2); audio.play('hero.fall'); if (this.fx) this.fx.dust(this.pos, 4, 0xd8d0b8, 0.9);
+  }
+  /** A new arena: no pose carried over (a game over or a quit in the middle of a pile-on leaves him down, and down he
+   *  cannot move). */
+  standUp() { this.special = null; this.front.material.color.setHex(0xffffff); this.back.material.color.setHex(0xffffff); }
+  /** Back on his feet once O's pulse has thrown them off. */
+  async recover() {
+    if (this.special !== 'down') return;
+    const s = this.front; if (s.hasAnim('hurt')) { s.hold('hurt', 3); await tweens.delay(0.4).promise; }
+    if (this.special === 'down') this.special = null;
+  }
   /** Casting the charge toward the gap: the back sheet's cast row (seen from behind in the top view) plays once and holds
    *  its last pose until endCast(). Without that art it does nothing (the charge still gathers at O by itself). */
   cast() {
@@ -97,38 +118,58 @@ export class Hero {
   update(dt) {
     const w = this.world, cam = w.camera;
     const lift = topDownLift(cam); this.front.sprite.position.y = lift; this.back.sprite.position.y = lift;   // visible from the puzzle camera
-    const ro = lift > 0 ? 16 : 0; this.front.sprite.renderOrder = ro; this.back.sprite.renderOrder = ro;           // ...and drawn over the floor overlays (the dim)
-    // ---- scripted movement
-    const move = this._tmp.set(0, 0, 0); let moving = false;
-    if (this.target && this.special !== 'knockdown') {
-      move.copy(this.target).sub(this.pos).setY(0);
-      const d = move.length();
-      if (d >= (this.within ?? 0.35) && (this.runT += dt) > this.runMax) { this.pos.x = this.target.x; this.pos.z = this.target.z; move.set(0, 0, 0); }   // stuck: finish the run
-      if (move.length() < (this.within ?? 0.35)) { this.target = null; this.vel.set(0, 0, 0); if (this.lookAt) { this.faceTo(this.lookAt); this.lookAt = null; } const cb = this.onArrive; this.onArrive = null; if (cb) cb(); }
-      else { move.normalize(); moving = true; if (d < 0.6) move.multiplyScalar(Math.max(0.25, d / 0.6)); }   // ease into a designated spot
+    const ro = lift > 0 ? (this.special === 'down' ? 17 : 16) : 0; this.front.sprite.renderOrder = ro; this.back.sprite.renderOrder = ro;   // ...and drawn over the floor overlays (the dim); down in a pile-on, over the guardians on him: he must stay in sight
+    if (this.drive && !this.special) {
+      // ---- the player steers: ease toward the stick's velocity and turn the way he walks
+      this.vel.lerp(this.drive, 1 - Math.exp(-11 * dt));
+      if (this.drive.lengthSq() > 0.05) this.face(this.drive);
+    } else {
+      // ---- scripted movement
+      const move = this._tmp.set(0, 0, 0); let moving = false;
+      if (this.target && this.special !== 'knockdown' && this.special !== 'down') {
+        move.copy(this.target).sub(this.pos).setY(0);
+        const d = move.length();
+        if (d >= (this.within ?? 0.35) && (this.runT += dt) > this.runMax) { this.pos.x = this.target.x; this.pos.z = this.target.z; move.set(0, 0, 0); }   // stuck: finish the run
+        if (move.length() < (this.within ?? 0.35)) { this.target = null; this.vel.set(0, 0, 0); if (this.lookAt) { this.faceTo(this.lookAt); this.lookAt = null; } const cb = this.onArrive; this.onArrive = null; if (cb) cb(); }
+        else { move.normalize(); moving = true; if (d < 0.6) move.multiplyScalar(Math.max(0.25, d / 0.6)); }   // ease into a designated spot
+      }
+      const spd = this.runSpeed || this.speed;
+      if (moving) { this.vel.lerp(move.multiplyScalar(spd), 1 - Math.exp(-12 * dt)); this.face(this.lookAt ? this._tmp2.copy(this.lookAt).sub(this.pos) : this.vel); }
+      else this.vel.multiplyScalar(Math.exp(-14 * dt));
     }
-    const spd = this.runSpeed || this.speed;
-    if (moving) { this.vel.lerp(move.multiplyScalar(spd), 1 - Math.exp(-12 * dt)); this.face(this.lookAt ? this._tmp2.copy(this.lookAt).sub(this.pos) : this.vel); }
-    else this.vel.multiplyScalar(Math.exp(-14 * dt));
-    if (this.special !== 'knockdown') this.pos.addScaledVector(this.vel, dt);
+    this._prev.copy(this.pos);
+    if (this.special !== 'knockdown' && this.special !== 'down') this.pos.addScaledVector(this.vel, dt);
+    if (this.bound && dt > 0) {
+      // the edge of the walkable floor: he slides along it; pushing straight into it he stops (and stands, not runs on the spot)
+      this.bound(this.pos);
+      const real = this._tmp2.copy(this.pos).sub(this._prev).divideScalar(dt).setY(0);
+      if (real.lengthSq() < this.vel.lengthSq()) this.vel.lerp(real, 0.5);
+    }
     const speedNow = this.vel.length();
     // ---- footsteps
     if (speedNow > 1.5) { this.stepTimer -= dt * (speedNow / 6); if (this.stepTimer <= 0) { this.stepTimer = 0.3; audio.play(this.surface === 'grass' ? 'step.grass' : 'step.stone', { minGap: 0.12 }); if (this.fx) this.fx.dust(this.pos); } }
-    // ---- choose sheet: back when facing away from camera
+    // ---- which way he reads on screen (user 2026-10-27): running away from the camera → the back sheet's run; across the
+    //      screen → the front sheet's side run (its cells run to the right: mirrored to the left); toward the camera → the
+    //      front run (row 'runFront' once that art exists; until then the side run). Standing: the front or back idle.
     if (!this.special) {
       // the camera's viewing direction (not its position): sprites face the camera plane, and from the near-vertical puzzle
       // camera (shifted sideways for the panel) the hero→camera vector is almost sideways and picked the wrong sheet
       const toCam = this._tmp2.set(0, 0, 1).applyQuaternion(cam.quaternion).setY(0).normalize();
-      const facingCam = this.facing.dot(toCam);
-      const showBack = facingCam < -0.15 ? true : facingCam > 0.15 ? false : this.back.sprite.visible;
-      this.showFront(!showBack);
-      const s = this.visibleSprite;
-      s.play(speedNow > 0.8 ? 'run' : 'idle', { speed: speedNow > 0.8 ? clamp(speedNow / 6, 0.7, 1.4) : 1 });
-      // mirror when moving to the camera's left
       const right = this._tmp.set(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();
-      const lat = this.facing.dot(right); if (lat < -0.45) this._flip = true; else if (lat > 0.45) this._flip = false;
+      const fc = this.facing.dot(toCam), lat = this.facing.dot(right), running = speedNow > 0.8;
+      let view = this._view || 'front';
+      if (running) {   // within ~45° of straight toward / away from the camera; a little hysteresis, so a diagonal never flickers
+        if ((view === 'front' && fc < 0.55) || (view === 'back' && fc > -0.55)) view = 'side';
+        if (fc > 0.7) view = 'front'; else if (fc < -0.7) view = 'back';
+      } else view = fc < -0.15 ? 'back' : fc > 0.15 || view === 'side' ? 'front' : view;
+      this._view = view;
+      this.showFront(view !== 'back');
+      const s = this.visibleSprite, anim = !running ? 'idle' : view === 'front' && s.hasAnim('runFront') ? 'runFront' : 'run';
+      s.play(anim, { speed: running ? clamp(speedNow / 6, 0.7, 1.4) : 1 });
+      // mirror when he faces the camera's left
+      if (lat < -0.45) this._flip = true; else if (lat > 0.45) this._flip = false;
       s.setFlip(!!this._flip);
-    } else if (this.special === 'knockdown' || this.special === 'hurt') this.front.setFlip(false);
+    } else if (this.special === 'knockdown' || this.special === 'hurt' || this.special === 'down') this.front.setFlip(false);
     this.front.update(dt); this.back.update(dt);
   }
   dispose() { this.world.remove(this.group); this.front.dispose(); this.back.dispose(); }

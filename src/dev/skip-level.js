@@ -6,12 +6,10 @@
 //
 // Skipping = the exact area is fired for you, so the normal win path plays (the charge, the barrier breaking, the reward
 // path, progress save, walk into the next ring) and the game state stays consistent. Clicked before the question is up,
-// it waits for it.
+// it waits for it. Karan walks the walks by himself meanwhile (the autopilot), until the next ring's top view.
 // ---------------------------------------------------------------------------
-import { sectorArea } from '../game/levels.js';
-
 const enabled = ['localhost', '127.0.0.1', ''].includes(location.hostname) || new URLSearchParams(location.search).has('dev');
-const ARENA_PHASES = ['gate', 'inside', 'arrive', 'observe', 'tactical', 'scan', 'input', 'firing', 'result', 'cleared'];
+const ARENA_PHASES = ['causeway', 'gate', 'inside', 'arrive', 'observe', 'tactical', 'scan', 'input', 'solve', 'firing', 'result', 'cleared'];   // (the causeway walk is arena 1's)
 
 if (enabled) {
   const btn = document.createElement('button');
@@ -25,19 +23,20 @@ if (enabled) {
   });
   document.body.appendChild(btn);
 
-  let queued = false, pressNext = false;
+  let queued = false, pressNext = false, autoBefore = null;
   const label = () => { btn.textContent = queued ? 'DEV · skipping…' : 'DEV · Skip ring ⏭'; };
   label();
-  btn.addEventListener('click', () => { queued = true; label(); });
+  btn.addEventListener('click', () => { const roam = window.__se.game.roam; if (autoBefore == null) autoBefore = roam.autopilot; roam.autopilot = true; queued = true; label(); });
 
   setInterval(() => {
     const se = window.__se, scene = se && se.scene, phase = se && se.phase;
     const inArena = !!scene && ARENA_PHASES.includes(phase);
     btn.style.display = inArena || queued ? 'block' : 'none';
     if (pressNext && phase === 'cleared') { const b = document.getElementById('btn-ar-next'); if (b) { pressNext = false; b.click(); } }   // past the results card
+    if (!queued && !pressNext && autoBefore != null && (phase === 'tactical' || !inArena && phase !== 'exit')) { se.game.roam.autopilot = autoBefore; autoBefore = null; }   // walked into the next ring and onto its spot
     if (!queued || !scene) return;
     if (phase === 'input') {
-      se.fire(String(sectorArea(scene.R, scene.A.theta)));
+      se.answer('correct');   // (chosen in arenas 1–4, typed in terms of π in 5–7)
       queued = false; pressNext = true; label();
     }
     if (!inArena && phase !== 'exit') { queued = false; label(); }   // left the ring some other way (quit, game over)

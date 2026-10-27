@@ -1,7 +1,8 @@
 // ---------------------------------------------------------------------------
-// ChainWorld – the whole jungle in one scene: a stone causeway across a lake
-// → the small gate of ring 1 → seven rings (each open arc leads through a
-// breach bay and a shallow lens into the next) → the temple court.
+// ChainWorld – the whole jungle in one scene: an islet in a lake (where Karan
+// is stranded, user 2026-10-27) → a stone causeway → the small gate of ring 1
+// → seven rings (each open arc leads through a breach bay and a shallow lens
+// into the next) → the temple court, the lost temple and its beam of light.
 // All wall pieces, bays, pillars and seals come from CHAIN (levels.js).
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
@@ -41,6 +42,28 @@ const TEMPLE = { x: 260, z: 8, h: 103, base: -10.3 };
 const SKY = { span: 35, glowU: 0.565 };
 const T = 1.0;          // wall thickness
 const WATER_Y = -0.7;
+// The islet at the west end of the causeway, where the opening finds Karan stranded (user 2026-10-27): water all round
+// it (the lake opens into a wide pool there), the causeway his only way on. back: its centre this far behind the
+// causeway's start; r: its radius.
+const ISLET = { back: 6.2, r: 7.2 };
+// The temple's beam of light (the opening's "what's that light?"): it rises from the painted temple's peak (u 0.581,
+// v 0.048 of the art) high into the sky; from then on it marks the goal from everywhere.
+const BEAM = { peakU: 0.581, peakV: 0.048, width: 22, height: 430 };
+const BEAM_VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const BEAM_FRAG = `
+uniform vec3 color; uniform float opacity; uniform float rise; uniform float time;
+varying vec2 vUv;
+void main(){
+  float v = vUv.y; if (v > rise) discard;
+  float x = (vUv.x - 0.5) * 2.0;
+  float core = exp(-x * x * 38.0), halo = exp(-x * x * 4.5) * 0.42;
+  float top = 1.0 - smoothstep(0.4, 1.0, v);                                   // fades up into the sky
+  float base = 1.0 + 0.6 * (1.0 - smoothstep(0.0, 0.06, v));                   // brightest where it leaves the temple
+  float streak = 0.84 + 0.16 * sin(v * 95.0 - time * 4.0 + x * 2.5);           // light climbing the beam
+  float tip = exp(-pow((v - rise) * 36.0, 2.0)) * step(rise, 0.995) * 1.6;     // the bright head while it rises
+  float a = (core + halo) * (top * base * streak + tip);
+  gl_FragColor = vec4(mix(color, vec3(1.0), core * 0.7), clamp(a, 0.0, 1.0) * opacity);
+}`;
 
 export class ChainWorld {
   constructor(world, fx) {
@@ -48,7 +71,11 @@ export class ChainWorld {
     this.H = WALL_HEIGHT; this.rng = mulberry32(4242);
     this.causewayTorches = []; this.titleOn = 0;
     this.rings = []; this.seals = []; this.animTorches = []; this.lights = []; this.pillarMeshes = []; this.waterMats = []; this.wallPieces = []; this.cutRing = -1; this.keepSeals = false; this.fadeOff = false;
+    this.watchPoint = null;   // while the player walks Karan (Roam): his position, so no wall between the walk camera and him stays solid
     this.skyName = null; this.fogDensity = 0.0034; this.activeIndex = -1; this.focusIndex = -1;
+    const cw = CHAIN.causeway, ip = polar(cw.dirDeg + 180, ISLET.back);
+    this.islet = { x: cw.start.x + ip.x, z: cw.start.z + ip.z, r: ISLET.r };
+    this.templeBoost = 0;   // the temple gate's glow when it is the goal of the walk (0..1)
     this.tint = { pano: new THREE.Color(0xffffff), sky: new THREE.Color(0xffffff), foliage: new THREE.Color(0xffffff) };
     this.build();
   }
@@ -78,7 +105,9 @@ export class ChainWorld {
     this.sky.rotation.y = aSun + 8 * DEG - (180 + 180 * SKY.glowU) * DEG;   // sphere u → polar 180° + 360u (u = glowU / 2: two wraps); +8° ≈ the sun seen from the title
     this.buildTitleSky(mid);
     this.buildLostTemple();
+    this.buildTempleBeam();
     this.buildGroundAndLake();
+    this.buildIslet();
     this.buildCauseway();
     for (const ring of CHAIN.all) this.buildRing(ring);
     for (const a of CHAIN.arenas) if (a.bay) this.buildBay(a);
@@ -95,10 +124,12 @@ export class ChainWorld {
   lakeOutline() {
     if (this._lake) return this._lake;
     const cw = CHAIN.causeway, x0 = cw.start.x - 12, x1 = cw.gate.x - 3.2, cx = (x0 + x1) / 2, ax = (x1 - x0) / 2, az = 16, pts = [];
-    for (let k = 0; k < 72; k++) {
-      const t = (k / 72) * Math.PI * 2, n = 1 + 0.12 * Math.sin(t * 3 + 1.3) + 0.07 * Math.sin(t * 7 + 0.4) + 0.05 * Math.sin(t * 11 + 2.1);
-      const east = Math.cos(t) > 0 ? Math.pow(Math.cos(t), 0.6) : Math.cos(t);       // flatter east end at the gate
-      pts.push(new THREE.Vector2(cx + ax * east * (0.96 + 0.04 * n), (az * Math.sin(t) * n) * (0.7 + 0.3 * (1 - Math.abs(Math.cos(t))))));
+    const axW = cx - (this.islet.x - this.islet.r - 15);   // the west half reaches 15 m of water beyond the islet
+    for (let k = 0; k < 96; k++) {
+      const t = (k / 96) * Math.PI * 2, n = 1 + 0.12 * Math.sin(t * 3 + 1.3) + 0.07 * Math.sin(t * 7 + 0.4) + 0.05 * Math.sin(t * 11 + 2.1), c = Math.cos(t);
+      if (c > 0) pts.push(new THREE.Vector2(cx + ax * Math.pow(c, 0.6) * (0.96 + 0.04 * n), (az * Math.sin(t) * n) * (0.7 + 0.3 * (1 - c))));   // flatter east end at the gate
+      // the west half opens into a wide pool round the islet (the opening: water on every side of Karan)
+      else pts.push(new THREE.Vector2(cx + axW * c * (0.96 + 0.04 * n), az * Math.sin(t) * n * (1 + 0.42 * Math.abs(Math.sin(2 * t)))));
     }
     this._lake = pts; return pts;
   }
@@ -128,6 +159,18 @@ export class ChainWorld {
     for (let i = 0; i < skirtPts.length; i++) { const a = skirtPts[i], b = skirtPts[(i + 1) % skirtPts.length]; pos.push(a.x, -0.02, -a.y, b.x, -0.02, -b.y, b.x, WATER_Y - 0.1, -b.y, a.x, -0.02, -a.y, b.x, WATER_Y - 0.1, -b.y, a.x, WATER_Y - 0.1, -a.y); }
     skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); skirtGeo.computeVertexNormals();
     this.group.add(new THREE.Mesh(skirtGeo, new THREE.MeshLambertMaterial({ color: 0x5a5340, side: THREE.DoubleSide })));
+  }
+
+  /** The islet (user 2026-10-27): a low grassy island with a sandy rim at the causeway's west end, water all round it. */
+  buildIslet() {
+    const I = this.islet, outline = (k) => { const pts = []; for (let i = 0; i < 72; i++) { const a = (i / 72) * Math.PI * 2, r = I.r * k * (1 + 0.06 * Math.sin(a * 3 + 1.1) + 0.035 * Math.sin(a * 7 + 0.3)); pts.push(new THREE.Vector2(I.x + Math.cos(a) * r, -I.z + Math.sin(a) * r)); } return pts; };
+    const lay = (pts, mat, y) => { const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts), 2), mat); m.rotation.x = -Math.PI / 2; m.position.y = y; this.group.add(m); return m; };
+    lay(outline(1), new THREE.MeshLambertMaterial({ map: assets.texture('ground_jungle', { repeat: [1 / 12, 1 / 12] }), color: 0xd9c49a }), -0.01);   // the sandy rim
+    lay(outline(0.84), new THREE.MeshLambertMaterial({ map: assets.texture('ground_jungle', { repeat: [1 / 12, 1 / 12] }), color: 0xc4ceb4, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 0);
+    const rim = outline(1), pos = [];   // the bank down into the water
+    for (let i = 0; i < rim.length; i++) { const a = rim[i], b = rim[(i + 1) % rim.length]; pos.push(a.x, -0.01, -a.y, b.x, -0.01, -b.y, b.x, WATER_Y - 0.1, -b.y, a.x, -0.01, -a.y, b.x, WATER_Y - 0.1, -b.y, a.x, WATER_Y - 0.1, -a.y); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.computeVertexNormals();
+    this.group.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x6a5f44, side: THREE.DoubleSide })));
   }
 
   /* ---------------------------------------------------------------- walls */
@@ -173,7 +216,11 @@ export class ChainWorld {
     const floor = new THREE.Mesh(new THREE.RingGeometry(a.R - 0.1, Rb + 0.05, Math.max(12, Math.round(a.theta / 3)), 1, (a.exitDeg - a.theta / 2) * DEG, a.theta * DEG),
       new THREE.MeshLambertMaterial({ map: tex, color: new THREE.Color(env.floor).multiplyScalar(1.05), polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
     floor.rotation.x = -Math.PI / 2; floor.position.y = -0.006; g.add(floor);
-    for (const [a0, a1] of this.splitArcs(a.bay.outerArcs, 24)) g.add(this.wallArc(Rb, a0, a1, col));
+    const at = (deg, r) => { const p = polar(deg, r); return [a.center.x + p.x, a.center.z + p.z]; };
+    for (const [a0, a1] of this.splitArcs(a.bay.outerArcs, 24)) {
+      const w = this.wallArc(Rb, a0, a1, col); g.add(w);
+      this.wallPieces.push({ g: w, ring: a.index, mid: (a0 + a1) / 2, bay: true, mats: w.children.map((c) => c.material), k: 1, pts: [0, 0.25, 0.5, 0.75, 1].map((f) => at(a0 + (a1 - a0) * f, Rb + 0.5)) });
+    }
     for (const w of a.bay.radials) {
       const r1 = w.r1 >= Rb - 0.05 ? w.r1 + T : w.r1, L = r1 - w.r0; if (L < 0.3) continue;   // reach the outer wall's far face: closed corner, no column
       const wt = assets.texture('arena_wall', {}).clone(); wt.needsUpdate = true; wt.repeat.set(L / H, 1);
@@ -184,7 +231,7 @@ export class ChainWorld {
       const u = polar(w.deg, 1); box.rotation.y = Math.atan2(u.x, u.z);
       // nudge outward so the wall face lines up with the sector's radial line
       const n = polar(w.deg + 90 * Math.sign(degDiff(a.exitDeg, w.deg)), T / 2); box.position.x += n.x; box.position.z += n.z;
-      g.add(box);
+      g.add(box); this.wallPieces.push({ g: box, ring: a.index, mid: w.deg, bay: true, mats: [side, topM], k: 1, pts: [0, 0.25, 0.5, 0.75, 1].map((f) => at(w.deg, w.r0 + (r1 - w.r0) * f)) });
     }
   }
   /** Cut the wall_pillar art into capital / shaft / base bands (opaque crops on a stone backing) for stacked cylinders. */
@@ -411,6 +458,14 @@ export class ChainWorld {
       if (this.rng() < 0.55) rocks.add(x, -0.25, z, this.rnd(1.0, 2.1), Math.floor(this.rng() * 4), this.rnd(0.8, 0.95));
       else plants.add(x, -0.1, z, this.rnd(1.2, 2.0), Math.floor(this.rng() * 4), this.rnd(0.85, 1));
     }
+    // the islet: ferns and rocks round its rim, none where the causeway leaves it or where the opening's camera circles
+    { const I = this.islet;
+      for (let k = 0; k < 22; k++) {
+        const deg = (k / 22) * 360 + this.rnd(-5, 5); if (Math.abs(degDiff(cw.dirDeg, deg)) < 34) continue;
+        const p = polar(deg, I.r * this.rnd(0.82, 0.97)), x = I.x + p.x, z = I.z + p.z;
+        if (this.rng() < 0.45) rocks.add(x, -0.05, z, this.rnd(0.8, 1.5), Math.floor(this.rng() * 4), this.rnd(0.8, 0.95));
+        else plants.add(x, 0, z, this.rnd(1.0, 1.7), Math.floor(this.rng() * 4), this.rnd(0.85, 1));
+      } }
     // Layer 3 – foreground accents at the foot of the ring walls (sparse)
     for (const ring of CHAIN.all) {
       for (const r of ring.wallArcs) for (let deg = r.a0 + 10; deg < r.a1 - 10; deg += this.rnd(22, 34)) {
@@ -433,12 +488,13 @@ export class ChainWorld {
 
   /* ---------------------------------------------------------------- fireflies (title ambience) */
   buildFireflies() {
-    const cw = CHAIN.causeway, n = 46, g = new THREE.Group(); g.visible = false; this.group.add(g);
-    const tex = assets.texture('fx_spark', { wrap: false }); this.flies = [];
+    const cw = CHAIN.causeway, n = 60, g = new THREE.Group(); g.visible = false; this.group.add(g);
+    const tex = assets.texture('fx_spark', { wrap: false }), I = this.islet; this.flies = [];
     for (let i = 0; i < n; i++) {
       const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xd8ff8a, opacity: 0 });
       const s = new THREE.Sprite(m); s.scale.setScalar(this.rnd(0.18, 0.32));
-      const home = new THREE.Vector3(this.rnd(cw.start.x + 4, cw.gate.x - 2), this.rnd(0.6, 3.4), this.rnd(-9, 9));
+      const a = this.rnd(0, Math.PI * 2), r = this.rnd(3, I.r + 6);   // the last 14 drift round the islet (the opening)
+      const home = i < 46 ? new THREE.Vector3(this.rnd(cw.start.x + 4, cw.gate.x - 2), this.rnd(0.6, 3.4), this.rnd(-9, 9)) : new THREE.Vector3(I.x + Math.cos(a) * r, this.rnd(0.6, 3.0), I.z + Math.sin(a) * r);
       s.position.copy(home); g.add(s); this.flies.push({ s, home, ph: this.rnd(0, 10), sp: this.rnd(0.3, 0.7) });
     }
     this.fireflies = g;
@@ -452,6 +508,31 @@ export class ChainWorld {
     const s = new THREE.Sprite(mat); s.center.set(0.5, 0); s.scale.set(TEMPLE.h, TEMPLE.h, 1); s.position.set(TEMPLE.x, TEMPLE.base, TEMPLE.z); s.renderOrder = -3;
     this.group.add(s); this.temple = s; this.templeHaze = new THREE.Color(0xc9b4cc);
   }
+  /** The temple's beam of light: a vertical shaft turned to the camera, rising from the painted temple's peak, and a
+   *  flare where it leaves the temple. Off until the opening raises it (riseBeam), then on for the whole journey. */
+  buildTempleBeam() {
+    const mat = new THREE.ShaderMaterial({ vertexShader: BEAM_VERT, fragmentShader: BEAM_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+      uniforms: { color: { value: new THREE.Color(0xffd98a) }, opacity: { value: 0 }, rise: { value: 0 }, time: { value: 0 } } });
+    const geo = new THREE.PlaneGeometry(1, 1); geo.translate(0, 0.5, 0);
+    const shaft = new THREE.Mesh(geo, mat); shaft.scale.set(BEAM.width, BEAM.height, 1); shaft.renderOrder = -2; shaft.frustumCulled = false; this.group.add(shaft);   // (always in the scene: compiled at load)
+    const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: assets.texture('fx_glow', { wrap: false }), color: 0xffe6b0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    flare.scale.setScalar(64); flare.renderOrder = -2; this.group.add(flare);
+    this.beam = { shaft, mat, flare, k: 0, flash: 0 };
+  }
+  /** The painted temple's peak in the world as the camera sees it: the temple is a camera-facing sprite, so its peak sits
+   *  off its centre along the camera's right. */
+  templePeak(out = new THREE.Vector3()) {
+    const s = this.temple, cr = this._camRight || (this._camRight = new THREE.Vector3()); cr.setFromMatrixColumn(this.world.camera.matrixWorld, 0).setY(0).normalize();
+    return out.set(s.position.x + cr.x * (BEAM.peakU - 0.5) * s.scale.x, s.position.y + (1 - BEAM.peakV) * s.scale.y - 2, s.position.z + cr.z * (BEAM.peakU - 0.5) * s.scale.x);
+  }
+  /** The beam rises out of the temple (the opening, scene 2): its head climbs into the sky, the flare flashes. */
+  riseBeam(dur = 2.4) {
+    const b = this.beam, u = b.mat.uniforms; tweens.cancelTag('beam');
+    u.rise.value = 0; u.opacity.value = 1; b.k = 1; b.flash = 1; audio.play('temple.beam');
+    return tweens.add({ duration: dur, tag: 'beam', ease: Ease.inOutSine, onUpdate: (e) => { u.rise.value = e; } }).promise;
+  }
+  /** The beam on (risen) or off at once: the journey vs the title. */
+  setBeam(on) { const u = this.beam.mat.uniforms; tweens.cancelTag('beam'); u.rise.value = on ? 1 : 0; u.opacity.value = on ? 1 : 0; this.beam.k = on ? 1 : 0; this.beam.flash = 0; }
   /** Sun bloom over the painted sun, and the title's lake mist. */
   buildTitleSky(mid) {
     const glowTex = assets.texture('fx_glow', { wrap: false });
@@ -539,7 +620,16 @@ export class ChainWorld {
     { const dim = 1 - 0.65 * f; this.sunParts.forEach((sp, i) => { sp.material.opacity = Math.min(1, sp.userData.op * this.sunK * dim * (i ? 1 : 0.9 + 0.1 * Math.sin(t * 0.7))); }); }
     for (const pl of this.lights) if (pl.visible) { pl.userData.phase += dt * 9; pl.intensity = pl.userData.base * (0.85 + 0.15 * Math.sin(pl.userData.phase) * Math.sin(pl.userData.phase * 0.37)); }
     for (const w of this.waterMats) { w.tex.offset.x += dt * 0.012 * w.speed; w.tex.offset.y += dt * 0.008 * w.speed; }
-    if (this.templeGlow) { this.templeGlow.material.opacity = 0.5 + Math.sin(t * 2) * 0.12; this.templeLight.intensity = 30 + Math.sin(t * 2) * 6; }
+    if (this.templeGlow) {
+      const b = this.templeBoost; this.templeGlow.material.opacity = Math.min(1, 0.5 + Math.sin(t * 2) * 0.12 + b * (0.4 + 0.1 * Math.sin(t * 5)));
+      this.templeGlow.scale.setScalar(6 * (1 + 0.45 * b)); this.templeLight.intensity = 30 + Math.sin(t * 2) * 6 + b * 26;
+    }
+    if (this.beam.k > 0) {
+      const b = this.beam, pk = this.templePeak(b.shaft.position), px = pk.x, py = pk.y, pz = pk.z;
+      b.shaft.rotation.y = Math.atan2(cam.x - px, cam.z - pz); b.mat.uniforms.time.value = t;
+      b.mat.uniforms.opacity.value = b.k * (1 - 0.65 * f) * (0.9 + 0.1 * Math.sin(t * 1.3));
+      b.flash = Math.max(0, b.flash - dt * 0.7); b.flare.position.set(px, py + 2, pz); b.flare.material.opacity = b.k * (0.55 + 0.45 * b.flash) * (1 - 0.65 * f); b.flare.scale.setScalar(64 * (1 + 1.4 * b.flash));
+    } else this.beam.flare.material.opacity = 0;
     // camera rule: walls of the current ring between the camera and the ring cut away; pillars also fade when the camera brushes past
     const cr = this.fadeOff ? null : CHAIN.all[this.cutRing]; let camB = 0, cutOn = false;
     if (cr) { const hx = cam.x - cr.center.x, hz = cam.z - cr.center.z; cutOn = Math.hypot(hx, hz) > cr.R - 0.5 && cam.y > 2 && cam.y < 45; camB = toDeg(hx, hz); }
@@ -547,13 +637,21 @@ export class ChainWorld {
     // ease k toward its target and SNAP the last step: an asymptotic ease used to stall at ~0.96, leaving pieces
     // transparent with depthWrite off for good (walls then painted over the gate frame and other walls)
     const applyK = (o, t) => { let k = o.k + (t - o.k) * ease; if (Math.abs(t - k) < 0.02) k = t; if (k === o.k) return; o.k = k; for (const m of o.mats) { const tr = k < 0.99; if (m.transparent !== tr) { m.transparent = tr; m.needsUpdate = true; } m.opacity = k; m.depthWrite = !tr; } };
-    // occluder test: does a wall sample sit on the camera→target sightline, below the wall top?
-    const tg = this.world.rig.target, sx = tg.x - cam.x, sz = tg.z - cam.z, sl2 = sx * sx + sz * sz || 1, WT = this.H + 0.6;
-    const occludes = (px, pz, rad) => { const t = ((px - cam.x) * sx + (pz - cam.z) * sz) / sl2; if (t < 0.02 || t > 0.86) return false; if (cam.y + (tg.y - cam.y) * t > WT) return false; const qx = cam.x + sx * t - px, qz = cam.z + sz * t - pz; return qx * qx + qz * qz < rad * rad; };
+    // occluder test: does a wall sample sit on a sightline from the camera (to its target; while the player walks him, also
+    // down to Karan), below the wall top?
+    const WT = this.H + 0.6, line = (tx, ty, tz) => {
+      const sx = tx - cam.x, sz = tz - cam.z, sl2 = sx * sx + sz * sz || 1;
+      return (px, pz, rad) => { const t = ((px - cam.x) * sx + (pz - cam.z) * sz) / sl2; if (t < 0.02 || t > 0.86) return false; if (cam.y + (ty - cam.y) * t > WT) return false; const qx = cam.x + sx * t - px, qz = cam.z + sz * t - pz; return qx * qx + qz * qz < rad * rad; };
+    };
+    const tg = this.world.rig.target, toTarget = line(tg.x, tg.y, tg.z), wp = this.watchPoint, toHero = wp ? line(wp.x, 0.3, wp.z) : null;
+    const occludes = (px, pz, rad) => toTarget(px, pz, rad) || (toHero ? toHero(px, pz, rad * 1.2) : false);
+    // …and, on a walk, the walls just in front of the walk camera (they would fill the bottom of the frame)
+    const cf = this._camFwd || (this._camFwd = new THREE.Vector3()); this.world.camera.getWorldDirection(cf);
+    const foreground = wp ? (px, pz) => { const dx = px - cam.x, dz = pz - cam.z; return dx * dx + dz * dz < 30 && dx * cf.x + dz * cf.z > -1; } : null;
     for (const w of this.wallPieces) {
-      if (!w.pts) { const o = CHAIN.all[w.ring]; w.pts = (w.a0 != null ? [w.a0, w.mid, w.a1] : [w.mid]).map((d) => { const p = polar(d, o.R + 0.5); return [o.center.x + p.x, o.center.z + p.z]; }); }
-      const blocking = !this.fadeOff && cam.y > 1.5 && w.pts.some(([px, pz]) => occludes(px, pz, 2.0));
-      const t = (cutOn && !(w.seal && this.keepSeals) && w.ring === this.cutRing && Math.abs(degDiff(camB, w.mid)) < 72) || (blocking && !(w.seal && this.keepSeals)) ? 0.08 : 1; applyK(w, t);
+      if (!w.pts) { const o = CHAIN.all[w.ring]; w.pts = (w.a0 != null ? [0, 0.25, 0.5, 0.75, 1].map((f) => w.a0 + (w.a1 - w.a0) * f) : [w.mid]).map((d) => { const p = polar(d, o.R + 0.5); return [o.center.x + p.x, o.center.z + p.z]; }); }
+      const blocking = !this.fadeOff && cam.y > 1.5 && w.pts.some(([px, pz]) => occludes(px, pz, 2.0) || (foreground && foreground(px, pz)));
+      const t = (cutOn && !w.bay && !(w.seal && this.keepSeals) && w.ring === this.cutRing && Math.abs(degDiff(camB, w.mid)) < 72) || (blocking && !(w.seal && this.keepSeals)) ? 0.08 : 1; applyK(w, t);
     }
     for (const tr of this.animTorches) { if (tr.deg == null) continue; const t = cutOn && tr.ring === this.cutRing && Math.abs(degDiff(camB, tr.deg)) < 72 ? 0 : 1; const c = tr.cut + (t - tr.cut) * ease; if (Math.abs(c - tr.cut) > 0.01 || (t !== tr.cut && Math.abs(c - t) < 0.01)) { tr.cut = Math.abs(c - t) < 0.01 ? t : c; tr.spr.material.opacity = tr.cut; tr.spr.sprite.visible = tr.cut > 0.02; } }
     for (const p of this.pillarMeshes) {

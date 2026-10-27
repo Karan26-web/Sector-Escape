@@ -143,7 +143,7 @@ export function heroSheet(back, cols = 8, rows = back ? 2 : 5, fw = 256, fh = 25
   return sheet(cols, rows, fw, fh, (g, c, r) => {
     const cx = fw / 2, base = fh - 10;
     if (r === 0) { const t = (c / 6) * Math.PI * 2; drawHero(g, cx, base, s, { back, bob: Math.sin(t) * 1.2, armL: Math.sin(t) * 0.04, armR: -Math.sin(t) * 0.04 }); }
-    else if (r === 1) { const t = (c / 8) * Math.PI * 2; drawHero(g, cx, base, s, { back, legL: Math.sin(t) * 0.85, legR: -Math.sin(t) * 0.85, armL: -Math.sin(t) * 0.7, armR: Math.sin(t) * 0.7, bob: Math.abs(Math.cos(t)) * 3, lean: 0.08 }); }
+    else if (r === 1 || r === 5) { const t = (c / 8) * Math.PI * 2; drawHero(g, cx, base, s, { back, legL: Math.sin(t) * 0.85, legR: -Math.sin(t) * 0.85, armL: -Math.sin(t) * 0.7, armR: Math.sin(t) * 0.7, bob: Math.abs(Math.cos(t)) * 3, lean: 0.08 }); }   // (row 5: the front run)
     else if (r === 2) { const k = Math.min(1, c / 3); drawHero(g, cx, base, s, { back, point: k, lean: -0.04 * k, bob: c >= 4 ? -1.5 : 0 }); }
     else if (r === 3) { drawHero(g, cx, base, s, { back, lean: -0.22 - c * 0.03, arms: 0.7, hurt: c % 2 === 0 ? 0.9 : 0.3, legL: -0.3, legR: 0.4 }); }
     else { const t = (c / 6) * Math.PI; drawHero(g, cx, base, s, { back, lift: Math.sin(t) * 22, arms: 1, legL: 0.3 * Math.sin(t), legR: -0.3 * Math.sin(t) }); }

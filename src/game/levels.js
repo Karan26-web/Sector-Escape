@@ -1,13 +1,13 @@
 // ---------------------------------------------------------------------------
 // Sector Escape – level table (LXD final dimensions), chain geometry,
 // answer parsing / evaluation, misconception diagnosis, hints, scoring.
-//   A = (θ / 360) × π × r²,  π = 22/7
+//   A = (θ / 360) × π × r²: rings 1–3 in terms of π, rings 4–7 with π = 22/7
 // The seven arenas form ONE continuous chain of overlapping circles: the open
 // arc of arena i (central angle θ_i) is exactly the lens shared with arena i+1,
 // so the two walls meet at the two intersection points and the open arc leads
 // straight into the next arena.
 // ---------------------------------------------------------------------------
-import { reduceFraction, formatNumber, DEG, polar, wrapDeg, degDiff, toDeg } from '../engine/util.js';
+import { reduceFraction, formatNumber, DEG, polar, wrapDeg, degDiff, toDeg, gcd } from '../engine/util.js';
 
 export const PI = { num: 22, den: 7, value: 22 / 7, label: '22/7' };
 // LXD 2026-10-22: fractions and decimals are accepted, compared at 3 decimal places (38.5, 38.500, 77/2 are all right;
@@ -19,10 +19,14 @@ export const SEAL_BEHIND = false;
 const round6 = (v) => Math.round(v * 1e6) / 1e6;
 export const sectorArea = (r, theta, pi = PI.value) => round6((theta / 360) * pi * r * r);
 export const sectorCoef = (r, theta) => round6((theta / 360) * r * r);
+/** User 2026-10-27: rings 1–3 are answered in terms of π. The π is printed beside the answer field and the learner enters
+ *  only the whole number in front of it (r and θ are chosen so it is never a decimal); from ring 4 on, π = 22/7. */
+export const answerFor = (level) => formatNumber(level.piForm ? sectorCoef(level.radius, level.theta) : sectorArea(level.radius, level.theta));
 export const arcLength = (r, theta, pi = PI.value) => (theta / 360) * 2 * pi * r;
 /** 22/7 gives a clean answer when 2r is a multiple of 7 (7, 10.5, 14, 17.5, 21 …). */
 export const isPiFriendly = (r) => Math.abs((r * 2) % 7) < 1e-9;
-export function formatArea(r, theta) {
+export function formatArea(r, theta, piForm = false) {
+  if (piForm) return `${formatNumber(sectorCoef(r, theta))}π`;
   if (isPiFriendly(r)) return formatNumber(sectorArea(r, theta));
   return `${formatNumber(sectorCoef(r, theta))}π ≈ ${formatNumber(sectorArea(r, theta))}`;
 }
@@ -57,7 +61,16 @@ const ENV = {
 };
 
 /**
- * Final arena dimensions from the LXD (π = 22/7). exitDeg = direction of the
+ * Final arena dimensions and question forms from the LXD (review 2026-10-27). Every area is in terms of π: there is no
+ * 22/7 any more and no decimal is ever shown.
+ *  * Arenas 1–4 are answered by CHOOSING (ask), never typed: 1 picks one of three substituted formulas (mcq); 2 picks the
+ *    angle and the radius in drop-downs inside the formula ('theta'); 3 and 4 pick the fraction θ/360 and the radius
+ *    ('fraction'). Right or wrong, the game then works the chosen formula out on screen and fires what it gives.
+ *  * Arenas 5–7 are typed in terms of π (piForm: the π is printed beside the field), always a whole number of π: r 20
+ *    (80π), r 24 (96π: now truly the largest ring), r 21 (147π).
+ *  * show: how the top view labels the sector: 'symbol' θ = 90° / r = 7 m (default) · 'value' just 120° (inside the
+ *    sector) / 10.5 m · angle 'right': the right-angle square, no number · radius 'diameter': a diameter line, 28 m.
+ * exitDeg = direction of the
  * open arc (0° = east/right, 90° = north/up on the overview). The suggested
  * zig-zag is kept where the geometry allows it: a turn sharper than
  * 180° − (θ + φ)/2 would make the open arc overlap the entrance arc.
@@ -65,13 +78,19 @@ const ENV = {
  * guardians wait behind the barrier, so it no longer sets their speed).
  */
 export const LEVELS = [
-  { id: 1, name: 'The Mossy Gate', tagline: 'A small gate. A big trap.', radius: 7, theta: 90, exitDeg: 45, timeBudget: 60, speed: 'Slow', scaffold: 'full', env: ENV.day },
-  { id: 2, name: 'Fallen Idol', tagline: 'A third of the wall is missing', radius: 10.5, theta: 120, exitDeg: 0, timeBudget: 54, speed: 'Slow–Moderate', scaffold: 'formula', env: ENV.day2 },
-  { id: 3, name: 'Serpent Court', tagline: 'The guardians grow restless', radius: 14, theta: 90, exitDeg: 320, timeBudget: 50, speed: 'Moderate', scaffold: 'hint', env: ENV.dusk },
-  { id: 4, name: 'Crimson Ruins', tagline: 'A wide breach, little time', radius: 14, theta: 135, exitDeg: 0, timeBudget: 46, speed: 'Moderate–Fast', scaffold: 'hint', env: ENV.dusk2 },
-  { id: 5, name: 'Twin Falls', tagline: 'Narrow arc, fast feet', radius: 17.5, theta: 72, exitDeg: 315, timeBudget: 42, speed: 'Fast', scaffold: 'hint', env: ENV.night },
-  { id: 6, name: 'Thunder Well', tagline: 'The largest ring in the jungle', radius: 21, theta: 60, exitDeg: 45, timeBudget: 38, speed: 'Faster', scaffold: 'hint', env: ENV.night2 },
-  { id: 7, name: "The Warden's Court", tagline: 'The last ring before the temple', radius: 21, theta: 120, exitDeg: 0, timeBudget: 34, speed: 'Fastest', scaffold: 'hint', boss: true, env: ENV.storm },
+  { id: 1, name: 'The Mossy Gate', tagline: 'A small gate. A big trap.', radius: 7, theta: 90, exitDeg: 45, timeBudget: 60, speed: 'Slow', scaffold: 'full', env: ENV.day,
+    ask: { kind: 'mcq', options: [{ n: 90, d: 360, fp: 1, r: 7, rp: 2 }, { n: 90, d: 180, fp: 1, r: 7, rp: 2 }, { n: 90, d: 360, fp: 2, r: 7, rp: 1 }] } },
+  { id: 2, name: 'Fallen Idol', tagline: 'A third of the wall is missing', radius: 10.5, theta: 120, exitDeg: 0, timeBudget: 54, speed: 'Slow–Moderate', scaffold: 'formula', env: ENV.day2,
+    ask: { kind: 'pick', form: 'theta', a: [60, 120, 30], r: [21, 120, 10.5] }, show: { angle: 'value', radius: 'value' } },
+  { id: 3, name: 'Serpent Court', tagline: 'The guardians grow restless', radius: 14, theta: 90, exitDeg: 320, timeBudget: 50, speed: 'Moderate', scaffold: 'hint', env: ENV.dusk,
+    ask: { kind: 'pick', form: 'fraction', a: [[1, 4], [1, 2], [1, 5]], r: [21, 7, 14] }, show: { angle: 'right', radius: 'value' } },
+  // (arena 4's choices are ours: the LXD said "as in round 3". 3/4 = 135/180, the half-turn slip; 1/4 = arena 3's answer
+  // carried over; 28 m = the diameter as the radius, the slip this arena is about; 7 m = halved twice)
+  { id: 4, name: 'Crimson Ruins', tagline: 'A wide breach, little time', radius: 14, theta: 135, exitDeg: 0, timeBudget: 46, speed: 'Moderate–Fast', scaffold: 'hint', env: ENV.dusk2,
+    ask: { kind: 'pick', form: 'fraction', a: [[3, 4], [3, 8], [1, 4]], r: [28, 14, 7] }, show: { angle: 'value', radius: 'diameter' } },
+  { id: 5, name: 'Twin Falls', tagline: 'Narrow arc, fast feet', radius: 20, theta: 72, piForm: true, exitDeg: 315, timeBudget: 42, speed: 'Fast', scaffold: 'hint', env: ENV.night },
+  { id: 6, name: 'Thunder Well', tagline: 'The largest ring in the jungle', radius: 24, theta: 60, piForm: true, exitDeg: 45, timeBudget: 38, speed: 'Faster', scaffold: 'hint', env: ENV.night2 },
+  { id: 7, name: "The Warden's Court", tagline: 'The last ring before the temple', radius: 21, theta: 120, piForm: true, exitDeg: 0, timeBudget: 34, speed: 'Fastest', scaffold: 'hint', boss: true, env: ENV.storm },
 ];
 export const TOTAL_LEVELS = LEVELS.length;
 
@@ -228,8 +247,16 @@ export function enemyMaxR(a, deg) {
 export function validateChain() {
   const problems = [];
   for (const a of CHAIN.arenas) {
-    const area = sectorArea(a.R, a.theta);
-    if (Math.abs(area * 2 - Math.round(area * 2)) > 1e-9) problems.push(`Arena ${a.id}: area ${area} is not a half-integer`);
+    if (a.level.ask) {
+      const right = choices(a.level).filter((c) => evaluatePick(c.expr, a.R, a.theta).status === 'correct');
+      if (!right.some((c) => c.right)) problems.push(`Arena ${a.id}: no choice gives the area`);
+    } else if (a.level.piForm) {
+      const k = sectorCoef(a.R, a.theta);
+      if (!Number.isInteger(a.R) || !Number.isInteger(k)) problems.push(`Arena ${a.id}: r ${a.R}, answer ${k}π: not whole numbers`);
+    } else {
+      const area = sectorArea(a.R, a.theta);
+      if (Math.abs(area * 2 - Math.round(area * 2)) > 1e-9) problems.push(`Arena ${a.id}: area ${area} is not a half-integer`);
+    }
     const overlapPct = Math.round((100 * a.lens.depth) / (2 * Math.min(a.R, a.nextR)));
     if (overlapPct > 20) problems.push(`Arena ${a.id}: lens depth ${overlapPct}% of the smaller diameter`);
     if (a.seal.arcs.length !== 1) problems.push(`Arena ${a.id}: seal has ${a.seal.arcs.length} pieces`);
@@ -273,16 +300,86 @@ export function parseAnswer(raw) {
   return { value: v, isPi: false, piCoef: null, text: isFinite(v) ? formatNumber(v) : String(raw) };
 }
 
-export function evaluateAnswer(raw, r, theta) {
+/** piForm: the π is printed beside the field, so a plain number is the coefficient of π (9 → 9π). */
+export function evaluateAnswer(raw, r, theta, { piForm = false } = {}) {
   const exact = sectorArea(r, theta), coef = sectorCoef(r, theta);
-  const p = parseAnswer(raw);
-  const base = { exact, coef, exactText: formatArea(r, theta), isPi: p.isPi, enteredText: p.text };
+  let p = parseAnswer(raw);
+  if (piForm && !p.isPi) p = { value: p.value * PI.value, isPi: true, piCoef: p.value, text: `${p.text}π` };
+  const base = { exact, coef, exactText: formatArea(r, theta, piForm), isPi: p.isPi, enteredText: p.text };
   if (!isFinite(p.value) || p.value <= 0) return { ...base, status: 'invalid', entered: NaN, ratio: 0, firedTheta: 0, excessTheta: 0, coverage: 0, diagnosis: null };
   let status, ratio;
   if (p.isPi) { ratio = p.piCoef / coef; status = Math.abs(round3(p.piCoef) - round3(coef)) < 1e-6 ? 'correct' : p.piCoef < coef ? 'under' : 'over'; }
   else { ratio = p.value / exact; status = Math.abs(round3(p.value) - round3(exact)) < 1e-6 ? 'correct' : p.value < exact ? 'under' : 'over'; }
   const firedTheta = Math.min(360, theta * ratio);
-  return { ...base, status, entered: p.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis: status === 'correct' ? null : diagnose(p.value, r, theta, exact) };
+  const diagnosis = status === 'correct' ? null : piForm ? diagnosePi(p.piCoef, r, theta, coef) : diagnose(p.value, r, theta, exact);
+  return { ...base, status, entered: p.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis };
+}
+
+/* ---------------------------------------------------------------------- */
+/* Arenas 1–4: answers chosen, not typed (LXD 2026-10-27)                   */
+/*  A chosen answer is an expression { n, d, fp, r, rp }: (n/d)^fp × π ×    */
+/*  r^rp. It is worked out exactly (fractions, never decimals) and fired    */
+/*  like a typed answer: its area decides the shot.                         */
+/* ---------------------------------------------------------------------- */
+const Q = (n, d = 1) => { if (d < 0) { n = -n; d = -d; } const g = gcd(n, d); return { n: n / g, d: d / g }; };
+const qOf = (x) => { let d = 1; while (!Number.isInteger(Math.round(x * d * 1e9) / 1e9) && d < 1e6) d *= 10; return Q(Math.round(x * d), d); };
+const qMul = (a, b) => Q(a.n * b.n, a.d * b.d);
+const qPow = (a, k) => (k === 2 ? qMul(a, a) : a);
+/** the expression's number in front of π, exact */
+export const exprCoef = (e) => qMul(qPow(Q(e.n, e.d), e.fp), qPow(qOf(e.r), e.rp));
+/** Every choice of a level, with the expression it makes: mcq → its options; pick → each angle-or-fraction × radius pair.
+ *  sel: { opt } or { a, r } (indices); right: the substitution of the diagram's own values (θ/360 and R). */
+export function choices(L) {
+  const ask = L.ask; if (!ask) return [];
+  const exact = Q(L.theta, 360), R = qOf(L.radius), same = (p, q) => p.n === q.n && p.d === q.d;
+  if (ask.kind === 'mcq') return ask.options.map((e, i) => ({ sel: { opt: i }, expr: e, right: e.fp === 1 && e.rp === 2 && same(Q(e.n, e.d), exact) && same(qOf(e.r), R) }));
+  const out = [];
+  ask.a.forEach((a, i) => ask.r.forEach((r, j) => {
+    const expr = ask.form === 'theta' ? { n: a, d: 360, fp: 1, r, rp: 2 } : { n: a[0], d: a[1], fp: 1, r, rp: 2 };
+    out.push({ sel: { a: i, r: j }, expr, right: same(Q(expr.n, expr.d), exact) && same(qOf(r), R) });
+  }));
+  return out;
+}
+/** which option of each drop-down (or the mcq option) is the diagram's own value */
+export function pickTruth(L) {
+  const right = choices(L).find((c) => c.right); return right ? right.sel : {};
+}
+/** Evaluate a chosen expression like a typed answer (status, the fired wedge), in terms of π. */
+export function evaluatePick(e, r, theta) {
+  const k = exprCoef(e), coef = sectorCoef(r, theta), value = k.n / k.d, ratio = value / coef;
+  const status = Math.abs(ratio - 1) < 1e-9 ? 'correct' : ratio < 1 ? 'under' : 'over', firedTheta = Math.min(360, theta * ratio);
+  return { status, coef, entered: value * PI.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis: null, k };
+}
+/** The working, line by line, for the animation (ui.formula.solveExpr): as chosen → (a decimal radius as a fraction) →
+ *  the fraction reduced and the power worked out → A = kπ. */
+export function solveSteps(e) {
+  const r = qOf(e.r), f = Q(e.n, e.d), steps = [{ f: { n: e.n, d: e.d, pow: e.fp }, r: { text: formatNumber(e.r), pow: e.rp } }];
+  if (r.d !== 1) steps.push({ f: { n: e.n, d: e.d, pow: e.fp }, r: { q: r, pow: e.rp } });
+  steps.push({ f: { q: qPow(f, e.fp) }, r: { q: qPow(r, e.rp) } });
+  steps.push({ k: exprCoef(e) });
+  return steps;
+}
+/** One line after a wrong choice: what was misread, in the diagram's own terms. */
+export function pickTip(L, sel) {
+  const ask = L.ask, truth = pickTruth(L), R = formatNumber(L.radius);
+  if (ask.kind === 'mcq') {
+    const e = ask.options[sel.opt];
+    if (e.d !== 360) return `A full turn is 360°: the fraction is ${L.theta}/360, not ${e.n}/${e.d}.`;
+    if (e.fp === 2 || e.rp !== 2) return `Only the radius is squared: (${L.theta}/360) × π × (${R})².`;
+    return '';
+  }
+  const aWrong = sel.a !== truth.a, rWrong = sel.r !== truth.r, rv = ask.r[sel.r];
+  if (rWrong) {
+    if (rv === L.radius * 2) return L.show && L.show.radius === 'diameter' ? `${formatNumber(rv)} m is the diameter: the radius is half of it, ${R} m.` : `${formatNumber(rv)} m is twice the radius: the radius is ${R} m.`;
+    if (ask.form === 'theta' && rv === L.theta) return `${formatNumber(rv)} is the angle, not the radius: the radius is ${R} m.`;
+    return `The radius is ${R} m${L.show && L.show.radius === 'diameter' ? ': half the diameter' : ''}.`;
+  }
+  if (aWrong) {
+    if (ask.form === 'theta') return `The angle at O is ${L.theta}°.`;
+    const [n, d] = reduceFraction(L.theta, 360), mark = L.show && L.show.angle === 'right' ? 'The square mark at O means 90°' : `The angle is ${L.theta}°`;
+    return `${mark}: ${L.theta}/360 = ${n}/${d}.`;
+  }
+  return '';
 }
 
 export function diagnose(entered, r, theta, exact = sectorArea(r, theta)) {
@@ -311,6 +408,32 @@ export function diagnose(entered, r, theta, exact = sectorArea(r, theta)) {
   return under ? { code: 'under', title: `About ${pct}% too small.`, tip: `Re-check each step: θ/360, then r², then × ${piTxt}.`, under: true }
                : { code: 'over', title: `About ${pct}% too large.`, tip: `Re-check each step: θ/360, then r², then × ${piTxt}.`, under: false };
 }
+/** The same diagnosis for rings answered in terms of π: `entered` is the number in front of π, so every check is in
+ *  units of π (the whole circle is r², the circumference 2r …). One mistake only exists here: multiplying by 22/7 (or
+ *  3.14) although the π is already printed beside the answer. */
+export function diagnosePi(entered, r, theta, coef = sectorCoef(r, theta)) {
+  const near = (v, target, rel = 0.02) => Math.abs(v - target) <= Math.max(0.51, Math.abs(target) * rel);
+  const under = entered < coef;
+  const checks = [
+    [coef * PI.value, 'pi-included', 'π was multiplied in.', 'The π is already beside the answer — enter only the number in front of it.'],
+    [coef * 3.14, 'pi-included', 'π was multiplied in.', 'The π is already beside the answer — enter only the number in front of it.'],
+    [r * r, 'full-circle', 'That is the WHOLE circle (r²π).', 'The open arc is only part of it — multiply r² by θ/360.'],
+    [(theta / 360) * 2 * r, 'arc-length', 'That is the ARC LENGTH, not the area.', 'Area needs r², not 2r.'],
+    [(theta / 360) * r, 'not-squared', 'The radius was not squared.', `r² means r × r. Use ${r} × ${r} = ${r * r}.`],
+    [2 * r, 'circumference', 'That is the circumference (2rπ).', 'Area uses r², not 2r.'],
+    [(theta / 360) * 4 * r * r, 'used-diameter', 'Looks like the diameter was used instead of the radius.', `r is the distance from O to the wall: ${r} m.`],
+    [theta, 'angle', 'You entered the angle itself.', 'Compute (θ/360) × r².'],
+    [r, 'radius', 'That is just the radius.', 'Use (θ/360) × r².'],
+    [coef * 10, 'decimal', 'Ten times too large.', 'Check your place value.'],
+    [coef / 10, 'decimal', 'Ten times too small.', 'Check your place value.'],
+    [(360 / theta) * r * r, 'fraction-flipped', 'The fraction is upside down.', 'Use θ/360, not 360/θ.'],
+    [coef * 2, 'double', 'Exactly double the required area.', 'Is there an extra × 2?'],
+    [coef / 2, 'half', 'Exactly half the required area.', 'Check the fraction θ/360.'],
+  ];
+  for (const [target, code, title, tip] of checks) if (near(entered, target) && !near(target, coef, 0.005)) return { code, title, tip, under };
+  const pct = Math.round(Math.abs(entered / coef - 1) * 100);
+  return { code: under ? 'under' : 'over', title: `About ${pct}% too ${under ? 'small' : 'large'}.`, tip: 'Re-check each step: θ/360, then r².', under };
+}
 
 /* ---------------------------------------------------------------------- */
 /* Scaffolding                                                             */
@@ -322,7 +445,10 @@ export function diagnose(entered, r, theta, exact = sectorArea(r, theta)) {
 export function formulaParts(r, theta) {
   const [n, d] = reduceFraction(theta, 360), k = r / 7, P = 22 * k * r;
   const [an, ad] = reduceFraction(Math.round(n * P * 2), d * 2);
-  return { theta, r, n, d, k, P, an, ad, rText: formatNumber(r), kText: formatNumber(k), PText: formatNumber(P), answerFraction: ad === 1 ? `${an}` : `${an}/${ad}` };
+  // in terms of π (rings 1–3, whole r): A = n/d × π × r × r → n/d × π × r² → n/d × r²π = cn/cd π
+  const r2 = r * r, [cn, cd] = Number.isInteger(r2) ? reduceFraction(n * r2, d) : [n * r2, d];
+  return { theta, r, n, d, k, P, an, ad, rText: formatNumber(r), kText: formatNumber(k), PText: formatNumber(P), answerFraction: ad === 1 ? `${an}` : `${an}/${ad}`,
+    r2Text: formatNumber(r2), cn, cd };
 }
 /** One line near the beam after a WRONG shot: just the numbers (the banner already says too small / too wide). */
 export function beamLine(res, theta) {
@@ -348,6 +474,7 @@ export function tipLine(diag, r, theta) {
     double: `Exactly double — is there an extra × 2?`,
     half: `Exactly half — check θ/360 = ${f}.`,
     'pi-as-3': `π was taken as 3 — use 22/7.`,
+    'pi-included': `π is already beside your answer — enter only the number in front of it.`,
   };
   return lines[diag.code] || '';   // no generic advice: the solution line on the floor already shows the next step
 }

@@ -17,6 +17,11 @@ How the frames are placed:
   * --cell-height grows every cell when the new poses need more headroom (raised arms): the existing frames move down so
     their feet stay on the ground line; the printed manifest values (baseline, worldHeight factor) keep in-game sizes;
   * --repeat 6=5 uses frame 5 again as frame 6 (e.g. when the art of frame 6 is cut off by the image edge).
+  * runs and jumps (a front or back run, a hop): --keep-y keeps the strip's own vertical layout (the frames share ONE ground
+    line, the median of their lowest points, so an airborne frame stays up and the bob stays as drawn), and --center body
+    centres each frame on its head and shoulders instead of its feet (the feet alternate sides in a front run; centring on
+    the planted foot would swing the body sideways frame to frame):
+      python3 tools/add_sheet_row.py assets/sprites/hero_front.webp "Run.png" --grid 8x5 --frames 8 --ref-height 210 --baseline 0.904 --keep-y --center body
 Resizing uses premultiplied alpha (no dark fringes). Prints the manifest changes to make.
 """
 import argparse, json, os
@@ -75,7 +80,8 @@ def gif_figures(path, key):
 
 
 def cut_figures(strip, n):
-    """[(crop RGBA image, feet centre x, feet bottom y)] in strip order (relative to each crop)."""
+    """[(crop RGBA image, feet centre x, feet bottom y, crop top y in the strip, head-and-shoulders centre x)] in strip
+    order (x and the feet relative to each crop)."""
     rgba = np.asarray(strip)
     alpha = rgba[..., 3]
     lab, k = ndimage.label(alpha > 8)
@@ -97,7 +103,8 @@ def cut_figures(strip, n):
         rows = np.nonzero(solid.any(1))[0]; bottom = rows.max() + 1                     # the feet: lowest solid rows
         band = solid[max(0, bottom - max(4, int(0.04 * (y1 - y0)))):bottom]
         fx = np.nonzero(band)[1].mean()
-        out.append((Image.fromarray(crop), fx, bottom))
+        bx = np.nonzero(solid[:max(1, int(0.45 * (y1 - y0)))])[1].mean()           # the head and shoulders
+        out.append((Image.fromarray(crop), fx, bottom, y0, bx))
     return out
 
 
@@ -111,6 +118,8 @@ def main():
     ap.add_argument('--cell-height', type=int, help='grow every cell to this height (px)')
     ap.add_argument('--repeat', action='append', default=[], help='DST=SRC (1-based): reuse frame SRC as frame DST')
     ap.add_argument('--key', choices=['none', 'solid'], default='none', help='remove a flat background colour (GIFs without alpha are keyed automatically)')
+    ap.add_argument('--keep-y', action='store_true', help="keep the strip's vertical layout: one shared ground line, so hops and bobs stay as drawn")
+    ap.add_argument('--center', choices=['feet', 'body'], default='feet', help='centre each frame on its feet (default) or its head and shoulders (runs toward / away from the viewer)')
     ap.add_argument('--quality', type=int, default=85, help='WebP quality of the written sheet')
     ap.add_argument('--out', help='output sheet (default: overwrite SHEET)')
     a = ap.parse_args()
@@ -133,15 +142,17 @@ def main():
         d, s_ = (int(v) - 1 for v in r.split('=')); figs[d] = figs[s_]
     if a.scale: s = a.scale
     elif a.ref_height:
-        crop, fx, bottom = figs[a.ref_frame - 1]; top = np.nonzero(np.asarray(crop)[..., 3].any(1))[0].min()
+        crop, fx, bottom, *_ = figs[a.ref_frame - 1]; top = np.nonzero(np.asarray(crop)[..., 3].any(1))[0].min()
         s = a.ref_height / (bottom - top)
     else: raise SystemExit('give --scale or --ref-height')
     out = Image.new('RGBA', (W, (rows + 1) * H2), (0, 0, 0, 0))
     for r in range(rows): out.alpha_composite(sheet.crop((0, r * ch, W, (r + 1) * ch)), (0, r * H2 + pad))
-    for f, (crop, fx, bottom) in enumerate(figs):
+    ground = float(np.median([y0 + bottom for _, _, bottom, y0, _ in figs]))   # (--keep-y) the strip's own ground line
+    for f, (crop, fx, bottom, y0, bx) in enumerate(figs):
         w, h = max(1, round(crop.width * s)), max(1, round(crop.height * s))
         tile = resize_premultiplied(crop, (w, h))
-        x = round((f % cols) * cw + cw / 2 - fx * s); y = round(rows * H2 + feet_y - bottom * s)
+        x = round((f % cols) * cw + cw / 2 - (bx if a.center == 'body' else fx) * s)
+        y = round(rows * H2 + feet_y - ((ground - y0) if a.keep_y else bottom) * s)
         cx0, cy0 = (f % cols) * cw, rows * H2
         over = [cx0 - x, cy0 - y, x + w - (cx0 + cw), y + h - (cy0 + H2)]
         if max(over) > 0:

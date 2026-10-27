@@ -17,7 +17,9 @@ export class CameraRig {
     this.mode = 'static';
     this._tmp = new THREE.Vector3();
   }
+  /** A cut: jump to the pose (any camera move in progress stops). */
   setPose(p) {
+    if (this._tween) { this._tween.cancel(); this._tween = null; }
     if (p.pos) this.pos.copy(p.pos); if (p.target) this.target.copy(p.target); if (p.fov) this.fov = p.fov;
     this.mode = 'static'; this.followFn = null; this._apply();
   }

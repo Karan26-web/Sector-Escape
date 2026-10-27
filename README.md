@@ -1,8 +1,8 @@
 # Sector Escape
 
-A 2.5D maths adventure that teaches the **area of a sector** — `A = (θ/360) × π × r²`, with π = 22/7.
+A 2.5D maths adventure that teaches the **area of a sector**, `A = (θ/360) × π × r²`, every area in terms of π: arenas 1–4 by choosing the right values (the game works the formula out, then fires it), arenas 5–7 by typing the number in front of π.
 
-On a magical evening, Karan crosses a stone causeway into a chain of seven overlapping stone rings on the way to a lost temple. Each ring has a gap in its wall, which is the arc of a sector. When Karan arrives, guardians charge in from beyond the gap and pound on a thin barrier across it. He watches from a fixed spot behind the centre while the camera goes top-down: a point O lights up, a radius grows from it and sweeps along the arc into the sector. The learner types the sector's area, and the answer sets the width of the charge. Exact: the barrier and every guardian are destroyed. Too small: the barrier breaks, but the guardians the charge missed get in and attack. Too big: everything is destroyed, but the excess reflects back and knocks Karan down. A wrong answer costs a shield and works the formula through, one step per miss, right above the keypad.
+On a magical evening, Karan is stranded on an islet in a jungle lake. A beam of light rises from a lost temple far away, and the only way there is a stone causeway into a chain of seven overlapping stone rings. Every game starts from the very start: Play always plays that opening (Skip › jumps it; there is no Continue), then the player walks Karan with an on-screen stick or W A S D. Each ring has a gap in its wall, which is the arc of a sector. When Karan arrives, guardians charge in from beyond the gap and pound on a thin barrier across it. The player walks him to a glowing spot behind the centre, and the camera goes top-down: a point O lights up, a radius grows from it and sweeps along the arc into the sector. The learner types the sector's area, and the answer sets the width of a volley of rays that O fires all at once. Exact: the barrier and every guardian are destroyed. Too small: the barrier breaks, and the guardians the rays missed storm in at once with more behind them, surround Karan and pile on. Too big: everything is destroyed, but the excess rays strike the wall beside the gap and those same rays bounce back and knock Karan down. A wrong answer costs a shield and works the formula through, one step per miss, right above the keypad.
 
 Vanilla ES modules, HTML/CSS UI, procedural Web Audio and the open-source Three.js renderer (one vendored file). No game engine, no framework, no build step.
 
@@ -13,31 +13,35 @@ python3 -m http.server 8321      # in the project folder, then open http://local
 ```
 
 ## Controls
-Karan walks by himself (LXD: he has a designated observation point); the learner's only job in an arena is the area.
+The player walks Karan between the action beats: along the causeway to ring 1's gate, to the glowing observation spot in each ring, out through each cleared gap, across the temple court. Each walk keeps him on its own floor, and its goal lights up as he nears it or whenever he stops. During the action (the top view, the shot and its outcome) he stays on his spot, and the learner's only job is the area.
 
 | Action | Input |
 |---|---|
-| Answer | the keypad (digits, `.`, `/`) or the keyboard; decimals (checked to 3 places) or fractions such as `77/2` |
+| Walk | W A S D or the arrow keys; or drag the stick in the bottom-left corner (touch or mouse; a press anywhere in that corner brings the stick under the thumb) |
+| Opening | a tap, Space or Enter shows a line whole / moves on; Skip › jumps to the walk |
+| Answer | arenas 1–4: choose (arena 1 taps one of three formulas; 2–4 set two drop-downs in the formula, then FIRE), and the game works it out before firing; arenas 5–7: the keypad or the keyboard, the whole number in front of the fixed π (`80` = 80π) |
 | Fire | ✓ on the keypad, or Enter |
 | Sound / pause | M / Esc (no on-screen buttons; the map's settings menu also switches the sound) |
 
 ## Dev and QA
-- URL parameters: `?level=5` start at arena 5 · `?skip=1` skip the causeway · `?mute=1` · `?reset=1` wipe saved progress.
-- Console: `__se.phase` (inside → arrive → observe → tactical → scan → input → firing → result → cleared → exit), `__se.fire('38.5')`, `__se.scene`, `__se.CHAIN`.
+- URL parameters: `?level=5` start at arena 5 · `?skip=1` skip the causeway · `?mute=1` · `?reset=1` wipe saved progress (the opening plays again) · `?auto=1` Karan walks each walk by himself (the playtests use it).
+- Console: `__se.phase` (opening.stranded → opening.temple → opening.path → causeway → gate → inside → arrive → observe → tactical → scan → input → solve (arenas 1–4: the working) → firing → result → cleared → exit), `__se.answer('correct' | 'under' | 'over')` (any arena, chosen or typed), `__se.walk(true)` (the autopilot), `__se.controller.read()`, `__se.scene`, `__se.CHAIN`.
 - **Temporary DEV skip button** (localhost only, or `?dev=1`): remove `src/dev/skip-level.js` and the DEV `<script>` block at the end of `index.html` before pushing.
 
 ## Project layout
 ```
 index.html, styles/main.css     the page and the UI theme
-src/main.js                     boot and flow: title → how to play / story → map → arenas → temple
+src/main.js                     boot and flow: title → Play (always the opening, then arena 1) → arenas → temple; the map after a run
 src/game/levels.js              the 7 arenas (LXD table), chain geometry, answer checking, misconception tips, formula steps, scoring
-src/game/chain.js               the world: evening sky and panorama, the temple, causeway, rings, gates, columns, jungle
-src/game/arenaScene.js          one ring from entry to exit
+src/game/chain.js               the world: evening sky and panorama, the temple and its beam, the islet, causeway, rings, gates, columns, jungle
+src/game/arenaScene.js          one ring from entry to exit (its walks, the action, the results)
+src/game/opening.js             the opening: stranded on the islet → the temple's beam → the chain of arenas
+src/game/roam.js, markers.js    the player's walks (walkable floor as distance fields, the walk camera) and the goals they light up
 src/game/sector.js              the O / r / θ construction, the charge at O, the beam and the after-shot comparison
 src/game/barrier.js             the transparent barrier across the gap: ripples where the guardians pound; the break (crack → fall → vanish)
 src/game/bots.js, hero.js, boss.js, save.js
 src/ui/ui.js, mapArt.js         screens, HUD, answer dock and formula, results card, how to play, the painted map
-src/engine/                     renderer, camera rig, sprites, assets, tweens, labels, effects, audio
+src/engine/                     renderer, camera rig, the controller (stick + keys), sprites, assets, tweens, labels, effects, audio
 src/placeholders/               procedural stand-ins drawn if an asset fails to load
 assets/                         WebP art; assets/manifest.json lists every asset (sprite-sheet grids and ground baselines)
 vendor/three.module.js          Three.js

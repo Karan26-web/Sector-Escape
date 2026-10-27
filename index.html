@@ -29,6 +29,16 @@
   </div>
   <div id="stamp"></div>
   <div id="damage"></div>
+  <!-- The opening (user 2026-10-27): letterbox bars, the narrator's lines, Karan's lines (a tap hurries a line on) -->
+  <div id="cine" class="cine" aria-live="polite">
+    <div class="cine-bar top"></div><div class="cine-bar bottom"></div>
+    <p id="cine-narration" class="cine-narration"></p>
+    <div id="cine-dialog" class="cine-dialog"><img id="cine-portrait" alt=""><div class="cd-body"><div class="cd-name">Karan</div><p id="cine-line"></p></div><i class="cd-more" aria-hidden="true">▾</i></div>
+  </div>
+  <!-- The controller (user 2026-10-27): the stick in its corner (a touch anywhere in the corner brings it under the thumb);
+       W A S D / the arrow keys on a keyboard. The walkthrough sits beside it the first time. -->
+  <div id="joystick" class="joystick" aria-hidden="true"><div class="js-base"><i class="js-ar n"></i><i class="js-ar e"></i><i class="js-ar s"></i><i class="js-ar w"></i><div class="js-knob"></div></div></div>
+  <div id="move-hint" class="move-hint" role="status"></div>
   <div id="skip" class="pill small">Skip ›</div>
 
   <!-- Answer dock, right-centre: the formula (it substitutes, crosses out and simplifies on a wrong shot), the
@@ -36,7 +46,8 @@
   <section id="answer-dock" class="dock" aria-label="Sector area answer">
     <div id="formula" class="dock-formula" aria-live="polite"></div>
     <div id="tip" class="dock-tip" role="status" aria-live="polite"></div>
-    <label class="np-display"><span class="sr-only">Area in square metres</span><input id="answer" type="text" inputmode="decimal" autocomplete="off" placeholder="Area"><span class="unit">m²</span></label>
+    <div id="pick" class="pick"></div>   <!-- arenas 1–4 (LXD 2026-10-27): the answer is chosen (three formulas, or two drop-downs) -->
+    <label class="np-display"><span id="answer-sr" class="sr-only">Area in square metres</span><input id="answer" type="text" inputmode="decimal" autocomplete="off" placeholder="Area"><span class="pi-fixed" aria-hidden="true">π</span><span class="unit">m²</span></label>
     <div id="keypad" class="keypad"></div>
   </section>
 
@@ -56,18 +67,9 @@
     <div class="title-wrap">
       <img id="title-logo" class="logo" alt="Sector Escape">
       <div class="title-btns">
-        <button id="btn-continue" class="btn tablet">Continue</button>
-        <button id="btn-play" class="btn tablet">Play</button>
+        <button id="btn-play" class="btn tablet primary">Play</button>
         <button id="btn-howto" class="btn tablet small"><span class="q" aria-hidden="true">?</span>How to play</button>
       </div>
-    </div>
-  </section>
-
-  <section id="screen-story" class="screen">
-    <div class="parchment">
-      <p id="story-text"></p>
-      <img id="story-art" class="polaroid" alt="">
-      <button id="btn-start-journey" class="btn primary">Start Journey</button>
     </div>
   </section>
 
@@ -122,19 +124,20 @@
           <div class="hw-pic" id="hw-pic-0"></div>
           <h3>Watch the gap</h3>
           <p>Guardians pound on the barrier across the gap. A point at the centre draws the radius and sweeps out the sector.</p>
-          <p class="hw-small">Karan watches from his spot behind the centre.</p>
+          <p class="hw-small">Walk Karan to the glowing spot behind the centre (the stick, or W A S D).</p>
         </article>
         <article class="hw-card">
           <div class="hw-pic" id="hw-pic-1"></div>
           <h3>Find the sector area</h3>
-          <p class="hw-formula">A = <span class="frac"><span>θ</span><span>360</span></span> × π × r²,&nbsp; using π = <span class="frac"><span>22</span><span>7</span></span></p>
+          <p class="hw-formula">A = <span class="frac"><span>θ</span><span>360</span></span> × π × r²</p>
+          <p class="hw-small">Every area is in terms of π: keep π in the answer.</p>
           <p class="hw-small">The guardians freeze while you think, so take your time. Each miss shows you the next step of the working.</p>
         </article>
         <article class="hw-card">
           <div class="hw-pic hw-three" id="hw-pic-2"></div>
           <h3>Fire!</h3>
           <p>You have <span id="hw-shields" class="hw-shields"></span> 3 shields. Each wrong shot costs one.</p>
-          <p class="hw-small">You can answer like 38.5 or 77/2.</p>
+          <p class="hw-small">Arenas 1–4: choose the right values. Arenas 5–7: type the number in front of π, like 12 for 12π.</p>
         </article>
       </div></div>
       <div class="hw-nav">

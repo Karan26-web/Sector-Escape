@@ -5,7 +5,7 @@ import * as F from './fx.js';
 import * as U from './ui.js';
 
 export const PLACEHOLDERS = {
-  hero_front: () => heroSheet(false),
+  hero_front: (def) => heroSheet(false, 8, (def.sheet && def.sheet.rows) || 5),   // follow the manifest grid (the front-run row)
   hero_back: (def) => heroSheet(true, 8, (def.sheet && def.sheet.rows) || 2),   // follow the manifest grid (the cast row)
   enemy_bot: (def) => botSheet(8, (def.sheet && def.sheet.rows) || 4, 256, 296, def.baseline),   // follow the manifest grid (pound row, 296 px cells)
   boss_warden: () => bossSheet(),

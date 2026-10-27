@@ -276,6 +276,69 @@ SFX['reflect.hit'] = (A) => {
   const g = A.gain(0.0001); const d = A.dist(g); const o = A.osc('square', 110, d); const am = A.osc('square', 30); const amg = A.gain(0.5, g.gain); am.connect(amg);
   A.env(g.gain, t, { a: 0.005, d: 0.2, s: 0.5, r: 0.25, peak: 0.18 }); o.start(t); am.start(t); o.stop(t + 0.5); am.stop(t + 0.5);
 };
+// The shot as a volley (user 2026-10-27): every ray leaves O at once; an overcharge's rays ring off the wall as they bounce.
+SFX['ray.volley'] = (A) => {   // many rays at once: a spread chord of zaps over a whoomp
+  const t = A.now;
+  for (let i = 0; i < 6; i++) A.tone({ t0: t + i * 0.012, type: i % 2 ? 'sawtooth' : 'square', f0: rnd(1400, 2600), f1: rnd(160, 320), dur: 0.26, vol: 0.035, dest: A.panner(rnd(-0.7, 0.7), A.sfxBus), env: { a: 0.002, d: 0.1, s: 0.3, r: 0.14 } });
+  A.burst({ t0: t, dur: 0.3, vol: 0.3, type: 'bandpass', f0: 6000, f1: 900, Q: 0.9, env: { a: 0.002, d: 0.12, s: 0.3, r: 0.15 } });
+  A.tone({ t0: t, f0: 120, f1: 45, dur: 0.35, vol: 0.4, env: { a: 0.003, d: 0.14, s: 0.3, r: 0.2 } });
+};
+SFX['ray.ricochet'] = (A) => {   // the overcharge strikes the wall and bounces: a hard metallic ping and a spit of sparks
+  const t = A.now;
+  for (const [f, v] of [[1870, 0.09], [2960, 0.06], [4410, 0.035]]) A.tone({ t0: t, type: 'sine', f0: f, f1: f * 0.94, dur: 0.45, vol: v, env: { a: 0.001, d: 0.12, s: 0.25, r: 0.3 } });
+  A.burst({ t0: t, dur: 0.12, vol: 0.4, type: 'highpass', f0: 3200, env: { a: 0.001, d: 0.04, s: 0.25, r: 0.07 } });
+  A.tone({ t0: t, f0: 260, f1: 90, dur: 0.18, vol: 0.22, env: { a: 0.002, d: 0.07, s: 0.3, r: 0.1 } });
+};
+// Too small (user 2026-10-27): the horde pours in through the gap and piles onto Karan.
+SFX['swarm.surge'] = (A) => {   // a rising rumble and a clatter of metal feet
+  const t = A.now, D = 1.3;
+  A.burst({ t0: t, dur: D, vol: 0.22, type: 'lowpass', f0: 180, f1: 900, Q: 1, env: { a: 0.15, d: 0.5, s: 0.7, r: 0.4 } });
+  for (let i = 0; i < 16; i++) {
+    const tt = Math.pow(i / 16, 0.8) * D;
+    A.burst({ t0: t + tt, dur: 0.05, vol: rnd(0.08, 0.16), type: 'highpass', f0: rnd(2200, 3800), pan: rnd(-0.7, 0.7), env: { a: 0.002, d: 0.03, s: 0.2, r: 0.02 } });
+    A.tone({ t0: t + tt, f0: rnd(65, 85), f1: 40, dur: 0.1, vol: 0.12, env: { a: 0.002, d: 0.05, s: 0.2, r: 0.05 } });
+  }
+  A.tone({ t0: t + 0.05, type: 'sawtooth', f0: 90, f1: 140, dur: 0.9, vol: 0.06, env: { a: 0.2, d: 0.3, s: 0.6, r: 0.3 } });
+};
+SFX['swarm.blow'] = (A, o) => {   // a blow landing in the pile-on: a short heavy thud with a metallic knock
+  const t = A.now, pan = o.pan ?? 0;
+  A.tone({ t0: t, f0: rnd(85, 110), f1: 40, dur: 0.16, vol: 0.32, env: { a: 0.002, d: 0.06, s: 0.3, r: 0.09 } });
+  A.burst({ t0: t, dur: 0.07, vol: 0.2, type: 'bandpass', f0: rnd(900, 1500), Q: 1.5, pan, env: { a: 0.002, d: 0.03, s: 0.2, r: 0.03 } });
+  A.tone({ t0: t, type: 'square', f0: rnd(330, 420), f1: 160, dur: 0.07, vol: 0.05, dest: A.panner(pan, A.sfxBus), env: { a: 0.002, d: 0.03, s: 0.2, r: 0.04 } });
+};
+// The opening and the controller (user 2026-10-27).
+SFX['voice.karan'] = (A) => {   // a soft syllable blip while Karan's line types out (a voice without words)
+  const t = A.now, f = rnd(430, 560);
+  A.tone({ t0: t, type: 'triangle', f0: f, f1: f * rnd(0.88, 1.14), dur: 0.06, vol: 0.05, env: { a: 0.004, d: 0.03, s: 0.3, r: 0.03 } });
+};
+SFX['cine.narration'] = (A) => {   // a narrator's line appears: a low, breathy swell
+  const t = A.now;
+  A.burst({ t0: t, dur: 1.2, vol: 0.06, type: 'bandpass', f0: 280, f1: 1100, Q: 0.8, env: { a: 0.35, d: 0.45, s: 0.4, r: 0.4 } });
+  A.tone({ t0: t, f0: 110, dur: 1.5, vol: 0.05, env: { a: 0.4, d: 0.5, s: 0.5, r: 0.55 } });
+};
+SFX['temple.beam'] = (A) => {   // the temple's beam rises: a swelling shimmer under a bright, open chord
+  const t = A.now;
+  A.burst({ t0: t, dur: 2.6, vol: 0.12, type: 'bandpass', f0: 500, f1: 5600, Q: 1.2, env: { a: 0.7, d: 0.9, s: 0.5, r: 0.9 } });
+  A.seq([[62, 0, 2.8, 1], [69, 0.16, 2.6, 0.9], [74, 0.32, 2.4, 0.8], [78, 0.48, 2.2, 0.7], [81, 0.64, 2.0, 0.6]], { type: 'sine', vol: 0.05, env: { a: 0.45 } });
+  A.tone({ t0: t, f0: 55, f1: 82, dur: 2.4, vol: 0.12, env: { a: 0.5, d: 0.8, s: 0.5, r: 0.9 } });
+};
+SFX['controller.reveal'] = (A) => {   // the stick appears: a stone thunk and a short rising shimmer
+  const t = A.now;
+  A.tone({ t0: t, f0: 160, f1: 70, dur: 0.18, vol: 0.28, env: { a: 0.002, d: 0.07, s: 0.3, r: 0.1 } });
+  A.burst({ t0: t, dur: 0.35, vol: 0.1, type: 'bandpass', f0: 800, f1: 3800, Q: 1.4 });
+  A.seq([[79, 0.05, 0.2, 1], [86, 0.13, 0.35, 0.8]], { type: 'sine', vol: 0.07 });
+};
+SFX['tutorial.done'] = (A) => A.seq([[76, 0, 0.12, 1], [83, 0.08, 0.14, 1], [88, 0.16, 0.42, 0.9]], { type: 'triangle', vol: 0.08 });
+SFX['objective.ping'] = (A) => {   // the goal lights up while the player stands still: a soft, bell-like call
+  const t = A.now;
+  A.tone({ t0: t, type: 'sine', f0: 1046.5, dur: 0.9, vol: 0.06, env: { a: 0.005, d: 0.25, s: 0.3, r: 0.6 } });
+  A.tone({ t0: t + 0.09, type: 'sine', f0: 1568, dur: 0.8, vol: 0.035, env: { a: 0.005, d: 0.25, s: 0.3, r: 0.5 } });
+};
+SFX['roam.bump'] = (A) => {   // pushing into an open edge he may not cross: a low hum of the ring's energy
+  const t = A.now;
+  A.tone({ t0: t, type: 'sine', f0: 240, f1: 180, dur: 0.28, vol: 0.07, env: { a: 0.01, d: 0.1, s: 0.3, r: 0.14 } });
+  A.burst({ t0: t, dur: 0.22, vol: 0.05, type: 'bandpass', f0: 2600, Q: 3 });
+};
 SFX['player.hurt'] = (A) => { const t = A.now; A.tone({ t0: t, f0: 70, f1: 30, dur: 0.35, vol: 0.5, env: { a: 0.002, d: 0.12, s: 0.3, r: 0.22 } }); A.burst({ t0: t, dur: 0.25, vol: 0.3, f0: 1200, f1: 150 }); A.tone({ t0: t + 0.02, type: 'sawtooth', f0: 320, f1: 80, dur: 0.32, vol: 0.1 }); };
 SFX['shield.break'] = (A) => {
   const t = A.now;

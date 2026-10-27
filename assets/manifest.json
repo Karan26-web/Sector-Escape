@@ -1,13 +1,13 @@
 {
   "_readme": "Every image listed here is optional. If the file is missing the game draws a procedural placeholder. Sheets: cols × rows grid; anims map a name to a row, a frame count and fps. worldHeight = metres the full frame height spans in the 3D arena. Gate frames: \"opening\" = transparent arch width as a fraction of the image width, \"top\" = arch top as a fraction of the height. \"baseline\" = fraction of the cell height where the feet / trunk base sit (measured); the game anchors sprites there so nothing floats. bytes: the file's size on disk (tools/manifest_sizes.py writes it; the loading bar weighs each download by it). version: added to every asset URL (?v=...) so browsers fetch fresh files; bump it whenever art is replaced under the same file name.",
-  "version": "2026-10-23.6",
+  "version": "2026-10-27.2",
   "images": {
     "hero_front": {
       "path": "sprites/hero_front.webp",
       "worldHeight": 1.75,
       "sheet": {
         "cols": 8,
-        "rows": 5,
+        "rows": 6,
         "anims": {
           "idle": {
             "row": 0,
@@ -35,11 +35,16 @@
             "row": 4,
             "frames": 6,
             "fps": 8
+          },
+          "runFront": {
+            "row": 5,
+            "frames": 8,
+            "fps": 13
           }
         }
       },
       "baseline": 0.904,
-      "bytes": 384222
+      "bytes": 492292
     },
     "hero_back": {
       "path": "sprites/hero_back.webp",
@@ -483,6 +488,21 @@
         }
       },
       "bytes": 48396
+    },
+    "karan_portrait": {
+      "path": "ui/karan_portrait.webp",
+      "sheet": {
+        "cols": 3,
+        "rows": 1,
+        "anims": {
+          "idle": {
+            "row": 0,
+            "frames": 3,
+            "fps": 1
+          }
+        }
+      },
+      "bytes": 124402
     }
   },
   "sfx": {},

@@ -4,7 +4,9 @@
 import * as THREE from '../../vendor/three.module.js';
 import { assets } from '../engine/assets.js';
 import { audio } from '../engine/audio.js';
-import { CHAIN, formulaParts } from '../game/levels.js';
+import { delay } from '../engine/tween.js';
+import { CHAIN, formulaParts, choices, pickTruth, evaluatePick, solveSteps, sectorCoef, answerFor } from '../game/levels.js';
+import { formatNumber } from '../engine/util.js';
 import { MapArt } from './mapArt.js';
 import { save } from '../game/save.js';
 
@@ -40,6 +42,8 @@ function waitClick(map) {
     for (const [sel, val] of Object.entries(map)) { const el = $(sel); if (!el) continue; const h = () => { handlers.forEach(([e, f]) => e.removeEventListener('click', f)); res(val); }; el.addEventListener('click', h); handlers.push([el, h]); }
   });
 }
+/** (n/d)^fp × π × r^rp as the LXD writes it: (90/360) × π × (7)² */
+const exprHtml = (e) => { const f = `(<span class="frac"><span>${e.n}</span><span>${e.d}</span></span>)`, r = formatNumber(e.r); return `${f}${e.fp === 2 ? '<sup>2</sup>' : ''} × π × ${e.rp === 2 ? `(${r})<sup>2</sup>` : r}`; };
 const starsHtml = (n, max = 3) => [...Array(max)].map((_, i) => `<img src="${frameUrl('ui_icons', i < n ? 1 : 2)}" alt="">`).join('');
 
 export const ui = {
@@ -59,7 +63,7 @@ export const ui = {
     }, true);
   },
   applyArt() { document.documentElement.style.setProperty('--stone-tex', `url("${imgUrl('wall_top')}")`);   // the tablet buttons' stone: the already-loaded image, no second fetch
-    setImg($('#title-logo'), 'ui_logo'); $('.parchment').style.backgroundImage = `url(${imgUrl('ui_parchment')})`; $('.howto-deck').style.backgroundImage = `url(${imgUrl('ui_parchment')})`; setImg($('#story-art'), 'ui_story_art'); },
+    setImg($('#title-logo'), 'ui_logo'); $('.howto-deck').style.backgroundImage = `url(${imgUrl('ui_parchment')})`; },
 
   /* ---------------------------------------------------------- screens */
   show(id) { const el = $('#screen-' + id); if (el) el.classList.add('active'); },
@@ -76,12 +80,9 @@ export const ui = {
     logo() { setImg($('#loading-logo'), 'ui_logo'); },
   },
   title: {
-    /** resume: null for a new player (Play is the main button); { id } when there is progress (Continue · Arena N is). */
-    async show(resume) {
-      const cont = $('#btn-continue'), play = $('#btn-play');
-      cont.style.display = resume ? '' : 'none'; if (resume) cont.textContent = `Continue · Arena ${resume.id}`;
-      cont.classList.toggle('primary', !!resume); play.classList.toggle('primary', !resume);
-      ui.hideAll(); ui.show('title'); const c = await waitClick({ '#btn-play': 'play', '#btn-continue': 'continue', '#btn-howto': 'howto' }); return c;
+    /** Play and How to play. There is no Continue (user 2026-10-27): every game starts from the very start. */
+    async show() {
+      ui.hideAll(); ui.show('title'); const c = await waitClick({ '#btn-play': 'play', '#btn-howto': 'howto' }); return c;
     },
     hide() { ui.hide('title'); },
   },
@@ -165,17 +166,77 @@ export const ui = {
       clearInterval(anim); window.removeEventListener('keydown', onKey); audio.play('ui.confirm'); ui.hide('howto');
     },
   },
-  story: {
-    async show() {
-      ui.hideAll(); ui.show('story');
-      const text = 'Karan is trapped in the Lost Jungle! A maze of overlapping stone rings seals every path. Break each sector, cross each open arc and reach the lost temple!';
-      const p = $('#story-text'); p.textContent = ''; const btn = $('#btn-start-journey'); btn.style.visibility = 'hidden';
-      let done = false; const finish = () => { done = true; p.textContent = text; btn.style.visibility = 'visible'; };
-      $('#screen-story').addEventListener('click', (e) => { if (e.target !== btn && !done) finish(); }, { once: true });
-      for (let i = 0; i < text.length && !done; i++) { p.textContent = text.slice(0, i + 1); if (i % 2 === 0) audio.play('ui.type', { minGap: 0.02 }); await sleep(26); }
-      finish();
-      await once(btn, 'click'); audio.play('ui.confirm'); ui.hide('story');
+  /* ---------------------------------------------------------- the opening (user 2026-10-27): letterbox, the narrator, Karan
+     The narrator's lines fade in whole across the lower letterbox; Karan's are typed out in a dialogue box with his face.
+     A tap (or Space / Enter) shows a line whole, a second tap moves on; otherwise each is held for its reading time. Game
+     time, so a pause holds a line. */
+  cine: {
+    on: false, token: 0, hurry: null, bound: false,
+    bind() {
+      if (this.bound) return; this.bound = true;
+      $('#cine').addEventListener('pointerdown', () => { if (this.hurry) this.hurry(); });
+      window.addEventListener('keydown', (e) => { if (this.on && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); if (this.hurry) this.hurry(); } });
     },
+    start() { this.bind(); this.on = true; this.clear(); $('#cine').classList.add('on'); ui.hud.hide(); },
+    end() { this.cancel(); this.on = false; $('#cine').classList.remove('on'); },
+    cancel() { this.token++; this.hurry = null; this.clear(); },
+    clear() { $('#cine-dialog').classList.remove('show', 'done'); $('#cine-narration').classList.remove('show'); },
+    /** Karan's face: the portrait sheet once that art exists (mood = its frame: 0 worried · 1 surprised · 2 determined),
+     *  until then his idle frame cropped to head and shoulders. */
+    portrait(mood = 0) {
+      if (assets.def('karan_portrait') && !assets.isPlaceholder('karan_portrait')) return frameUrl('karan_portrait', mood);
+      if (this._face !== undefined) return this._face;
+      this._face = '';
+      try {
+        const def = assets.frames('hero_front'), img = assets.get('hero_front'), a = def.anims.idle || { row: 0, col: 0 };
+        const fw = Math.round(def.frameW), fh = Math.round(def.frameH), c = document.createElement('canvas'); c.width = fw; c.height = fh;
+        const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, (a.col ?? 0) * fw, (a.row ?? 0) * fh, fw, fh, 0, 0, fw, fh);
+        const d = g.getImageData(0, 0, fw, fh).data; let x0 = fw, x1 = -1, y0 = fh;
+        for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) if (d[(y * fw + x) * 4 + 3] > 60) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; }
+        if (x1 < 0) return this._face;
+        const sz = Math.round((x1 - x0) * 0.8), cx = (x0 + x1) / 2, o = document.createElement('canvas'); o.width = o.height = 160;
+        o.getContext('2d').drawImage(c, cx - sz / 2, y0 - sz * 0.05, sz, sz, 0, 0, 160, 160);
+        this._face = o.toDataURL('image/png');
+      } catch (e) { console.warn('[portrait]', e); }
+      return this._face;
+    },
+    /** who: 'narrator' | 'karan'. Resolves when the line has been read (or tapped on), or at once if cancelled. */
+    async say(who, text, { mood = 0 } = {}) {
+      const my = ++this.token, karan = who === 'karan', box = karan ? $('#cine-dialog') : $('#cine-narration'), el = karan ? $('#cine-line') : box;
+      this.clear();
+      if (karan) { const src = this.portrait(mood), im = $('#cine-portrait'); if (src) im.src = src; im.style.visibility = src ? '' : 'hidden'; }
+      el.textContent = karan ? '' : text; void box.offsetWidth; box.classList.add('show'); audio.play(karan ? 'ui.panel' : 'cine.narration');
+      if (karan) {
+        let full = false; this.hurry = () => { full = true; };
+        for (let i = 1; i <= text.length && !full; i++) {
+          el.textContent = text.slice(0, i);
+          if (i % 2 === 0 && /\w/.test(text[i - 1])) audio.play('voice.karan', { minGap: 0.035 });
+          await delay(0.03); if (my !== this.token) return;
+        }
+        el.textContent = text; box.classList.add('done');
+      }
+      let go = false; this.hurry = () => { go = true; };
+      const hold = Math.min(5.4, Math.max(2.4, 1.3 + text.length * 0.045));
+      for (let t = 0; t < hold && !go; t += 0.05) { await delay(0.05); if (my !== this.token) return; }
+      this.hurry = null; box.classList.remove('show', 'done');
+      await delay(0.3);
+    },
+  },
+  /** The controller's walkthrough (the first walk only): beside the stick, "Drag to move" on a touch screen, the W A S D keys
+   *  on a keyboard; it ticks off once Karan has walked a few steps. */
+  moveHint: {
+    show(touch) {
+      const el = $('#move-hint');
+      el.innerHTML = touch ? '<span class="mh-icon" aria-hidden="true"></span><b>Drag to move</b>'
+        : '<span class="mh-keys" aria-hidden="true"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><b>Move</b><small>or drag the stick</small>';
+      clearTimeout(timers.mh); el.classList.remove('done'); el.classList.add('show');
+    },
+    done() {
+      const el = $('#move-hint'); if (!el.classList.contains('show') || el.classList.contains('done')) return;
+      el.classList.add('done'); audio.play('tutorial.done');
+      clearTimeout(timers.mh); timers.mh = setTimeout(() => el.classList.remove('show', 'done'), 1200);
+    },
+    hide() { clearTimeout(timers.mh); $('#move-hint').classList.remove('show', 'done'); },
   },
 
   /* ---------------------------------------------------------- map: painted isometric miniature of the real chain */
@@ -382,6 +443,11 @@ export const ui = {
     refresh() { $('#answer-dock').classList.toggle('ready', $('#answer').value.trim().length > 0 && !this.locked); },
     open(cfg) {
       this.cfg = cfg; this.locked = false; this.typed = false;
+      // arenas 1–4 (LXD 2026-10-27): the answer is chosen, no keypad; 5–7: typed, a number of π (the π fixed beside the field)
+      const picking = !!(cfg.level && cfg.level.ask); $('#answer-dock').classList.toggle('pick-mode', picking);
+      if (picking) ui.pick.build(cfg.level, (choice) => { if (this.locked) return; audio.play('ui.confirm'); this.cfg.onFire && this.cfg.onFire(choice); });
+      const pi = !!cfg.piForm; $('#answer-dock').classList.toggle('pi-form', pi);
+      $('#answer').placeholder = pi ? '?' : 'Area'; $('#answer-sr').textContent = pi ? 'Area in square metres, as a number of π' : 'Area in square metres';
       $('#answer-dock').classList.add('open'); $('#answer-dock').classList.remove('locked'); audio.play('ui.panel');
       $('#answer').value = ''; this.setTip(''); this.refresh();
       if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 350);
@@ -392,6 +458,83 @@ export const ui = {
     unlock() { this.locked = false; this.typed = false; $('#answer-dock').classList.remove('locked'); $('#answer').value = ''; this.refresh(); if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 50); },
     setValue(v) { $('#answer').value = String(v); this.refresh(); },
     fire() { if (this.locked || !this.cfg) return; const v = $('#answer').value.trim(); if (!v) { audio.play('ui.error'); return; } audio.play('ui.confirm'); this.cfg.onFire && this.cfg.onFire(v); },
+    /** tests / DEV: answer with the wanted outcome ('correct' · 'under' · 'over'), chosen or typed */
+    answer(kind = 'correct') {
+      if (!this.cfg || this.locked) return false;
+      const L = this.cfg.level; if (L && L.ask) return ui.pick.answer(kind);
+      const k = sectorCoef(L.radius, L.theta);
+      this.setValue(kind === 'correct' ? answerFor(L) : formatNumber(Math.max(1, Math.round(k * (kind === 'under' ? 0.5 : 1.6))))); this.fire(); return true;
+    },
+  },
+
+  /* ---------------------------------------------------------- arenas 1–4 (LXD 2026-10-27): the answer is chosen
+     mcq: three substituted formulas, a tap answers. pick: the formula with two drop-downs (the angle, or the fraction
+     θ/360, and the radius) and FIRE once both are set. After a wrong shot its wrong parts are struck out (the right part of
+     a half-right answer stays set), so every try has one guess fewer. Answers { expr, sel }. */
+  pick: {
+    L: null, sel: {}, wrong: null, onChoose: null, menuSlot: null,
+    build(L, onChoose) {
+      this.L = L; this.onChoose = onChoose; this.sel = {}; this.wrong = { opt: new Set(), a: new Set(), r: new Set() };
+      const ask = L.ask, box = $('#pick'); this.closeMenu();
+      if (ask.kind === 'mcq') {
+        box.innerHTML = `<p class="pk-q">Which one gives the area of the sector?</p><div class="pk-opts">${ask.options.map((e, i) => `<button class="pk-opt silent" data-i="${i}"><span class="pk-x">${exprHtml(e)}</span></button>`).join('')}</div>`;
+        box.querySelectorAll('.pk-opt').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.i; if (!this.wrong.opt.has(i)) this.choose({ opt: i }); }));
+      } else {
+        const chip = (slot) => `<button class="pk-chip silent" data-slot="${slot}" aria-haspopup="listbox" aria-label="${slot === 'r' ? 'the radius' : ask.form === 'theta' ? 'the angle' : 'the fraction of the circle'}">?</button>`;
+        const first = ask.form === 'theta' ? `(<span class="frac"><span>${chip('a')}</span><span>360</span></span>)` : chip('a');
+        box.innerHTML = `<p class="pk-q">Complete the formula</p><div class="pk-formula">A = ${first} × π × (${chip('r')})<sup>2</sup></div><div class="pk-menu" role="listbox" hidden></div><button class="pk-fire btn primary silent" disabled>Fire ✓</button>`;
+        box.querySelectorAll('.pk-chip').forEach((c) => c.addEventListener('click', (e) => { e.stopPropagation(); if (ui.panel.locked) return; if (this.menuSlot === c.dataset.slot) this.closeMenu(); else this.openMenu(c); }));
+        box.querySelector('.pk-fire').addEventListener('click', () => { if (this.ready()) this.choose({ a: this.sel.a, r: this.sel.r }); });
+        if (!this._outside) { this._outside = true; document.addEventListener('pointerdown', (e) => { if (this.menuSlot && !e.target.closest('.pk-menu, .pk-chip')) this.closeMenu(); }); }
+        requestAnimationFrame(() => this.fit());
+      }
+    },
+    /** the formula stays on one line inside the dock: it scales down when a chosen value makes it longer (10.5 m) */
+    fit() {
+      const f = $('#pick .pk-formula'); if (!f) return;
+      f.style.fontSize = ''; let fs = parseFloat(getComputedStyle(f).fontSize);
+      while (f.scrollWidth > f.clientWidth && fs > 13) { fs -= 1; f.style.fontSize = fs + 'px'; }
+    },
+    label(slot, v) { if (slot === 'r') return `${formatNumber(v)} m`; return this.L.ask.form === 'theta' ? `${v}°` : `<span class="frac"><span>${v[0]}</span><span>${v[1]}</span></span>`; },
+    /** the drop-down: below its chip, or above it when the dock sits at the bottom of the screen (phones) */
+    openMenu(chip) {
+      const slot = chip.dataset.slot, opts = this.L.ask[slot], menu = $('#pick .pk-menu'), dock = $('#answer-dock');
+      menu.innerHTML = opts.map((v, i) => `<button class="silent${this.wrong[slot].has(i) ? ' wrong' : ''}${this.sel[slot] === i ? ' on' : ''}" role="option" data-i="${i}">${this.label(slot, v)}</button>`).join('');
+      menu.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.i; if (this.wrong[slot].has(i)) return; this.set(slot, i); this.closeMenu(); }));
+      menu.hidden = false; this.menuSlot = slot; chip.classList.add('open'); audio.play('ui.click');
+      const d = dock.getBoundingClientRect(), c = chip.getBoundingClientRect(), below = window.innerHeight - c.bottom > menu.offsetHeight + 14, half = menu.offsetWidth / 2;
+      menu.style.left = `${Math.max(half + 8, Math.min(d.width - half - 8, c.left - d.left + c.width / 2))}px`;   // under its chip, inside the dock
+      menu.style.top = `${below ? c.bottom - d.top + 8 : c.top - d.top - menu.offsetHeight - 8}px`;
+    },
+    closeMenu() { const menu = $('#pick .pk-menu'); if (menu) menu.hidden = true; document.querySelectorAll('.pk-chip.open').forEach((c) => c.classList.remove('open')); this.menuSlot = null; },
+    set(slot, i) {
+      this.sel[slot] = i; const chip = $(`#pick .pk-chip[data-slot="${slot}"]`); chip.innerHTML = this.label(slot, this.L.ask[slot][i]); chip.classList.add('set'); chip.classList.remove('again');
+      $('#pick .pk-fire').disabled = !this.ready(); this.fit(); audio.play('ui.type'); if (ui.panel.cfg && ui.panel.cfg.onType) ui.panel.cfg.onType();
+    },
+    ready() { return this.sel.a != null && this.sel.r != null; },
+    choose(sel) {
+      if (ui.panel.locked) return;
+      const c = choices(this.L).find((x) => (sel.opt != null ? x.sel.opt === sel.opt : x.sel.a === sel.a && x.sel.r === sel.r)); if (!c) return;
+      if (sel.opt != null) $(`#pick .pk-opt[data-i="${sel.opt}"]`).classList.add('chosen');
+      this.closeMenu(); this.onChoose({ expr: c.expr, sel });
+    },
+    /** after a wrong shot: strike out what was wrong; a half-right drop-down answer keeps its right part */
+    markWrong(sel) {
+      if (sel.opt != null) { this.wrong.opt.add(sel.opt); const b = $(`#pick .pk-opt[data-i="${sel.opt}"]`); b.classList.remove('chosen'); b.classList.add('wrong'); return; }
+      const truth = pickTruth(this.L);
+      for (const slot of ['a', 'r']) if (sel[slot] !== truth[slot]) {
+        this.wrong[slot].add(sel[slot]); this.sel[slot] = null;
+        const chip = $(`#pick .pk-chip[data-slot="${slot}"]`); chip.innerHTML = '?'; chip.classList.remove('set'); chip.classList.add('again');
+      }
+      $('#pick .pk-fire').disabled = !this.ready(); this.fit();
+    },
+    /** tests / DEV: a choice with the wanted outcome that is still open (the diagram's own values first, for 'correct') */
+    answer(kind) {
+      const open = choices(this.L).filter((c) => (c.sel.opt != null ? !this.wrong.opt.has(c.sel.opt) : !this.wrong.a.has(c.sel.a) && !this.wrong.r.has(c.sel.r)));
+      const c = (kind === 'correct' && open.find((x) => x.right)) || open.find((x) => evaluatePick(x.expr, this.L.radius, this.L.theta).status === kind) || open[0];
+      if (c.sel.opt == null) { this.set('a', c.sel.a); this.set('r', c.sel.r); }
+      this.choose(c.sel); return true;
+    },
   },
 
   /** Centre of the arena area (left of the dock) for stamps: set by the puzzle camera, cleared afterwards. */
@@ -400,9 +543,11 @@ export const ui = {
   /* ---------------------------------------------------------- the formula above the keypad (user, 2026-10-22)
      A = θ/360 × π × r² from the start. 1st wrong shot: the numbers are substituted (θ, π = 22/7, r), what cancels is
      crossed out with the small result written beside it (θ/360 → n/d; the 7 of 22/7 against one r → k), then it
-     simplifies to A = n/d × 22 × k × r. 2nd wrong shot: A = n/d × P = the answer as a fraction. */
+     simplifies to A = n/d × 22 × k × r. 2nd wrong shot: A = n/d × P = the answer as a fraction.
+     Arenas 1–3 (piForm, user 2026-10-27): π stays π throughout — θ/360 is crossed out to n/d, r × r becomes r², and the
+     2nd miss shows A = n/d × r²π = kπ. */
   formula: {
-    p: null, cur: [],
+    p: null, cur: [], piForm: false,
     row() { return $('#formula .row'); },
     V(text, note = null) { return `<span class="v">${text}${note == null ? '' : `<i class="note">${note}</i>`}</span>`; },
     F(num, den) { return `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`; },
@@ -410,6 +555,12 @@ export const ui = {
     tokens(stage) {
       const p = this.p, V = (t, n) => this.V(t, n), F = (a, b) => this.F(a, b), X = (k) => [k, '×'];
       const f0 = F(V('θ'), V('360')), f1 = F(V(p.theta, p.n), V('360', p.d)), pi1 = F(V('22'), V('7', '1')), r2 = `${V('r')}<sup>2</sup>`;
+      if (this.piForm) switch (stage) {
+        case 'formula': return [['A', 'A ='], ['f', f0], X('x1'), ['pi', V('π')], X('x2'), ['r', r2]];
+        case 'sub': return [['A', 'A ='], ['f', f1], X('x1'), ['pi', V('π')], X('x2'), ['r1', V(p.rText)], X('x3'), ['r2', V(p.rText)]];
+        case 'reduced': return [['A', 'A ='], ['f', F(V(p.n), V(p.d))], X('x1'), ['pi', V('π')], X('x2'), ['rr', V(p.r2Text)]];
+        case 'solved': return [['A', 'A ='], ['f', F(V(p.n), V(p.d))], X('x1'), ['P', `${V(p.r2Text)}${V('π')}`], ['eq', '='], ['ans', `${p.cd === 1 ? V(p.cn) : F(V(p.cn), V(p.cd))}${V('π')}`]];
+      }
       switch (stage) {
         case 'formula': return [['A', 'A ='], ['f', f0], X('x1'), ['pi', V('π')], X('x2'), ['r', r2]];
         case 'sub': return [['A', 'A ='], ['f', f1], X('x1'), ['pi', pi1], X('x2'), ['r1', V(p.rText, p.kText)], X('x3'), ['r2', V(p.rText)]];
@@ -430,8 +581,11 @@ export const ui = {
       row.style.fontSize = ''; let fs = parseFloat(getComputedStyle(row).fontSize);
       while (row.scrollWidth > room && fs > 12) { fs -= 1; row.style.fontSize = fs + 'px'; }
     },
-    /** the formula, and beside it the value of π every answer uses (user, 2026-10-23) */
-    show(r, theta) { this.p = formulaParts(r, theta); $('#formula').innerHTML = `<div class="row"></div><div class="given">π = ${this.F('22', '7')}</div>`; this.render(this.tokens('formula')); },
+    /** the formula, and beside it the value of π every answer uses (user, 2026-10-23); none in arenas 1–3, where π stays π */
+    show(r, theta, { piForm = false } = {}) {
+      this.p = formulaParts(r, theta); this.piForm = piForm;
+      $('#formula').innerHTML = `<div class="row"></div>${piForm ? '' : `<div class="given">π = ${this.F('22', '7')}</div>`}`; this.render(this.tokens('formula'));
+    },
     hide() { $('#formula').innerHTML = ''; this.cur = []; },
     /** tokens that change glow, dissolve, and the new ones dissolve in (staggered left to right) */
     async morph(tokens, { glow = true, stagger = 0.16 } = {}) {
@@ -449,7 +603,8 @@ export const ui = {
     /** cross out what cancels, pair by pair, writing the result small beside each crossed number */
     async cancel() {
       const row = this.row(); if (!row) return;
-      const q = (sel) => row.querySelector(sel), pairs = [[q('[data-k="f"] .num .v'), q('[data-k="f"] .den .v')], [q('[data-k="pi"] .den .v'), q('[data-k="r1"] .v')]];
+      const q = (sel) => row.querySelector(sel), pairs = [[q('[data-k="f"] .num .v'), q('[data-k="f"] .den .v')]];
+      if (!this.piForm) pairs.push([q('[data-k="pi"] .den .v'), q('[data-k="r1"] .v')]);   // (in terms of π nothing cancels against 22/7)
       for (const pair of pairs) {
         for (const v of pair) { if (!v) continue; v.classList.add('struck'); audio.play('ui.type'); await sleep(230); }
         await sleep(120); for (const v of pair) { const n = v && v.querySelector('.note'); if (n) n.classList.add('show'); }
@@ -461,6 +616,23 @@ export const ui = {
     async walkthrough() { if (!this.p) return; await this.morph(this.tokens('sub')); await sleep(250); await this.cancel(); await this.morph(this.tokens('reduced'), { glow: false }); },
     /** 2nd wrong shot: the answer as a fraction */
     async solve() { if (!this.p) return; await this.morph(this.tokens('solved')); },
+    /** Arenas 1–4 (LXD 2026-10-27): the chosen formula worked out step by step, right or wrong, before it is fired: as
+     *  chosen → a decimal radius as a fraction → the fraction reduced and the power worked out → A = kπ m² (never a
+     *  decimal). The answer stays on the line, in amber, while the shot plays. */
+    async solveExpr(e) {
+      const V = (t) => this.V(t), F = (a, b) => this.F(a, b), q = (x) => (x.d === 1 ? V(x.n) : F(V(x.n), V(x.d)));
+      const sq = (html, pow) => (pow === 2 ? `(${html})<sup>2</sup>` : html);
+      const line = (st) => {
+        if (st.k) return [['A', 'A ='], ['ans', st.k.d === 1 ? V(`${st.k.n}π`) : F(V(`${st.k.n}π`), V(st.k.d))], ['unit', 'm²']];
+        const f = st.f.q ? q(st.f.q) : `(${F(V(st.f.n), V(st.f.d))})${st.f.pow === 2 ? '<sup>2</sup>' : ''}`;   // as the LXD writes it: (90/360), (90/360)²
+        const r = st.r.text != null ? sq(V(st.r.text), st.r.pow) : st.r.pow ? sq(q(st.r.q), st.r.pow) : q(st.r.q);
+        return [['A', 'A ='], ['f', f], ['x1', '×'], ['pi', V('π')], ['x2', '×'], ['r', r]];
+      };
+      const steps = solveSteps(e), first = line(steps[0]);
+      $('#formula').innerHTML = '<div class="row"></div>'; this.cur = [];
+      this.render(first, new Set(first.map(([k]) => k)), 0.07); audio.play('scan.ping'); await sleep(1250);
+      for (const st of steps.slice(1)) { await this.morph(line(st)); await sleep(st.k ? 900 : 450); }
+    },
   },
   /** One line near the beam after a shot (LXD), in the game's language. */
   beamline: {
