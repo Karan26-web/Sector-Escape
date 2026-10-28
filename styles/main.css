@@ -22,6 +22,9 @@ button { font-family: inherit; }
 #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 #ui { position: fixed; inset: 0; pointer-events: none; }
 #ui button, #ui input, #ui .screen.active, #ui .dock.open { pointer-events: auto; }
+#ui .dock.locked button { pointer-events: none; }   /* (#ui button would otherwise keep a locked dock's keys live) */
+#ui .map-settings:not(.open) button, #ui .map-tag:not(.show) button { pointer-events: none; }   /* a closed menu or hidden tag keeps no live, invisible buttons (two stray taps on the temple reset all progress) */
+#ui button { touch-action: manipulation; }   /* no double-tap zoom on a quick repeated key (tablets) */
 .screen:not(.active) * { pointer-events: none !important; }
 
 /* ---------- buttons ---------- */
@@ -237,6 +240,15 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 /* ---------- HUD (quiet) ---------- */
 .layer { position: absolute; inset: 0; opacity: 0; transition: opacity 0.4s; }
 .layer.show { opacity: 1; }
+/* the time to answer (user 2026-10-28): a thin bar at the top centre, level with the shields, no numbers; it drains toward its middle */
+.answer-timer { position: absolute; left: 50%; top: 35px; width: min(44vw, 520px); height: 6px; transform: translateX(-50%); border-radius: 4px; background: rgba(9, 17, 15, 0.6); box-shadow: 0 0 0 1px rgba(243, 235, 216, 0.14), 0 2px 8px rgba(0, 0, 0, 0.45); overflow: hidden; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.answer-timer.on { opacity: 1; transition-delay: var(--timer-after, 0s); }
+.answer-timer > i { position: absolute; inset: 0; border-radius: inherit; background: var(--cyan); transform-origin: center; transition: background-color 0.6s; }
+.answer-timer.intro > i { animation: timerIn 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) var(--timer-after, 0s) backwards; }   /* (opens from its middle; `last` below takes over the animation) */
+@keyframes timerIn { from { transform: scaleX(0); } }
+.answer-timer.low > i { background: var(--amber); }
+.answer-timer.last > i { background: #ff7a66; animation: timerLast 1.2s ease-in-out infinite; }
+@keyframes timerLast { 50% { opacity: 0.45; } }
 .hud-right { position: absolute; right: 20px; top: 18px; display: flex; flex-direction: row-reverse; align-items: center; gap: 10px; }
 .shields { display: flex; gap: 4px; } .shields img { width: 40px; height: 40px; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5)); transition: transform 0.3s; }
 .shields img.lost { animation: lost 0.9s ease-out both; }
@@ -383,6 +395,7 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
   .keypad .k { height: 44px; }
   .wlabel.beamline { font-size: 13px; white-space: normal; max-width: 86vw; text-align: center; }
   .shields img { width: 32px; height: 32px; }
+  .answer-timer { top: 31px; width: 34vw; }   /* (clear of the shields on the right) */
   .hud-right { flex-direction: column; align-items: flex-end; gap: 6px; } button.icon-btn { width: 36px; height: 36px; }
   .mt-name { font-size: 21px; } .map-tag { min-width: 170px; padding: 10px 12px 12px; }
   .cine-dialog { gap: 10px; padding: 10px 28px 12px 10px; } .cine-dialog img { width: 50px; height: 50px; }

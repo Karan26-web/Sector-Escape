@@ -222,6 +222,20 @@ export const ui = {
       await delay(0.3);
     },
   },
+  /** The time to answer (user 2026-10-28): a thin bar at the top centre of the screen, no numbers, draining toward its
+   *  middle. set(f): f of the time left (1 → 0); amber in its last third, red and breathing in its last 15 s. */
+  timer: {
+    /** A new question: the bar opens from its middle to full, `after` s from now (the last shot's numbers line first fades
+     *  out where the bar runs: they ran into each other, user 2026-10-28). */
+    start(after = 0) { const el = $('#answer-timer'); this.f = null; el.style.setProperty('--timer-after', `${after}s`); el.classList.remove('intro'); void el.offsetWidth; el.classList.add('intro'); },
+    set(f) {
+      const el = $('#answer-timer'); if (this.f === f && el.classList.contains('on')) return; this.f = f;
+      el.classList.add('on'); el.firstElementChild.style.transform = `scaleX(${f.toFixed(4)})`;
+      el.classList.toggle('low', f < 1 / 3); el.classList.toggle('last', f < 15 / 90);
+    },
+    hide() { this.f = null; $('#answer-timer').classList.remove('on', 'low', 'last', 'intro'); },
+  },
+
   /* ---------------------------------------------------------- map: painted isometric miniature of the real chain */
   map: {
     selected: null, saveData: null, art: null, raf: 0, busy: false, first: false,
@@ -243,13 +257,13 @@ export const ui = {
       $('#ms-sound').addEventListener('click', () => { audio.toggleMute(); this.syncSettings(); });
       $('#ms-howto').addEventListener('click', () => { this.closeSettings(); ui.howto.show(); });
       $('#ms-reset').addEventListener('click', () => {
-        const b = $('#ms-reset');
+        const b = $('#ms-reset'); if (this.busy) return;   // (not during the unlock walk: it would strand the map waiting for it)
         if (!b.classList.contains('confirm')) { b.classList.add('confirm'); b.textContent = 'Tap again to reset'; return; }
         save.reset(); this.saveData = save.load(); this.closeSettings(); this.refresh(); this.art.placeHero(1); this.select(1, true);
       });
     },
     syncSettings() { $('#ms-sound').textContent = `Sound: ${audio.muted ? 'off' : 'on'}`; const b = $('#ms-reset'); b.classList.remove('confirm'); b.textContent = 'Reset progress'; },
-    closeSettings() { $('#map-settings').classList.remove('open'); },
+    closeSettings() { $('#map-settings').classList.remove('open'); this.syncSettings(); },   // (a half-confirmed reset never waits behind a closed menu)
     frontier() { return Math.min(CHAIN.arenas.length, this.saveData.unlocked); },
     refresh() {
       const sd = this.saveData, art = this.art; art.save = sd; art.frontier = this.frontier(); art.build();
@@ -397,10 +411,11 @@ export const ui = {
           for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearTimeout(t));
           b.addEventListener('click', () => { if (!held) this.key('⌫'); held = false; });
         } else { if (k === '/') b.setAttribute('aria-label', 'Fraction bar'); b.addEventListener('click', () => this.key(k)); }
+        b.addEventListener('mousedown', (e) => e.preventDefault());   // (keep the focus in the answer field: Enter fires, not the last key)
         pad.appendChild(b); this.keyEls[k] = b;
       }
       const inp = $('#answer');
-      inp.addEventListener('input', () => { inp.value = this.clean(inp.value); this.changed(); audio.play('ui.type', { minGap: 0.03 }); });
+      inp.addEventListener('input', () => { if (this.locked) { inp.value = ''; return; } inp.value = this.clean(inp.value); this.changed(); audio.play('ui.type', { minGap: 0.03 }); });
       inp.addEventListener('keydown', (e) => {
         const map = { Backspace: '⌫', Delete: '⌫', Enter: '✓' }, el = this.keyEls[map[e.key] || e.key];
         if (el) { el.classList.add('press'); setTimeout(() => el.classList.remove('press'), 120); }   // typing lights the stone key too
@@ -415,6 +430,7 @@ export const ui = {
       return parts.map((p) => { const i = p.indexOf('.'); return i < 0 ? p : p.slice(0, i + 1) + p.slice(i + 1).replace(/\./g, '').slice(0, 3); }).join('/').slice(0, 12);
     },
     key(k) {
+      if (this.locked) return;   // (during the shot and the lesson: the entry would only be wiped on unlock)
       const inp = $('#answer');
       if (k === '⌫') inp.value = inp.value.slice(0, -1);
       else if (k === 'C') inp.value = '';
@@ -621,5 +637,6 @@ export const ui = {
   beamline: {
     show(text, status, worldPos, push) { game.world.labels.add('beamline', text, { className: `beamline ${status}`, worldPos, push, clampTop: window.innerWidth < 760 ? 64 : 16 }); },   // below the shields on phones
     hide(fade = true) { game.world.labels.remove('beamline', fade); },
+    get shown() { return !!game.world.labels.get('beamline'); },
   },
 };

@@ -46,12 +46,16 @@ export class AudioEngine {
     this.distCurve = curve;
     if (this.music.pendingMode) this.music.start(this.music.pendingMode);
     if (this.ambient.pendingMode) this.ambient.start(this.ambient.pendingMode);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx.state === 'suspended') ctx.resume().catch(() => {}); });
+    // a hidden tab sleeps (the beds and the music kept playing over a frozen game); back, it wakes from any state that is
+    // not running ('interrupted' on iOS after a call or Siri)
+    const wake = () => { if (!document.hidden && ctx.state !== 'running') ctx.resume().catch(() => {}); };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { if (ctx.state === 'running') ctx.suspend().catch(() => {}); } else wake(); });
+    window.addEventListener('pageshow', wake);
     return ctx;
   }
   unlock() {
     const ctx = this.ensure();
-    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx && ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => {});
   }
   get now() { return this.ctx ? this.ctx.currentTime : 0; }
   setMuted(m) {
@@ -63,7 +67,7 @@ export class AudioEngine {
 
   /* ----------------------------------------------------------- playback */
   play(name, o = {}) {
-    if (!this.ctx) return null;
+    if (!this.ctx || this.ctx.state !== 'running') return null;   // (a stopped clock queued them all for one burst)
     // throttle identical rapid-fire sounds (footsteps etc.)
     const minGap = o.minGap ?? 0.03, last = this.lastPlayed.get(name) ?? -1;
     if (this.now - last < minGap) return null;
@@ -329,6 +333,8 @@ SFX['controller.reveal'] = (A) => {   // the stick appears: a stone thunk and a 
   A.seq([[79, 0.05, 0.2, 1], [86, 0.13, 0.35, 0.8]], { type: 'sine', vol: 0.07 });
 };
 SFX['tutorial.done'] = (A) => A.seq([[76, 0, 0.12, 1], [83, 0.08, 0.14, 1], [88, 0.16, 0.42, 0.9]], { type: 'triangle', vol: 0.08 });
+SFX['timer.low'] = (A) => A.seq([[69, 0, 0.12, 1], [69, 0.2, 0.12, 1]], { type: 'triangle', vol: 0.07 });   // 15 s left to answer: two soft taps
+SFX['timer.out'] = (A) => { const t = A.now; A.tone({ type: 'triangle', f0: 440, f1: 220, dur: 0.6, vol: 0.1, t0: t }); };   // the answer bar ran out
 SFX['objective.ping'] = (A) => {   // the goal lights up while the player stands still: a soft, bell-like call
   const t = A.now;
   A.tone({ t0: t, type: 'sine', f0: 1046.5, dur: 0.9, vol: 0.06, env: { a: 0.005, d: 0.25, s: 0.3, r: 0.6 } });
@@ -375,12 +381,15 @@ class AmbientPlayer {
     const wl = A.osc('sine', 0.08); const wlg = A.gain(220, wf.frequency); wl.connect(wlg);
     wg.gain.setTargetAtTime(0.22, t, 1.5); wn.start(t); wl.start(t);
     // insects
-    const ig = A.gain(0.0001, A.ambBus); const inf = A.filter('bandpass', 6200, 9, ig); const inn = A.noiseSrc(inf);
-    const am = A.osc('sine', 8); const amg = A.gain(0.3, ig.gain); am.connect(amg);
-    ig.gain.setTargetAtTime(0.012, t, 2); inn.start(t); am.start(t);
+    //   (each swell modulates its own stage and the mode sets the level after it: added straight onto the level, ±0.3 / ±0.5
+    //   drowned setMode's values, so the water lapped in every arena and the insects never quietened; the rates and the
+    //   title / causeway loudness are as they sounded before)
+    const ig = A.gain(0.0001, A.ambBus), isw = A.gain(0.5, ig); const inf = A.filter('bandpass', 6200, 9, isw); const inn = A.noiseSrc(inf);
+    const am = A.osc('sine', 16); const amg = A.gain(0.5, isw.gain); am.connect(amg);
+    inn.start(t); am.start(t);
     // water lapping (causeway)
-    const wtg = A.gain(0.0001, A.ambBus); const wtf = A.filter('lowpass', 700, 0.8, wtg); const wtn = A.noiseSrc(wtf);
-    const wtl = A.osc('sine', 0.35); const wtlg = A.gain(0.5, wtg.gain); wtl.connect(wtlg); wtn.start(t); wtl.start(t);
+    const wtg = A.gain(0.0001, A.ambBus), wsw = A.gain(0.5, wtg); const wtf = A.filter('lowpass', 700, 0.8, wsw); const wtn = A.noiseSrc(wtf);
+    const wtl = A.osc('sine', 0.7); const wtlg = A.gain(0.5, wsw.gain); wtl.connect(wtlg); wtn.start(t); wtl.start(t);
     // low arena drone (fades in for 'arena' mode)
     const dg = A.gain(0.0001, A.ambBus); const df = A.filter('lowpass', 180, 1, dg); const d1 = A.osc('sawtooth', 55, df); const d2 = A.osc('sawtooth', 55.6, df);
     d1.start(t); d2.start(t);
@@ -393,11 +402,11 @@ class AmbientPlayer {
     const arena = mode === 'arena' || mode === 'boss';
     this.gains.drone.gain.setTargetAtTime(arena ? (mode === 'boss' ? 0.16 : 0.09) : 0.0001, t, 1.2);
     this.gains.wind.gain.setTargetAtTime(arena ? 0.1 : 0.22, t, 1.2);
-    this.gains.insects.gain.setTargetAtTime(arena ? 0.004 : 0.012, t, 1.2);
-    this.gains.water.gain.setTargetAtTime(mode === 'causeway' ? 0.14 : 0.0001, t, 1.5);
+    this.gains.insects.gain.setTargetAtTime(arena ? 0.12 : 0.35, t, 1.2);
+    this.gains.water.gain.setTargetAtTime(arena ? 0.0001 : 0.5, t, 1.5);   // (by the lake: the title, the map, the causeway)
   }
   tick() {
-    if (!this.running || this.A.muted) return;
+    if (!this.running || this.A.muted || this.A.ctx.state !== 'running') return;
     const birdChance = this.mode === 'jungle' || this.mode === 'causeway' ? 0.22 : 0.05;
     if (Math.random() < birdChance) this.bird();
     if (this.mode !== 'jungle' && Math.random() < 0.07) SFX['torch'](this.A);

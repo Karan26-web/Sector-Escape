@@ -96,7 +96,7 @@ export class BotManager {
     tweens.delay(delayS).promise.then(() => {
       if (!this.bots.includes(b)) return;
       b.spr.material.color.copy(b.spr.baseTone || WHITE);
-      b.spr.play('death', { restart: true, onComplete: () => { b.state = 'dead'; this.group.remove(b.g); b.spr.dispose(); } });
+      b.spr.play('death', { restart: true, onComplete: () => { b.state = 'dead'; this.group.remove(b.g); b.spr.dispose(); b.shadow.geometry.dispose(); b.shadow.material.dispose(); } });
       const p = b.g.position.clone(); p.y = 0.9;
       this.fx.explosion(p, 2.6); this.fx.smoke(p, 3);
       audio.play('bot.explode', { pan: this.pan(b), vol: 0.8 * vol, minGap: 0.02 });
@@ -171,7 +171,7 @@ export class BotManager {
   }
   /** Game over: the pile-on stops (they stand over him). */
   halt() { this.frenzy = false; }
-  clear() { for (const b of this.bots) { this.group.remove(b.g); b.spr.dispose(); } this.bots = []; this._onFirstBlow = null; this._onContact = null; this.onBlow = null; this.calm = false; this.idle = false; this.frenzy = false; }
+  clear() { for (const b of this.bots) { if (b.state === 'dead') continue; this.group.remove(b.g); b.spr.dispose(); b.shadow.geometry.dispose(); b.shadow.material.dispose(); } this.bots = []; this._onFirstBlow = null; this._onContact = null; this.onBlow = null; this.calm = false; this.idle = false; this.frenzy = false; }   // (the dead freed theirs already)
 
   update(dt) {
     const lift = topDownLift(this.world.camera);   // keep floor-level sprites visible from the puzzle camera

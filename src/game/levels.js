@@ -275,7 +275,7 @@ export function validateChain() {
 /* ---------------------------------------------------------------------- */
 /* Answer parsing & evaluation                                             */
 /* ---------------------------------------------------------------------- */
-const NUM = '\\d+(?:\\.\\d+)?';
+const NUM = '(?:\\d+(?:\\.\\d*)?|\\.\\d+)';   // 80 · 80.5 · 80. · .5
 const numOrFrac = (s) => {
   const m = s.match(new RegExp(`^\\(?(${NUM})(?:/(${NUM}))?\\)?$`));
   if (!m) return NaN;
@@ -312,6 +312,7 @@ export function evaluateAnswer(raw, r, theta, { piForm = false } = {}) {
   let status, ratio;
   if (p.isPi) { ratio = p.piCoef / coef; status = Math.abs(round3(p.piCoef) - round3(coef)) < 1e-6 ? 'correct' : p.piCoef < coef ? 'under' : 'over'; }
   else { ratio = p.value / exact; status = Math.abs(round3(p.value) - round3(exact)) < 1e-6 ? 'correct' : p.value < exact ? 'under' : 'over'; }
+  if (status === 'correct') ratio = 1;   // (exactly θ: 102.9/0.7 is right, but θ × ratio came out a hair over and bounced rays)
   const firedTheta = Math.min(360, theta * ratio);
   const diagnosis = status === 'correct' ? null : piForm ? diagnosePi(p.piCoef, r, theta, coef) : diagnose(p.value, r, theta, exact);
   return { ...base, status, entered: p.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis };
@@ -348,8 +349,8 @@ export function pickTruth(L) {
 }
 /** Evaluate a chosen expression like a typed answer (status, the fired wedge), in terms of π. */
 export function evaluatePick(e, r, theta) {
-  const k = exprCoef(e), coef = sectorCoef(r, theta), value = k.n / k.d, ratio = value / coef;
-  const status = Math.abs(ratio - 1) < 1e-9 ? 'correct' : ratio < 1 ? 'under' : 'over', firedTheta = Math.min(360, theta * ratio);
+  const k = exprCoef(e), coef = sectorCoef(r, theta), value = k.n / k.d, status = Math.abs(value / coef - 1) < 1e-9 ? 'correct' : value < coef ? 'under' : 'over';
+  const ratio = status === 'correct' ? 1 : value / coef, firedTheta = Math.min(360, theta * ratio);
   return { status, coef, entered: value * PI.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis: null, k };
 }
 /** The working, line by line, for the animation (ui.formula.solveExpr): as chosen → (a decimal radius as a fraction) →
@@ -455,7 +456,8 @@ export function formulaParts(r, theta) {
 /** One line near the beam after a WRONG shot: just the numbers (the banner already says too small / too wide). */
 export function beamLine(res, theta) {
   if (res.status === 'correct') return '';
-  return `Your beam covered ${Math.round(res.firedTheta)}° — the arc is ${theta}°.`;
+  for (const d of [0, 1, 2]) { const v = +res.firedTheta.toFixed(d); if (v !== theta && v > 0) return `Your beam covered ${formatNumber(v)}° — the arc is ${theta}°.`; }
+  return res.status === 'under' ? `Your beam fell just short of the ${theta}° arc.` : `Your beam went just past the ${theta}° arc.`;
 }
 /** The misconception tip: one line just above the answer field. */
 export function tipLine(diag, r, theta) {

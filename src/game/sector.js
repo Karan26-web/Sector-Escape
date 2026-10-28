@@ -54,7 +54,7 @@ function dashTexture() {
 function ribbon(length, width, deg, color, { dashed = true, opacity = 0.55, y = 0.09, order = 9 } = {}) {
   const geo = new THREE.PlaneGeometry(length, width); geo.translate(length / 2, 0, 0);
   const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-  if (dashed) { const t = dashTexture().clone(); t.needsUpdate = true; t.repeat.set(length / 1.2, 1); mat.map = t; }
+  if (dashed) { const t = dashTexture().clone(); t.needsUpdate = true; t.repeat.set(length / 1.2, 1); t.userData.owned = true; mat.map = t; }
   const m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI / 2; m.rotation.z = deg * DEG; m.position.y = y; m.renderOrder = order; return m;
 }
 const dirV = (deg) => { const p = polar(deg, 1); return new THREE.Vector3(p.x, 0, p.z); };
@@ -165,10 +165,13 @@ export class Sector {
     const sweeper = ribbon(R, 0.13 * lw, a0, 0xffffff, { dashed: false, opacity: 1, y: 0.075, order: 14 }); this.overlays.add(sweeper);
     this.fill = sectorMesh(R, a0, theta, 0x52ded8, 0.01); const fu = this.fill.material.uniforms; fu.progress.value = 1; fu.reveal.value = 0; fu.opacity.value = 0.32; this.overlays.add(this.fill);
     const ar = Math.max(2.2, R * 0.18);
-    const band = (r0, r1, len, color, op) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, Math.max(8, Math.round(len / 3)), 1, a0 * DEG, Math.max(0.01, len) * DEG), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.renderOrder = 13; this.overlays.add(m); return m; };
-    let arc = null, arcEdge = null;
+    // the angle's arc at O and the traced arc along the wall: built once at the full angle, one segment per degree, and
+    // revealed as the radius sweeps (rebuilding both every frame of the sweep stuttered on tablets)
+    const segs = Math.max(8, Math.round(theta));
+    const band = (r0, r1, color, op) => { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, segs, 1, a0 * DEG, theta * DEG), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.renderOrder = 13; m.geometry.setDrawRange(0, 0); this.overlays.add(m); return m; };
     // (a right angle is marked with a square, not an arc)
-    const grow = (len) => { for (const m of [arc, arcEdge]) if (m) { this.overlays.remove(m); m.geometry.dispose(); m.material.dispose(); } arc = angle === 'right' ? null : band(ar, ar + 0.16 * lw, len, 0xffffff, 0.75); arcEdge = band(R - 0.16 * lw, R - 0.02, len, 0x9ff7f2, 0.7); };
+    const bands = [angle === 'right' ? null : band(ar, ar + 0.16 * lw, 0xffffff, 0.75), band(R - 0.16 * lw, R - 0.02, 0x9ff7f2, 0.7)].filter(Boolean);
+    const grow = (len) => { const n = 6 * Math.min(segs, Math.ceil((segs * len) / theta - 1e-6)); for (const m of bands) m.geometry.setDrawRange(0, n); };   // (6 indices per segment, in order from a0)
     this._sweep = 0;
     const text = (v) => (angle === 'value' ? `${Math.round(v)}°` : `θ = ${Math.round(v)}°`);
     if (angle !== 'right') W.labels.add('theta', text(0), { className: 'measure theta', worldPos: () => this.angleLabelPos(a0, this._sweep, theta, ar + 0.16 * lw) });
@@ -210,12 +213,21 @@ export class Sector {
     const p = polar(mid, t / b.s);
     return this._tv.set(this.C.x + p.x, 0.6, this.C.z + p.z);
   }
+  /** Take an overlay off the floor and free what it owns (not the shared ray segment, sprite quads or cached textures:
+   *  every scan and shot used to leave its meshes on the GPU). */
+  drop(k) {
+    this.overlays.remove(k);
+    k.traverse((o) => {
+      if (o.geometry && o.geometry !== UNIT && !o.isSprite) o.geometry.dispose();
+      const m = o.material; if (m) { if (m.map && m.map.userData.owned) m.map.dispose(); m.dispose(); }
+    });
+  }
   clearOverlays(fade = true) {
     for (const id of ['theta', 'radius']) this.world.labels.remove(id, fade);
     this.pulsing = []; this.oGlow = null;
     const kids = [...this.overlays.children].filter((k) => k.position.y > -1);
-    if (!fade) { kids.forEach((k) => this.overlays.remove(k)); this.fill = null; return; }
-    kids.forEach((k) => { const mat = k.material; if (!mat) { this.overlays.remove(k); return; } const start = mat.uniforms ? mat.uniforms.opacity.value : mat.opacity; tweenValue(start, 0, 0.5, (v) => { if (mat.uniforms) mat.uniforms.opacity.value = v; else mat.opacity = v; }).then(() => this.overlays.remove(k)); });
+    if (!fade) { kids.forEach((k) => this.drop(k)); this.fill = null; return; }
+    kids.forEach((k) => { const mat = k.material; if (!mat) { this.drop(k); return; } const start = mat.uniforms ? mat.uniforms.opacity.value : mat.opacity; tweenValue(start, 0, 0.5, (v) => { if (mat.uniforms) mat.uniforms.opacity.value = v; else mat.opacity = v; }).then(() => this.drop(k)); });
     this.fill = null;
   }
 
@@ -251,7 +263,7 @@ export class Sector {
    */
   async fire(r, cb = {}) {
     const R = this.R, W = this.world, lw = Math.max(1, R / 9);
-    const fired = clamp(r.firedTheta, 2, 360), covered = Math.min(fired, r.theta), extra = Math.max(0, fired - r.theta) / 2;
+    const fired = clamp(r.firedTheta, 2, 360), covered = Math.min(fired, r.theta), extra = r.status === 'over' ? Math.max(0, fired - r.theta) / 2 : 0;   // (only a too-wide shot bounces)
     const start = r.breachDeg - fired / 2, a1 = r.breachDeg + r.theta / 2;
     const targets = cb.targets ? cb.targets() : [];
     audio.play('charge.fire'); audio.play('ray.volley'); const hum = audio.play('laser.loop');
@@ -332,7 +344,7 @@ export class Sector {
   releaseGhost(dur = 0.6) {
     this.pulsing = [];
     const ghosts = [...this.lasers, ...this.overlays.children.filter((k) => k.userData.ghost)]; this.lasers = [];   // only the comparison: the construction (O, radii, θ) stays
-    ghosts.forEach((k) => { const mat = k.material; const s0 = mat.uniforms ? mat.uniforms.opacity.value : mat.opacity; tweenValue(s0, 0, dur, (v) => { if (mat.uniforms) mat.uniforms.opacity.value = v; else mat.opacity = v; }).then(() => this.overlays.remove(k)); });
+    ghosts.forEach((k) => { const mat = k.material; const s0 = mat.uniforms ? mat.uniforms.opacity.value : mat.opacity; tweenValue(s0, 0, dur, (v) => { if (mat.uniforms) mat.uniforms.opacity.value = v; else mat.opacity = v; }).then(() => this.drop(k)); });
   }
   /** O sends a shockwave across the arena (the survivors who got in fall to it). */
   pulse() { audio.play('pulse'); this.fx.shockwave(this.C.clone(), this.R + 2, 0.8, 0xbff6ff); this.fx.flash(this.worldPos(0, 0, 1.1), 0x9ff4ff, 8, 0.5); this.world.rig.shake(0.3, 0.4); }

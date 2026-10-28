@@ -15,6 +15,8 @@ export class World {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     canvasHost.appendChild(this.renderer.domElement);
+    // a pinch on the 3D view must not zoom the page (iOS ignores user-scalable=no): the dock and keypad slid off-screen
+    this.renderer.domElement.style.touchAction = 'none'; document.addEventListener('gesturestart', (e) => e.preventDefault());
     assets.setRenderer(this.renderer);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.5, 900);
@@ -33,6 +35,7 @@ export class World {
     this.renderer.setSize(w, h, false);
     this.renderer.domElement.style.width = w + 'px'; this.renderer.domElement.style.height = h + 'px';
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    if (this.onResize) this.onResize();   // (a tablet turned mid-question: the scene frames its view again)
   }
   add(obj) { this.scene.add(obj); return obj; }
   remove(obj) { this.scene.remove(obj); }
@@ -46,14 +49,20 @@ export class World {
       const raw = this.clock.getDelta();
       if (this.sleeping) return;
       // adaptive resolution: drop the pixel ratio when frames are slow, restore when they are fast
-      this._ft += (Math.min(raw, 0.1) - this._ft) * 0.05; this._prTimer += raw;
-      if (this._prTimer > 2) { this._prTimer = 0; if (this._ft > 0.028 && this.pr > 0.75) { this.pr = Math.max(0.75, this.pr - 0.25); this.renderer.setPixelRatio(this.pr); } else if (this._ft < 0.013 && this.pr < this.maxPR) { this.pr = Math.min(this.maxPR, this.pr + 0.25); this.renderer.setPixelRatio(this.pr); } }
+      //   measured against the screen's own frame gap (the shortest in the window): a 60 Hz screen never gets under 16.7 ms,
+      //   so the old 13 ms bar never restored it, and a 30 fps cap (iOS Low Power) is not slowness
+      this._ft += (Math.min(raw, 0.1) - this._ft) * 0.05; this._prTimer += raw; this._gap = Math.min(this._gap ?? 1, Math.max(raw, 1 / 144));
+      if (this._prTimer > 2) {
+        const gap = this._gap; this._prTimer = 0; this._gap = 1;
+        if (this._ft > Math.max(0.028, gap * 1.6) && this.pr > 0.75) { this.pr = Math.max(0.75, this.pr - 0.25); this.renderer.setPixelRatio(this.pr); }
+        else if (this._ft < Math.max(1 / 55, gap * 1.2) && this.pr < this.maxPR) { this.pr = Math.min(this.maxPR, this.pr + 0.25); this.renderer.setPixelRatio(this.pr); }
+      }
       let dt = Math.min(0.05, raw) * this.timeScale;
       if (this.paused) dt = 0;
       this.elapsed += dt;
       tweens.update(dt);
       for (const u of this.updatables) u.update(dt, this.elapsed);
-      this.rig.update(dt);
+      this.rig.update(dt); this.camera.updateMatrixWorld();   // (lookAt leaves the matrix a frame behind: labels slipped against their lines)
       if (this.onFrame) this.onFrame(dt);
       for (const l of this.labelLayers) l.update();
       this.renderer.render(this.scene, this.camera);

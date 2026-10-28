@@ -34,7 +34,7 @@ export class AnimatedSprite {
   play(name, { restart = false, speed = 1, onComplete = null } = {}) {
     if (!this.def.anims[name]) name = Object.keys(this.def.anims)[0];
     if (this.animName === name && !restart) { this.speed = speed; if (onComplete) this.onComplete = onComplete; return this; }
-    this.anim = this.def.anims[name]; this.animName = name; this.frame = 0; this.time = 0; this.phase = 0; this.speed = speed; this.finished = false; this.onComplete = onComplete;
+    this.anim = this.def.anims[name]; this.animName = name; this.frame = 0; this.time = 0; this.phase = undefined; this.speed = speed; this.finished = false; this.onComplete = onComplete;   // (phase unset: update() starts it from .time, so a start offset set after play() staggers torches and guardians)
     this._apply(); return this;
   }
   /** Show one frame of an animation and keep it (no playback): poses held for a beat, e.g. Karan sitting after a fall. */

@@ -17,7 +17,7 @@
 import * as THREE from '../../vendor/three.module.js';
 import { CHAIN, botCountFor, evaluateAnswer, evaluatePick, pickTip, computeScore, beamLine, tipLine, enemyMaxR, SEAL_BEHIND, WALL_HEIGHT } from './levels.js';
 import { Boss } from './boss.js';
-import { SDF, PILLARS, walkPose } from './roam.js';
+import { SDF, PILLARS, walkPose, ringsFloor } from './roam.js';
 import { playOpening, handoverPoint, CAUSEWAY_VIEW } from './opening.js';
 import { save } from './save.js';
 import { controller } from '../engine/controller.js';
@@ -28,6 +28,8 @@ import { audio } from '../engine/audio.js';
 import { ui } from '../ui/ui.js';
 
 const ABORT = Symbol('abort');
+const TIMEOUT = Symbol('timeout');
+const ANSWER_TIME = 90;   // s to answer each time the question is up (user 2026-10-28), shown only as a draining bar
 const GUARD_TOP = 3.7;   // from the top view the guardians (1 m beyond the arc) rise this far past the arc toward screen-up
 
 export class ArenaScene {
@@ -190,8 +192,8 @@ export class ArenaScene {
    *  blow (~2 s), or at a watchdog if that blow never lands (game time, so a pause does not trip it): play never stalls. */
   async squadArrives(formAfter = 0.15) {
     const first = this.bots.arrive();
-    await delay(formAfter); this.barrier.form(0.55);
-    await Promise.race([first, delay(6)]);
+    await this.s(delay(formAfter)); this.barrier.form(0.55);
+    await this.s(Promise.race([first, delay(6)]));
   }
 
   /* ---------------------------------------------------------------- main */
@@ -227,7 +229,7 @@ export class ArenaScene {
   async placeInside() {
     this.hero.setPosition(this.V(this.A.spawn)); this.hero.faceTo(this.C); this.hero.surface = 'stone'; this.hero.stop();
     const dir = this.C.clone().sub(this.hero.pos).setY(0).normalize();
-    await this.rig.moveTo(this.behindPose(this.hero.pos, dir, 5, 3.6, 60, 1.0), 1.8);
+    await this.s(this.rig.moveTo(this.behindPose(this.hero.pos, dir, 5, 3.6, 60, 1.0), 1.8));
   }
   /** Arena 1 from the jungle: the opening (a new game's first Play), then the player walks Karan along the causeway to the
    *  gate; it opens as he reaches it and shuts behind him once he is inside. */
@@ -239,12 +241,12 @@ export class ArenaScene {
     if (this.opening) await this.s(playOpening(this));
     else {
       const hand = handoverPoint(); this.hero.setPosition(hand); this.hero.face(this.dirDeg(CHAIN.causeway.dirDeg)); this.chain.setBeam(true);
-      this.rig.setPose(walkPose(hand, CHAIN.causeway.dirDeg, CAUSEWAY_VIEW, this.world.camera.aspect)); await delay(0.3);
+      this.rig.setPose(walkPose(hand, CHAIN.causeway.dirDeg, CAUSEWAY_VIEW, this.world.camera.aspect)); await this.s(delay(0.3));
     }
     await this.s(this.walkToGate());
     await this.s(this.gateShut());
     this.chain.fadeOff = false; this.chain.setFireflies(false);
-    await delay(0.3);
+    await this.s(delay(0.3));
   }
   /** The first walk (user 2026-10-27): the islet and the causeway are the walkable floor (its parapets and the water bound
    *  it), ring 1's gate the goal. The door glows as he comes near, and whenever he stands still; it opens as he reaches
@@ -259,13 +261,13 @@ export class ArenaScene {
     const region = SDF.minus((x, z) => (open() ? through(x, z) : walk(x, z)), PILLARS);
     const first = this.opening || !save.load().moveTutorialSeen; let opened = false, taught = !first;   // (every start from the very beginning shows it)
     ui.hud.show(); controller.reveal({ demo: first });   // (its knob shows the move: no text box, the game is played on tablets)
-    await this.game.roam.run({
+    await this.s(this.game.roam.run({
       region, yawDeg: cw.dirDeg, view: CAUSEWAY_VIEW,
       goal: { pos: this.V(A.spawn), reached: (p) => Math.hypot(p.x - A.center.x, p.z - A.center.z) < A.R - 1.5 },
       mark: door, near: 5, far: 16, highlight: (k, dt) => M.door(opened ? 0 : k, dt),
       onMove: (m) => { if (!taught && m > 1.6) { taught = true; audio.play('tutorial.done'); const d = save.load(); d.moveTutorialSeen = true; save.write(); } },
       onTick: (p) => { if (!opened && p.distanceTo(door) < 3.4) { opened = true; this.setPhase('gate'); M.doorOff(); this.chain.openStartGate(1.0); } },
-    });
+    }));
     M.doorOff();
   }
   /** Inside the ring: Karan turns as the gate slams shut in front of him, seen from inside so nothing hides it. */
@@ -274,9 +276,9 @@ export class ArenaScene {
     this.hero.stop(); this.hero.faceTo(gp);
     const camPos = this.hero.pos.clone().addScaledVector(inward, 3.4).addScaledVector(side, 1.7).add(new THREE.Vector3(0, 2.3, 0));
     this.clampInside(camPos, 0.8);
-    await this.rig.moveTo({ pos: camPos, target: gp.clone().add(new THREE.Vector3(0, 1.9, 0)), fov: 56 }, 0.65);
-    await this.chain.closeStartGate(0.5);
-    await delay(1.0);
+    await this.s(this.rig.moveTo({ pos: camPos, target: gp.clone().add(new THREE.Vector3(0, 1.9, 0)), fov: 56 }, 0.65));
+    await this.s(this.chain.closeStartGate(0.5));
+    await this.s(delay(1.0));
   }
 
   /* ---------------------------------------------------------------- the fight */
@@ -295,13 +297,13 @@ export class ArenaScene {
       const B = this.R * 0.5 + 3.5, Hc = B * 1.05, Dka = this.hero.distTo(this.gapMid);
       this.rig.moveTo({ pos: this.hero.pos.clone().addScaledVector(look, -B).add(new THREE.Vector3(0, Hc, 0)), target: this.hero.pos.clone().addScaledVector(look, Dka * 0.5).setY(1.0), fov: this.world.camera.aspect < 0.8 ? 74 : 56 }, 1.6);
     }
-    await delay(1.5);
+    await this.s(delay(1.5));
     this.setPhase('arrive'); audio.play('alarm'); audio.music.setMode(L.boss ? 'boss' : 'arena');
     if (L.boss && !this.boss) { this.boss = new Boss(this.world, this.fx, this.W(A.exitDeg, this.R + (A.bay ? A.bay.D * 0.5 : 0) + 5), this.game.bossLight); this.boss.roar(); }
     this.bots.calm = false;
-    await this.squadArrives();
+    await this.s(this.squadArrives());
     this.rig.shake(0.18, 0.4);
-    await delay(1.4);   // a beat of pounding: the urgency has to land before anything else happens
+    await this.s(delay(1.4));   // a beat of pounding: the urgency has to land before anything else happens
   }
   /** LXD: Karan's designated observation point, just behind the centre on the line from the gap through O. The player walks
    *  him there (user 2026-10-27): the spot glows on the floor, brighter as he nears it and whenever he stands still. The
@@ -312,14 +314,14 @@ export class ArenaScene {
     const A = this.A, M = this.game.markers;
     this.bots.calm = true;   // the pounding eases while he walks over (it is the player's walk: it may take a while)
     M.spotAt(this.watch);
-    await this.game.roam.run({
-      region: SDF.minus(SDF.inset(SDF.disk(A.center, A.R), 0.75), PILLARS), yawDeg: A.exitDeg, view: this.walkView(),
+    await this.s(this.game.roam.run({
+      region: SDF.minus(ringsFloor(this.index), PILLARS), yawDeg: A.exitDeg, view: this.walkView(),   // (this ring, and back through the cleared ones)
       goal: { pos: this.watch, r: 0.75 }, near: 2.5, far: 10, highlight: (k, dt) => M.spotSet(k, dt), onBump: (p) => this.edgeBump(p),
-    });
+    }));
     M.spotOff();
-    await this.hero.runTo(this.watch, 2.4, { within: 0.06 });   // the last step onto the spot
+    await this.s(this.hero.runTo(this.watch, 2.4, { within: 0.06 }));   // the last step onto the spot
     this.hero.faceTo(this.gapMid);
-    await delay(0.3);
+    await this.s(delay(0.3));
   }
   /** The walk camera in a ring: higher and farther back in the big rings (they fill the view alike). */
   walkView() { const R = this.R; return { dist: 5.5 + R * 0.22, height: 6 + R * 0.3, ahead: 1.5 }; }
@@ -337,53 +339,80 @@ export class ArenaScene {
   async battle() {
     const L = this.level, A = this.A, R = this.R;
     this.attempt = 0;
-    await this.reveal();
-    await this.takePosition();
+    await this.s(this.reveal());
+    await this.s(this.takePosition());
     // ---- the top view, in the LXD's order: O lights up → a radius is drawn to the wall → it sweeps along the arc into
     //      the sector → the rest of the circle dims → zoom in on the sector to answer
     this.setPhase('tactical'); audio.play('ui.whoosh');
     this.bots.calm = true;   // the pounding eases off while the sector is drawn and the learner works (urgency, not noise)
     this.chain.setFocus(this.index, true, 0.85, { cull: true });
-    await this.rig.moveTo(this.tacticalPose(), 1.0, Ease.inOutCubic);
+    await this.s(this.rig.moveTo(this.tacticalPose(), 1.0, Ease.inOutCubic));
     audio.music.setMode(L.boss ? 'boss' : 'tension');
     this.setPhase('scan');
-    await this.sector.scan({ breachDeg: A.exitDeg, theta: A.theta, show: L.show });
-    await delay(0.3);
+    await this.s(this.sector.scan({ breachDeg: A.exitDeg, theta: A.theta, show: L.show }));
+    await this.s(delay(0.3));
     // ---- the formula above the keypad (user, 2026-10-22): shown from the start on every ring; misses work it through.
     //      Filled while the dock is still off-screen, so the phone fit (sectorPose) measures the dock at its real height.
     // arenas 1–4 choose their answer (mcq / drop-downs), 5–7 type it in terms of π; every area is in terms of π (LXD 2026-10-27)
     const picking = !!L.ask, piForm = picking || !!L.piForm;
     ui.formula.show(R, A.theta, { piForm });
-    await this.rig.moveTo(this.sectorPose(), 0.9, Ease.inOutCubic);    // zoom in on the sector: the learner answers here
+    await this.s(this.rig.moveTo(this.sectorPose(), 0.9, Ease.inOutCubic));    // zoom in on the sector: the learner answers here
     const arcTop = this.W(A.exitDeg, R + GUARD_TOP, 0.6), outward = this.dirDeg(A.exitDeg);
-    // ---- input loop
+    // ---- back to the sector for the next answer (after a missed shot or a timeout): Karan returns to his spot, the barrier
+    //      forms again and a fresh squad charges it; typed arenas work the formula one step further (1st miss → substitute,
+    //      cross out, simplify; 2nd miss → the answer as a fraction)
+    const regroup = async () => {
+      const back = this.hero.distTo(this.watch) > 0.15 ? this.hero.runTo(this.watch, 3.2, { face: this.gapMid, within: 0.06 }) : null;
+      this.rig.moveTo(this.sectorPose(), 0.8, Ease.inOutCubic);
+      this.spawnSquad(); this.bots.calm = false;
+      const arrived = this.squadArrives();
+      if (!picking && this.misses === 1) await this.s(ui.formula.walkthrough());
+      else if (!picking && this.misses === 2) await this.s(ui.formula.solve());
+      await this.s(arrived); if (back) await this.s(back); this.hero.faceTo(this.gapMid);
+      this.bots.calm = true;
+      ui.panel.unlock();
+    };
+    // a tablet turned (or the window resized) mid-question: frame the sector again once the dock has its new layout
+    this.world.onResize = this._onResize = () => { this.refitIn = 0.25; };
+    // ---- input loop (the dock opens once: re-opening it after an unreadable first entry wiped the tip that says so)
+    ui.panel.open({ piForm, level: L, onFire: (v) => this._resolveFire && this._resolveFire(v), onType: () => ui.beamline.hide() });
     while (true) {
       this.attempt++;
       this.setPhase('input');
-      if (this.attempt === 1) ui.panel.open({ piForm, level: L, onFire: (v) => this._resolveFire && this._resolveFire(v), onType: () => ui.beamline.hide() });
+      if (this.answerLeft == null) {   // (an unreadable entry keeps the time it had)
+        // a new question: the last shot's numbers line fades out, then the bar opens where it was (user 2026-10-28)
+        const after = ui.beamline.shown ? 0.32 : 0; ui.beamline.hide(true);
+        this.answerLeft = ANSWER_TIME; this.answerWarned = false; ui.timer.start(after);
+      }
       const t0 = this.world.elapsed;
       const answer = await new Promise((res) => { this._resolveFire = res; });
       this._resolveFire = null; this.timeUsed += this.world.elapsed - t0;
       if (answer === ABORT) throw ABORT;
+      if (answer === TIMEOUT) {
+        this.answerLeft = null; ui.timer.hide();
+        if (!(await this.s(this.timeUp()))) return this.gameOver();
+        ui.panel.setTip(''); await this.s(regroup()); continue;
+      }
       let res;
       if (picking) {
         // the chosen formula is worked out on screen, right or wrong, and what it gives is fired (LXD 2026-10-27)
-        this.setPhase('solve'); ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false);
+        this.setPhase('solve'); ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false); this.answerLeft = null; ui.timer.hide();
         await this.s(ui.formula.solveExpr(answer.expr));
         res = evaluatePick(answer.expr, R, A.theta); res.tip = res.status === 'correct' ? '' : pickTip(L, answer.sel);
       } else {
         res = evaluateAnswer(answer, R, A.theta, { piForm });
         if (res.status === 'invalid') { ui.panel.setTip(piForm ? 'Enter the number that goes in front of π' : 'Enter a number like 38.5 or 77/2'); audio.play('ui.error'); this.attempt--; ui.panel.unlock(); continue; }
       }
+      this.answerLeft = null; ui.timer.hide();
       // ---- the charge: zoom out to the whole circle, O charges and fires its rays all at once across the wedge the
       //      answer asks for; they break the barrier and strike the guardians behind the part of the arc they cover
       this.setPhase('firing'); this.heroDown = null; ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false);
-      await this.rig.moveTo(this.tacticalPose(), 0.8, Ease.inOutCubic);
-      this.hero.faceTo(this.gapMid); this.hero.cast(); await delay(0.25);   // Karan casts toward the gap; the charge gathers at O as his palm reaches out
-      await this.sector.charge();
+      await this.s(this.rig.moveTo(this.tacticalPose(), 0.8, Ease.inOutCubic));
+      this.hero.faceTo(this.gapMid); this.hero.cast(); await this.s(delay(0.25));   // Karan casts toward the gap; the charge gathers at O as his palm reaches out
+      await this.s(this.sector.charge());
       const covered = Math.min(res.firedTheta, A.theta);
       this.storm = null;
-      await this.sector.fire({ ...res, theta: A.theta, breachDeg: A.exitDeg }, {
+      await this.s(this.sector.fire({ ...res, theta: A.theta, breachDeg: A.exitDeg }, {
         onArc: () => {   // the rays hit the glass: the camera drops to see it crack (Karan in frame after a wrong answer), and
                          // every guardian at it hammers away as it cracks
           this.bots.rally(); this.rig.moveTo(this.breakPose(res.status !== 'correct'), 0.28, Ease.outCubic);
@@ -399,16 +428,16 @@ export class ArenaScene {
         kill: (b, at) => this.bots.kill(b, at, 0.7),
         reflectTo: () => this.hero.pos.clone(),
         onReflect: () => this.hitHero('reflect'),
-      });
+      }));
       this.hero.endCast();   // (a knock-down has already taken over if the charge reflected)
       if (this.boss) { if (res.status === 'correct') this.boss.defeat(); else this.boss.hurt(); }   // the Warden falls only to the exact sector
       this.setPhase('result');
       if (res.status === 'correct') {
         if (this.firstTry === null) this.firstTry = this.attempt === 1;
         audio.play('sting.perfect');
-        await delay(1.6);   // let the gold snap of the wedge read before the way on lights up
+        await this.s(delay(1.6));   // let the gold snap of the wedge read before the way on lights up
         this.sector.releaseGhost(0.6); ui.panel.close(); ui.beamline.hide(); ui.setArenaCentre(null);
-        this.sector.clearOverlays(true); await delay(0.3);
+        this.sector.clearOverlays(true); await this.s(delay(0.3));
         return true;
       }
       if (this.firstTry === null) this.firstTry = false;
@@ -417,39 +446,49 @@ export class ArenaScene {
       if (res.status === 'under') {
         // too small: the guardians the shot missed have been storming in since the glass gave way (more behind them, through
         // the same uncovered stretch); they reach Karan, surround him and pile on, until O's pulse throws them off
-        const storm = this.storm, got = storm ? await storm.contact : false; this.storm = null;
+        const storm = this.storm, got = storm ? await this.s(storm.contact) : false; this.storm = null;
         const stamp = ui.stamp('under', 'TOO SMALL', '', 1.5);
-        if (got) { await Promise.race([storm.allIn, delay(1.8)]); await delay(0.9); }   // the pile-on: the whole crowd on him, blows from every side
-        if (this.shields <= 0) { this.bots.halt(); await stamp; return this.gameOver(); }
-        this.sector.pulse(); this.bots.pulseKill(); await delay(0.45);
-        await this.hero.recover(); await stamp;
+        if (got) { await this.s(Promise.race([storm.allIn, delay(1.8)])); await this.s(delay(0.9)); }   // the pile-on: the whole crowd on him, blows from every side
+        if (this.shields <= 0) { this.bots.halt(); await this.s(stamp); return this.gameOver(); }
+        this.sector.pulse(); this.bots.pulseKill(); await this.s(delay(0.45));
+        await this.s(this.hero.recover()); await this.s(stamp);
       } else {
         // too big: every guardian fell, but the excess rays bounced off the wall into Karan (during the shot); he gets up
-        await ui.stamp('over', 'TOO WIDE', '', 1.3);
-        if (this.heroDown) await this.heroDown;
+        await this.s(ui.stamp('over', 'TOO WIDE', '', 1.3));
+        if (this.heroDown) await this.s(this.heroDown);
         if (this.shields <= 0) return this.gameOver();
       }
       // the lesson, from above, once the action is over: the shot against the sector (the dashed target around it / its red
       // excess) and the numbers line beside the arc (during the push-in it would only collide with the r label)
-      await this.rig.moveTo(this.tacticalPose(), 0.6, Ease.inOutCubic);
-      ui.beamline.show(beamLine(res, A.theta), res.status, arcTop, outward); await delay(0.7);
+      await this.s(this.rig.moveTo(this.tacticalPose(), 0.6, Ease.inOutCubic));
+      ui.beamline.show(beamLine(res, A.theta), res.status, arcTop, outward); await this.s(delay(0.7));
       this.sector.releaseGhost(0.8);
-      // ---- back to the sector for the next answer: Karan returns to his spot, the barrier forms again and a fresh
-      //      squad charges it; the one-line tip goes above the answer. Typed: the formula works itself one step further
-      //      (1st miss → substitute, cross out, simplify; 2nd miss → the answer as a fraction). Chosen: the wrong choices
-      //      are struck out and the plain formula returns (each try already showed its working)
+      // ---- the one-line tip goes above the answer. Chosen: the wrong choices are struck out and the plain formula returns
+      //      (each try already showed its working)
       ui.panel.setTip(picking ? res.tip : tipLine(res.diagnosis, R, A.theta));
       if (picking) { ui.pick.markWrong(answer.sel); ui.formula.show(R, A.theta, { piForm }); }
-      const back = this.hero.distTo(this.watch) > 0.15 ? this.hero.runTo(this.watch, 3.2, { face: this.gapMid, within: 0.06 }) : null;
-      this.rig.moveTo(this.sectorPose(), 0.8, Ease.inOutCubic);
-      this.spawnSquad(); this.bots.calm = false;
-      const arrived = this.squadArrives();
-      if (!picking && this.misses === 1) await ui.formula.walkthrough();
-      else if (!picking && this.misses === 2) await ui.formula.solve();
-      await arrived; if (back) await back; this.hero.faceTo(this.gapMid);
-      this.bots.calm = true;
-      ui.panel.unlock();
+      await this.s(regroup());
     }
+  }
+  /** The answer bar ran out (user 2026-10-28): the guardians have pounded the glass long enough. It gives way and they storm
+   *  Karan as after a too-small shot (−1 shield, a miss), until O's pulse throws them off. False if that was his last shield. */
+  async timeUp() {
+    const A = this.A;
+    this.setPhase('timeup'); ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false); ui.pick.closeMenu();
+    if (this.firstTry === null) this.firstTry = false;
+    this.misses++;
+    audio.play('timer.out'); audio.play('sting.fail');
+    const stamp = ui.stamp('under', 'TIME’S UP', '', 1.5);
+    await this.s(this.rig.moveTo(this.tacticalPose(), 0.7, Ease.inOutCubic));
+    this.bots.calm = false; this.bots.rally();
+    await this.s(this.barrier.breakAt({ fromDeg: A.exitDeg - A.theta / 2, spanDeg: A.theta }));
+    this.bots.idle = true;
+    const storm = this.bots.swarm(this.hero.pos, { extra: this.reinforcements(), onContact: () => this.hitHero('swarm'), onBlow: (b) => this.blowOnHero(b) });
+    if (await this.s(storm.contact)) { await this.s(Promise.race([storm.allIn, delay(1.8)])); await this.s(delay(0.9)); }
+    if (this.shields <= 0) { this.bots.halt(); await this.s(stamp); return false; }
+    this.sector.pulse(); this.bots.pulseKill(); await this.s(delay(0.45));
+    await this.s(this.hero.recover()); await this.s(stamp);
+    return true;
   }
   /** Who the charge destroys. Exact or wider: the whole squad. Too small (LXD): only the guardians fully inside the covered
    *  part of the arc (one it merely grazes slips past), and never all of them, however close the answer. */
@@ -469,8 +508,12 @@ export class ArenaScene {
   /** Karan takes a hit: the bounced rays (he is knocked down) or the swarm reaching him (down under the pile). −1 shield. */
   hitHero(kind) {
     if (this.shields <= 0 || this.aborted) return;
-    this.shields--; ui.hud.setShields(this.shields, this.maxShields); ui.damage();
-    audio.play(kind === 'reflect' ? 'reflect.hit' : 'bot.hit'); audio.play('player.hurt'); audio.play('shield.break');
+    // the chosen arenas (1–4) can never end in a game over (GDD): their last shield takes the blow and holds. A drop-down
+    // miss strikes out only its wrong part, so three or four misses (and now timeouts) can come before the right pair
+    const holds = !!this.level.ask && this.shields === 1;
+    if (!holds) { this.shields--; ui.hud.setShields(this.shields, this.maxShields); }
+    ui.damage();
+    audio.play(kind === 'reflect' ? 'reflect.hit' : 'bot.hit'); audio.play('player.hurt'); if (!holds) audio.play('shield.break');
     this.fx.hit(this.hero.pos.clone().add(new THREE.Vector3(0, 1, 0))); this.rig.shake(0.6, 0.6);
     if (kind === 'reflect') {
       // thrown back away from the gap: frame (and hang TOO WIDE below) where he will land, not where he stood
@@ -513,37 +556,36 @@ export class ArenaScene {
   }
   async exitRun(score) {
     this.setPhase('exit'); ui.panel.close(); audio.music.setMode('explore'); audio.play('sting.clear');
-    await delay(0.45);                                                  // breathing: let the cleared ring sit for a beat
+    await this.s(delay(0.45));                                                  // breathing: let the cleared ring sit for a beat
     const A = this.A, next = this.next, u = this.dirDeg(A.exitDeg), M = this.game.markers;
     const through = this.W(A.exitDeg, this.R + 0.6), nextC = this.V(next.center), spawn = this.V(next.spawn);
     // reward: the way on lights up in amber, from Karan's spot straight through O and the cleared gap
     this.chain.setFocus(this.index, false, 0.9, { cull: false });
     this.lightPath([this.hero.pos.clone(), through, spawn]);
     this.rig.moveTo({ pos: this.C.clone().addScaledVector(u, -(this.R * 0.8 + 6)).add(new THREE.Vector3(0, this.R * 0.9 + 9, 0)), target: nextC.clone().addScaledVector(u, -next.R * 0.35).add(new THREE.Vector3(0, 1, 0)), fov: 56 }, 1.3);
-    await this.hero.celebrate(0.25);
-    await delay(0.5);
+    await this.s(this.hero.celebrate(0.25));
+    await this.s(delay(0.5));
     if (this.game.prepareNext) this.game.prepareNext(this.index + 1);
     // progression (user 2026-10-27): the player walks him out through the cleared gap, lit like an open door, into the next
-    // ring (the way back stays closed); its guardians only appear once he is inside it
+    // ring; its guardians only appear once he is inside it. The way back is open too, as far as ring 1's gate (2026-10-28)
     M.gapAt(A);
-    let floor = SDF.union(SDF.inset(SDF.disk(A.center, A.R), 0.75), SDF.inset(SDF.bay(A), 0.7), SDF.inset(SDF.disk(next.center, next.R), 0.75));
-    const prev = CHAIN.arenas[this.index - 1]; if (prev) floor = SDF.minus(floor, SDF.disk(prev.center, prev.R + 0.3));
-    await this.game.roam.run({
+    const floor = SDF.union(ringsFloor(this.index), SDF.inset(SDF.bay(A), 0.7), SDF.inset(SDF.disk(next.center, next.R), 0.75));
+    await this.s(this.game.roam.run({
       region: SDF.minus(floor, PILLARS), yawDeg: A.exitDeg, view: this.walkView(),
       goal: { pos: spawn, reached: (p) => Math.hypot(p.x - nextC.x, p.z - nextC.z) < next.R - 1.6 },
       mark: through, near: 3, far: 12, highlight: (k, dt) => M.gapSet(k, dt), onBump: (p) => this.edgeBump(p),
-    });
+    }));
     M.gapOff(); this.clearPath(0.6);
     this.chain.cutRing = next.index; this.chain.keepSeals = true;
     if (SEAL_BEHIND) {   // (off, LXD: the passage you came through stays open) the ring closes behind him; he looks back
       this.chain.raiseSeal(this.index);
       const sm = this.chain.seals[this.index].mid, back = new THREE.Vector3(sm.x, 0, sm.z).sub(this.hero.pos).setY(0).normalize();
       this.hero.face(back);
-      await this.rig.moveTo({ pos: this.hero.pos.clone().addScaledVector(back, -4.2).add(new THREE.Vector3(0, 3.0, 0)), target: new THREE.Vector3(sm.x, 2.4, sm.z), fov: 58 }, 0.7);
-      await delay(1.0);
+      await this.s(this.rig.moveTo({ pos: this.hero.pos.clone().addScaledVector(back, -4.2).add(new THREE.Vector3(0, 3.0, 0)), target: new THREE.Vector3(sm.x, 2.4, sm.z), fov: 58 }, 0.7));
+      await this.s(delay(1.0));
     }
     this.hero.faceTo(nextC);
-    await delay(0.2);
+    await this.s(delay(0.2));
   }
   /** After the seventh ring: the player walks him across the temple court to the temple gate (it glows brighter as he
    *  nears it); there the gate flares and he runs out through it. */
@@ -552,7 +594,7 @@ export class ArenaScene {
     game.onPhase && game.onPhase('finale');
     chain.setActiveArena(S.index); audio.music.setMode('explore');
     const gate = new THREE.Vector3(S.gatePos.x, 0, S.gatePos.z), esc = new THREE.Vector3(S.escape.x, 0, S.escape.z), dir = esc.clone().sub(gate).normalize(), stand = gate.clone().addScaledVector(dir, -2.4);
-    const court = SDF.union(SDF.inset(SDF.disk(S.center, S.R), 0.8), SDF.inset(SDF.disk(last.center, last.R), 0.8), SDF.inset(SDF.bay(last), 0.7), SDF.lane(gate.clone().addScaledVector(dir, -3), gate, 1.4));
+    const court = SDF.union(SDF.inset(SDF.disk(S.center, S.R), 0.8), ringsFloor(CHAIN.arenas.length - 1), SDF.inset(SDF.bay(last), 0.7), SDF.lane(gate.clone().addScaledVector(dir, -3), gate, 1.4));   // (and back through every ring)
     await game.roam.run({
       region: SDF.minus(court, PILLARS), yawDeg: S.gateDeg, view: { dist: 9, height: 8, ahead: 3 },
       goal: { pos: stand, r: 1.4 }, mark: gate, near: 6, far: 20, highlight: (k) => M.templeGate(k),
@@ -568,11 +610,17 @@ export class ArenaScene {
 
   update(dt) {
     if (this.boss) this.boss.update(dt);
+    if (this.refitIn > 0 && (this.refitIn -= Math.max(dt, 1 / 60)) <= 0 && this.phase === 'input') this.rig.moveTo(this.sectorPose(), 0.35, Ease.outCubic);
+    if (this.answerLeft != null && this.phase === 'input' && dt > 0) {
+      this.answerLeft = Math.max(0, this.answerLeft - dt); ui.timer.set(this.answerLeft / ANSWER_TIME);
+      if (!this.answerWarned && this.answerLeft < 15) { this.answerWarned = true; audio.play('timer.low'); }
+      if (this.answerLeft === 0 && this._resolveFire) this._resolveFire(TIMEOUT);
+    }
   }
   dispose() {
-    if (this.disposed) return; this.disposed = true; this.aborted = true;
+    if (this.disposed) return; this.disposed = true; this.aborted = true; this.world.timeScale = 1; if (this.world.onResize === this._onResize) this.world.onResize = null;   // (quit mid-shot: no slow motion left behind)
     this.world.removeUpdatable(this); if (this.boss) { this.boss.dispose(); this.boss = null; } this.clearPath(0.01);
     this.sector.clearOverlays(false); this.barrier.hide(); this.world.labels.clear(); ui.panel.close(); ui.setArenaCentre(null);
-    this.game.roam.stop(); this.game.markers.clear(); ui.cine.end(); ui.skip.hide();   // (a walk or the opening cut short)
+    this.game.roam.stop(); this.game.markers.clear(); ui.cine.end(); ui.skip.hide(); ui.timer.hide();   // (a walk or the opening cut short)
   }
 }

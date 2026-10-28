@@ -39,5 +39,5 @@ export class Boss {
     this.t += dt; this.spr.update(dt);
     if (this.alive) { this.spr.sprite.position.y = 0.3 + Math.sin(this.t * 1.5) * 0.25; this.glow.material.opacity = 0.25 + Math.sin(this.t * 2) * 0.1; }
   }
-  dispose() { this.world.remove(this.group); this.spr.dispose(); if (!this.ownLight) this.light.intensity = 0; }
+  dispose() { this.world.remove(this.group); this.spr.dispose(); this.shadow.geometry.dispose(); this.shadow.material.dispose(); this.glow.material.dispose(); if (!this.ownLight) this.light.intensity = 0; }
 }

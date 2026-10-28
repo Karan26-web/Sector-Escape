@@ -59,7 +59,7 @@ class Game {
     ui.loading.progress(1, 'Ready'); await new Promise((r) => setTimeout(r, 250));   // a beat on the full bar, then the title buttons pop in
     this.setReady();
     const unlock = () => { audio.unlock(); if (!audio.ambient.running && !this.scene) { audio.ambient.start('jungle'); audio.music.start('title'); } };
-    window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
+    for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock);   // (a touch's pointerdown is not a gesture everywhere: the tap's end is)
     this.world.start();
     const direct = parseInt(params.get('level') || '', 10);
     if (direct >= 1 && direct <= TOTAL_LEVELS) { ui.hideAll(); const r = await this.playFrom(direct); return this.mapLoop(r.lastId); }
@@ -104,7 +104,7 @@ class Game {
     // camera on the left edge of the causeway: the bridge runs up the right of the frame to the gate, clear of the logo column
     const far = new THREE.Vector3(-37, 2.75, -1.6), near = new THREE.Vector3(-31.5, 2.55, -1.4), target = new THREE.Vector3(-8, 3.0, 1.2);
     this.chain.setTitleMode(true, { camPos: far });   // the evening sky itself is global (chain.js); this adds the lake mist + torch light
-    this.hero.group.visible = true; this.hero.stop(); this.hero.control = false; this.hero.setPosition(new THREE.Vector3(-24.5, 0, 0.5)); this.hero.face(new THREE.Vector3(1, 0, 0));
+    this.hero.group.visible = true; this.hero.stop(); this.hero.standUp(); this.hero.control = false;   // (a pile-on game over leaves him down) this.hero.setPosition(new THREE.Vector3(-24.5, 0, 0.5)); this.hero.face(new THREE.Vector3(1, 0, 0));
     const t0 = this.world.elapsed;
     this.world.rig.setPose({ pos: far, target, fov: 50 });                      // start on the shot (no swoop), then drift
     this.world.rig.follow((out) => { const t = this.world.elapsed - t0, k = (1 - Math.cos((t / 46) * Math.PI * 2)) / 2; out.pos.lerpVectors(far, near, k).add(new THREE.Vector3(0, Math.sin(t * 0.37) * 0.06, Math.sin(t * 0.21) * 0.12)); out.target.copy(target); out.fov = 50; return out; }, 3);
@@ -155,7 +155,7 @@ class Game {
       }
       if (res.outcome === 'gameover') {
         const c = await ui.gameover.show(); scene.dispose(); this.bots.clear();
-        if (c === 'retry') { this.resetWorldFor(index); scene = new ArenaScene(this, index, { mode: 'inside' }); continue; }
+        if (c === 'retry') { ui.hud.show(); this.resetWorldFor(index); scene = new ArenaScene(this, index, { mode: 'inside' }); continue; }   // (game over hid the HUD: the shields and the answer bar)
         this.finish(); return { lastId: level.id };
       }
       scene.dispose(); this.bots.clear(); this.finish(); return { lastId: level.id };
@@ -171,11 +171,11 @@ class Game {
   onPhase(p) { this.phase = p; }
   async togglePause() {
     if (!this.scene || this.pausing || this.world.paused) return;
-    this.pausing = true; this.world.paused = true; audio.music.setMode('calm');
+    const mode = audio.music.mode; this.pausing = true; this.world.paused = true; audio.music.setMode('calm');
     const c = await ui.pause.show();
     this.world.paused = false; this.pausing = false;
     if (c === 'map' && this.scene) this.scene.abort();
-    else audio.music.setMode(this.scene && this.scene.phase === 'input' ? 'tension' : 'arena');
+    else audio.music.setMode(mode);   // (whatever was playing: the boss theme, a walk's explore, the answer's tension)
   }
 }
 

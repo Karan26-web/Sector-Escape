@@ -49,6 +49,14 @@ export const SDF = {
   minus: (f, g) => (x, z) => Math.max(f(x, z), -g(x, z)),
   inset: (f, m) => (x, z) => f(x, z) + m,
 };
+/** The way back (user 2026-10-28): every ring up to ring upTo (0-based) and the bays between them, so the player can walk
+ *  back through the cleared rings as far as ring 1's gate (shut behind him). Their walls bound it as before: consecutive
+ *  rings meet in their lens (a wide gap through its bay), and the passages behind him stay open. */
+export function ringsFloor(upTo) {
+  const parts = [];
+  for (let i = 0; i <= upTo; i++) { const a = CHAIN.arenas[i]; parts.push(SDF.inset(SDF.disk(a.center, a.R), 0.75)); if (i < upTo) parts.push(SDF.inset(SDF.bay(a), 0.7)); }
+  return SDF.union(...parts);
+}
 /** The carved columns at the wall ends stand on the walkable edge: walk round them, not through them. */
 export const PILLARS = SDF.union(...CHAIN.pillars.map((p) => SDF.disk(p, 1.15)));
 

@@ -50,7 +50,7 @@ export class CameraRig {
   _apply(dt = 0) {
     const cam = this.camera;
     cam.position.copy(this.pos);
-    if (this.shakeTime > 0) {
+    if (this.shakeTime > 0 && dt > 0) {   // (paused: no jitter behind the pause card)
       this.shakeTime -= dt; const a = this.shakeAmt * Math.min(1, this.shakeTime / 0.4);
       cam.position.x += (Math.random() - 0.5) * a; cam.position.y += (Math.random() - 0.5) * a; cam.position.z += (Math.random() - 0.5) * a;
       if (this.shakeTime <= 0) this.shakeAmt = 0;

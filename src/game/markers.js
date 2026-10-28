@@ -6,7 +6,7 @@
 //  * the observation spot behind O: a ring of light on the floor, a soft glow
 //    inside it and a faint shaft of light above it (always faintly there while
 //    it is the goal: nothing else marks the spot);
-//  * the cleared gap: a low curtain of warm light along the arc, an open door;
+//  * the cleared gap: a low glow of warm light along the threshold, an open door;
 //  * the temple gate: its own glow grows (ChainWorld.templeBoost).
 // bump(): a short shimmer where he pushes into an edge that has no wall (an open
 // passage he may not take): the restriction is seen, not just felt.
@@ -79,14 +79,16 @@ export class Markers {
   gapAt(a) {
     if (this.gapArena !== a) {
       this.gapArena = a; this.gapMesh.geometry.dispose();
-      const geo = new THREE.CylinderGeometry(a.R - 0.1, a.R - 0.1, 3.4, Math.max(12, Math.round(a.theta / 3)), 1, true, (a.exitDeg - a.theta / 2) * DEG + Math.PI / 2, a.theta * DEG);
-      geo.translate(0, 1.7, 0); this.gapMesh.geometry = geo;
+      // low, a glow along the threshold: 3.4 m of curtain, seen from the walk camera above it, lay over the next ring's
+      // floor like a pulsing pane (user 2026-10-28: "something is flickering")
+      const geo = new THREE.CylinderGeometry(a.R - 0.1, a.R - 0.1, 1.2, Math.max(12, Math.round(a.theta / 3)), 1, true, (a.exitDeg - a.theta / 2) * DEG + Math.PI / 2, a.theta * DEG);
+      geo.translate(0, 0.6, 0); this.gapMesh.geometry = geo;
     }
     this.gapMesh.position.set(a.center.x, 0, a.center.z); this.gapSet(0);
   }
   gapSet(k, dt = 0) {
     const a = this.gapArena; if (!a) return;
-    this.gapMesh.material.opacity = (0.22 + 0.55 * k) * (0.85 + 0.15 * Math.sin(this.t * 3.4));
+    this.gapMesh.material.opacity = (0.14 + 0.36 * k) * (1 + 0.08 * k * Math.sin(this.t * 2));   // (it breathes only when fully lit)
     this.motes(k, dt, () => { const p = polar(a.exitDeg + (Math.random() - 0.5) * a.theta * 0.9, a.R); return new THREE.Vector3(a.center.x + p.x, 0.2, a.center.z + p.z); }, 0.5);
   }
   gapOff() { this.gapMesh.position.y = PARK; this.gapArena = null; }

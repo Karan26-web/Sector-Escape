@@ -48,6 +48,7 @@ const WATER_Y = -0.7;
 // ground). Only the ring floors (0.003 × index, above all of these) carry offsets, forward ones that settle their overlaps
 // with each other; every layer here wins or loses by height alone.
 const FLOOR = { ground: -0.02, under: -0.016, sand: -0.012, grass: -0.006, bay: -0.006, deck: -0.002 };
+const FADE_HOLD = 0.6;   // s a faded wall or pillar stays faded after the camera's line to the action has cleared it
 // The islet at the west end of the causeway, where the opening finds Karan stranded (user 2026-10-27): water all round
 // it (the lake opens into a wide pool there), the causeway his only way on. back: its centre this far behind the
 // causeway's start; r: its radius.
@@ -655,10 +656,13 @@ export class ChainWorld {
     // …and, on a walk, the walls just in front of the walk camera (they would fill the bottom of the frame)
     const cf = this._camFwd || (this._camFwd = new THREE.Vector3()); this.world.camera.getWorldDirection(cf);
     const foreground = wp ? (px, pz) => { const dx = px - cam.x, dz = pz - cam.z; return dx * dx + dz * dz < 30 && dx * cf.x + dz * cf.z > -1; } : null;
+    // a wall that has just faded stays faded a moment: as the camera glides, its sightline grazes a wall's sample points and
+    // the tests flip on and off, and every flip flashed the wall solid and see-through again (user 2026-10-28: "flickering")
+    const held = (o, t) => { if (t < 1) o.hold = FADE_HOLD; else if ((o.hold = (o.hold || 0) - dt) > 0) return 0.08; return t; };
     for (const w of this.wallPieces) {
       if (!w.pts) { const o = CHAIN.all[w.ring]; w.pts = (w.a0 != null ? [0, 0.25, 0.5, 0.75, 1].map((f) => w.a0 + (w.a1 - w.a0) * f) : [w.mid]).map((d) => { const p = polar(d, o.R + 0.5); return [o.center.x + p.x, o.center.z + p.z]; }); }
       const blocking = !this.fadeOff && cam.y > 1.5 && w.pts.some(([px, pz]) => occludes(px, pz, 2.0) || (foreground && foreground(px, pz)));
-      const t = (cutOn && !w.bay && !(w.seal && this.keepSeals) && w.ring === this.cutRing && Math.abs(degDiff(camB, w.mid)) < 72) || (blocking && !(w.seal && this.keepSeals)) ? 0.08 : 1; applyK(w, t);
+      const t = (cutOn && !w.bay && !(w.seal && this.keepSeals) && w.ring === this.cutRing && Math.abs(degDiff(camB, w.mid)) < 72) || (blocking && !(w.seal && this.keepSeals)) ? 0.08 : 1; applyK(w, held(w, t));
     }
     for (const tr of this.animTorches) { if (tr.deg == null) continue; const t = cutOn && tr.ring === this.cutRing && Math.abs(degDiff(camB, tr.deg)) < 72 ? 0 : 1; const c = tr.cut + (t - tr.cut) * ease; if (Math.abs(c - tr.cut) > 0.01 || (t !== tr.cut && Math.abs(c - t) < 0.01)) { tr.cut = Math.abs(c - t) < 0.01 ? t : c; tr.spr.material.opacity = tr.cut; tr.spr.sprite.visible = tr.cut > 0.02; } }
     for (const p of this.pillarMeshes) {
@@ -666,7 +670,7 @@ export class ChainWorld {
       let cut = 1;
       if (cutOn) { const o = CHAIN.all[this.cutRing], dx = p.g.position.x - o.center.x, dz = p.g.position.z - o.center.z; if (Math.abs(Math.hypot(dx, dz) - o.R) < 1.6 && Math.abs(degDiff(camB, toDeg(dx, dz))) < 72) cut = 0.08; }   // junction pillars sit on two circles: test against the cut ring itself
       if (!this.fadeOff && cam.y > 1.5 && occludes(p.g.position.x, p.g.position.z, 1.6)) cut = Math.min(cut, 0.08);
-      applyK(p, Math.min(near, cut));
+      applyK(p, Math.min(near, held(p, cut)));
     }
     if (this.fireflies && this.fireflies.visible) for (const fl of this.flies) {
       fl.ph += dt * fl.sp; const s = fl.s;

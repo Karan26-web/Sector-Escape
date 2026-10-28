@@ -13,7 +13,7 @@ python3 -m http.server 8321      # in the project folder, then open http://local
 ```
 
 ## Controls
-The player walks Karan between the action beats: along the causeway to ring 1's gate, to the glowing observation spot in each ring, out through each cleared gap, across the temple court. Each walk keeps him on its own floor, and its goal lights up as he nears it or whenever he stops. During the action (the top view, the shot and its outcome) he stays on his spot, and the learner's only job is the area.
+The player walks Karan between the action beats: along the causeway to ring 1's gate, to the glowing observation spot in each ring, out through each cleared gap, across the temple court. Each walk keeps him on its floor, which includes every ring already cleared, so he can walk back as far as ring 1's gate (shut behind him); its goal lights up as he nears it or whenever he stops. During the action (the top view, the shot and its outcome) he stays on his spot, and the learner's only job is the area.
 
 | Action | Input |
 |---|---|
@@ -25,7 +25,7 @@ The player walks Karan between the action beats: along the causeway to ring 1's 
 
 ## Dev and QA
 - URL parameters: `?level=5` start at arena 5 · `?skip=1` skip the causeway · `?mute=1` · `?reset=1` wipe saved progress (the opening plays again) · `?auto=1` Karan walks each walk by himself (the playtests use it).
-- Console: `__se.phase` (opening.stranded → opening.temple → opening.path → causeway → gate → inside → arrive → observe → tactical → scan → input → solve (arenas 1–4: the working) → firing → result → exit), `__se.answer('correct' | 'under' | 'over')` (any arena, chosen or typed), `__se.walk(true)` (the autopilot), `__se.controller.read()`, `__se.scene`, `__se.CHAIN`.
+- Console: `__se.phase` (opening.stranded → opening.temple → opening.path → causeway → gate → inside → arrive → observe → tactical → scan → input (the answer bar runs; timeup if it runs out) → solve (arenas 1–4: the working) → firing → result → exit), `__se.answer('correct' | 'under' | 'over')` (any arena, chosen or typed), `__se.walk(true)` (the autopilot), `__se.scene.answerLeft = 3` (run the answer bar out), `__se.controller.read()`, `__se.scene`, `__se.CHAIN`.
 
 ## Project layout
 ```
