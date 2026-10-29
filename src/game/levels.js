@@ -81,8 +81,10 @@ const ENV = {
 export const LEVELS = [
   { id: 1, name: 'The Mossy Gate', tagline: 'A small gate. A big trap.', radius: 7, theta: 90, exitDeg: 45, timeBudget: 60, speed: 'Slow', scaffold: 'full', env: ENV.day,
     ask: { kind: 'mcq', options: [{ n: 90, d: 360, fp: 1, r: 7, rp: 2 }, { n: 90, d: 180, fp: 1, r: 7, rp: 2 }, { n: 90, d: 360, fp: 2, r: 7, rp: 1 }] } },
+  // (LXD 2026-10-29: the angles are 120 · 240 · 360, so copying the printed 120° is not enough: 240 is the big (major)
+  // sector, 360 the full circle. The old 30° with 21 m gave exactly the right area and cleared the arena.)
   { id: 2, name: 'Fallen Idol', tagline: 'A third of the wall is missing', radius: 10.5, theta: 120, exitDeg: 0, timeBudget: 54, speed: 'Slow–Moderate', scaffold: 'formula', env: ENV.day2,
-    ask: { kind: 'pick', form: 'theta', a: [60, 120, 30], r: [21, 120, 10.5] }, show: { angle: 'value', radius: 'value' } },
+    ask: { kind: 'pick', form: 'theta', a: [120, 240, 360], r: [21, 120, 10.5] }, show: { angle: 'value', radius: 'value' } },
   { id: 3, name: 'Serpent Court', tagline: 'The guardians grow restless', radius: 14, theta: 90, exitDeg: 320, timeBudget: 50, speed: 'Moderate', scaffold: 'hint', env: ENV.dusk,
     ask: { kind: 'pick', form: 'fraction', a: [[1, 4], [1, 2], [1, 5]], r: [21, 7, 14] }, show: { angle: 'right', radius: 'value' } },
   // (arena 4's choices are ours: the LXD said "as in round 3". 3/4 = 135/180, the half-turn slip; 1/4 = arena 3's answer
@@ -252,6 +254,7 @@ export function validateChain() {
     if (a.level.ask) {
       const right = choices(a.level).filter((c) => evaluatePick(c.expr, a.R, a.theta).status === 'correct');
       if (!right.some((c) => c.right)) problems.push(`Arena ${a.id}: no choice gives the area`);
+      if (right.some((c) => !c.right)) problems.push(`Arena ${a.id}: a wrong choice gives exactly the right area`);
     } else if (a.level.piForm) {
       const k = sectorCoef(a.R, a.theta);
       if (!Number.isInteger(a.R) || !Number.isInteger(k)) problems.push(`Arena ${a.id}: r ${a.R}, answer ${k}π: not whole numbers`);
@@ -315,7 +318,9 @@ export function evaluateAnswer(raw, r, theta, { piForm = false } = {}) {
   if (status === 'correct') ratio = 1;   // (exactly θ: 102.9/0.7 is right, but θ × ratio came out a hair over and bounced rays)
   const firedTheta = Math.min(360, theta * ratio);
   const diagnosis = status === 'correct' ? null : piForm ? diagnosePi(p.piCoef, r, theta, coef) : diagnose(p.value, r, theta, exact);
-  return { ...base, status, entered: p.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis };
+  const res = { ...base, status, entered: p.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis };
+  res.shot = shotFor(res, r, theta);
+  return res;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -347,11 +352,15 @@ export function choices(L) {
 export function pickTruth(L) {
   const right = choices(L).find((c) => c.right); return right ? right.sel : {};
 }
-/** Evaluate a chosen expression like a typed answer (status, the fired wedge), in terms of π. */
-export function evaluatePick(e, r, theta) {
+/** Evaluate a chosen expression like a typed answer (status, the fired wedge), in terms of π. L + sel: the level and the
+ *  choice, for the diagnosis of a wrong one (what it got wrong, and so the picture of its shot). */
+export function evaluatePick(e, r, theta, L = null, sel = null) {
   const k = exprCoef(e), coef = sectorCoef(r, theta), value = k.n / k.d, status = Math.abs(value / coef - 1) < 1e-9 ? 'correct' : value < coef ? 'under' : 'over';
   const ratio = status === 'correct' ? 1 : value / coef, firedTheta = Math.min(360, theta * ratio);
-  return { status, coef, entered: value * PI.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis: null, k };
+  const res = { status, coef, entered: value * PI.value, ratio, firedTheta, excessTheta: Math.max(0, firedTheta - theta), coverage: Math.min(1, ratio), diagnosis: null, k };
+  if (status !== 'correct' && L && sel) res.diagnosis = diagnosePick(L, sel, status === 'under');
+  res.shot = shotFor(res, r, theta, e);
+  return res;
 }
 /** The working, line by line, for the animation (ui.formula.solveExpr): as chosen → (a decimal radius as a fraction) →
  *  the fraction reduced and the power worked out → A = kπ. */
@@ -362,54 +371,84 @@ export function solveSteps(e) {
   steps.push({ k: exprCoef(e) });
   return steps;
 }
-/** One line after a wrong choice: what was misread, in the diagram's own terms. */
-export function pickTip(L, sel) {
-  const ask = L.ask, truth = pickTruth(L), R = formatNumber(L.radius);
+/* ---------------------------------------------------------------------- */
+/* Mistakes (LXD review 2026-10-29)                                         */
+/*  Every mistake the game can name has a title (⚠ what went wrong), an     */
+/*  idea (💡 the first rung of the hint ladder: what to check, never a      */
+/*  number) and an errorType, the picture its shot gets (A3): 'angle' a    */
+/*  wider or narrower sweep · 'radius' the right angle with a longer or     */
+/*  shorter beam · 'other' the sweep by area, with a line saying it is the */
+/*  size that is wrong, not the angle.                                      */
+/* ---------------------------------------------------------------------- */
+export const MISTAKES = {
+  // the fraction of the turn
+  'half-turn': { type: 'angle', title: 'That fraction is out of half a turn.', idea: 'An angle is a fraction of a full turn.' },
+  'squared-fraction': { type: 'angle', title: 'The square is on the wrong part.', idea: 'Check which part of the formula gets squared.' },
+  'full-turn': { type: 'angle', title: 'That angle is the whole circle.', idea: 'Use only the angle inside the sector.' },
+  'major-sector': { type: 'angle', title: 'That angle is the big part of the circle.', idea: 'Use the angle inside the shaded sector.' },
+  'wrong-angle': { type: 'angle', title: 'That is not the angle at O.', idea: 'Read the angle at O again.' },
+  'wrong-fraction': { type: 'angle', title: 'That is not the sector’s share of the circle.', idea: 'What fraction of a full turn is the angle at O?' },
+  'full-circle': { type: 'angle', title: 'That is the area of the whole circle.', idea: 'The sector is only part of the circle.' },
+  'fraction-flipped': { type: 'angle', title: 'The fraction is upside down.', idea: 'The angle goes on top of the fraction.' },
+  double: { type: 'angle', title: 'That is exactly double.', idea: 'Check the fraction of a full turn.' },
+  both: { type: 'angle', title: 'Both the angle and the radius are off.', idea: 'Read the angle at O and the radius again.' },
+  // the radius
+  'used-diameter': { type: 'radius', title: 'That length is the diameter.', idea: 'The radius runs from O to the wall, not across.' },
+  'angle-as-radius': { type: 'radius', title: 'That is the angle, not a length.', idea: 'The radius is a length in metres.' },
+  'half-radius': { type: 'radius', title: 'That is only part of the radius.', idea: 'The radius runs from O all the way to the wall.' },
+  'wrong-radius': { type: 'radius', title: 'That is not the radius.', idea: 'Read the radius again: from O to the wall.' },
+  'not-squared': { type: 'radius', title: 'The radius was not squared.', idea: 'Check which part of the formula gets squared.' },
+  // the size: neither the angle nor the radius
+  'pi-included': { type: 'other', title: 'π was multiplied in.', idea: 'The π is already printed beside your answer.' },
+  'arc-length': { type: 'other', title: 'That is the arc length, not the area.', idea: 'Area needs the radius squared.' },
+  circumference: { type: 'other', title: 'That is the circumference.', idea: 'Area needs the radius squared, not the distance round.' },
+  angle: { type: 'other', title: 'That is just the angle.', idea: 'Work through the whole formula.' },
+  radius: { type: 'other', title: 'That is just the radius.', idea: 'Work through the whole formula.' },
+  'r-squared': { type: 'other', title: 'That is only r².', idea: 'Finish the formula: the fraction and π as well.' },
+  'forgot-pi': { type: 'other', title: 'π is missing.', idea: 'Multiply by π as well.' },
+  'pi-as-3': { type: 'other', title: 'π was taken as 3.', idea: 'Use the value of π given beside the formula.' },
+  decimal: { type: 'other', title: 'That is ten times too big.', idea: 'Check the place value.' },
+  half: { type: 'other', title: 'That is exactly half.', idea: 'Check each step of the working.' },
+  timeout: { type: 'other', title: 'Time ran out.', idea: 'Find the fraction of a full turn first, then square the radius.' },
+};
+/** A diagnosis: { code, type (the errorType), title, idea, note?, under }. */
+export function mistake(code, under = false, over = {}) { const m = MISTAKES[code]; return { code, type: m.type, title: m.title, idea: m.idea, under, ...over }; }
+/** No known mistake matches (A6): how far off it is, and a line after it saying what to check. */
+function unknownMistake(ratio, under) {
+  return { code: under ? 'under' : 'over', type: 'other', title: `About ${Math.round(Math.abs(ratio - 1) * 100)}% too ${under ? 'small' : 'large'}.`, note: 'Check the angle fraction and the radius again.', idea: '', under };
+}
+const tenTimes = (under) => ({ title: `That is ten times too ${under ? 'small' : 'big'}.` });
+
+/** Arenas 1–4: what a wrong choice got wrong, in the diagram's own terms. */
+export function diagnosePick(L, sel, under) {
+  const ask = L.ask, R = L.radius, th = L.theta, eq = (a, b) => Math.abs(a - b) < 1e-9, right = L.show && L.show.angle === 'right';
+  // (240/360 is also 120/180: the big sector is the reading that fits a drawn sector, so it is checked first)
+  const angleCode = (n, d) => (eq(n / d, 1) ? 'full-turn' : eq(n / d, (360 - th) / 360) ? 'major-sector' : eq(n / d, th / 180) ? 'half-turn' : eq(n / d, 360 / th) ? 'fraction-flipped' : ask.form === 'theta' ? 'wrong-angle' : 'wrong-fraction');
+  const radiusCode = (v) => (eq(v, 2 * R) ? 'used-diameter' : ask.form === 'theta' && eq(v, th) ? 'angle-as-radius' : eq(v, R / 2) ? 'half-radius' : 'wrong-radius');
+  const fit = (code) => mistake(code, under, code === 'wrong-fraction' && right ? { idea: 'What fraction of a full turn does the square mark at O show?' } : {});
   if (ask.kind === 'mcq') {
     const e = ask.options[sel.opt];
-    if (e.d !== 360) return `A full turn is 360°: the fraction is ${L.theta}/360, not ${e.n}/${e.d}.`;
-    if (e.fp === 2 || e.rp !== 2) return `Only the radius is squared: (${L.theta}/360) × π × (${R})².`;
-    return '';
+    if (e.fp === 2) return fit('squared-fraction');
+    if (e.rp !== 2) return fit('not-squared');
+    return fit(!eq(e.n / e.d, th / 360) ? angleCode(e.n, e.d) : radiusCode(e.r));
   }
-  const aWrong = sel.a !== truth.a, rWrong = sel.r !== truth.r, rv = ask.r[sel.r];
-  if (rWrong) {
-    if (rv === L.radius * 2) return L.show && L.show.radius === 'diameter' ? `${formatNumber(rv)} m is the diameter: the radius is half of it, ${R} m.` : `${formatNumber(rv)} m is twice the radius: the radius is ${R} m.`;
-    if (ask.form === 'theta' && rv === L.theta) return `${formatNumber(rv)} is the angle, not the radius: the radius is ${R} m.`;
-    return `The radius is ${R} m${L.show && L.show.radius === 'diameter' ? ': half the diameter' : ''}.`;
-  }
-  if (aWrong) {
-    if (ask.form === 'theta') return `The angle at O is ${L.theta}°.`;
-    const [n, d] = reduceFraction(L.theta, 360), mark = L.show && L.show.angle === 'right' ? 'The square mark at O means 90°' : `The angle is ${L.theta}°`;
-    return `${mark}: ${L.theta}/360 = ${n}/${d}.`;
-  }
-  return '';
+  const truth = pickTruth(L), aWrong = sel.a !== truth.a, rWrong = sel.r !== truth.r, av = ask.a[sel.a], [n, d] = ask.form === 'theta' ? [av, 360] : av;
+  if (aWrong && rWrong) return fit('both');
+  return fit(aWrong ? angleCode(n, d) : radiusCode(ask.r[sel.r]));
 }
 
 export function diagnose(entered, r, theta, exact = sectorArea(r, theta)) {
-  const pi = PI.value, piTxt = '22/7';
+  const pi = PI.value;
   const near = (v, target, rel = 0.02) => Math.abs(v - target) <= Math.max(0.51, Math.abs(target) * rel);
   const under = entered < exact;
   const checks = [
-    [pi * r * r, 'full-circle', 'That is the area of the WHOLE circle.', 'The open arc is only part of it — multiply πr² by θ/360.'],
-    [(theta / 360) * 2 * pi * r, 'arc-length', 'That is the ARC LENGTH, not the area.', 'Area needs r² — multiply by r once more, and use πr² instead of 2πr.'],
-    [(theta / 360) * pi * r, 'not-squared', 'The radius was not squared.', 'r² means r × r. Use ' + r + ' × ' + r + ' = ' + formatNumber(r * r) + '.'],
-    [2 * pi * r, 'circumference', 'That is the circumference of the circle.', 'Area uses πr², not 2πr.'],
-    [(theta / 360) * pi * (2 * r) * (2 * r), 'used-diameter', 'Looks like the diameter was used instead of the radius.', 'r is the distance from the gun to the wall: ' + r + ' m.'],
-    [theta, 'angle', 'You entered the angle itself.', 'θ is only the first ingredient. Compute (θ/360) × πr².'],
-    [r * r, 'r-squared', 'r² is only one step of the formula.', 'Now multiply by π and by θ/360.'],
-    [(theta / 360) * r * r, 'forgot-pi', 'π is missing.', 'You have (θ/360) × r² — now multiply by 22/7.'],
-    [r, 'radius', 'That is just the radius.', 'Use the full formula: (θ/360) × πr².'],
-    [exact * 10, 'decimal', 'Ten times too large.', 'Check your place value / decimal point.'],
-    [exact / 10, 'decimal', 'Ten times too small.', 'Check your place value / decimal point.'],
-    [(360 / theta) * pi * r * r, 'fraction-flipped', 'The fraction is upside down.', 'Use θ/360, not 360/θ.'],
-    [exact * 2, 'double', 'Exactly double the required area.', 'Did you use 2πr² or a 2 somewhere it does not belong?'],
-    [exact / 2, 'half', 'Exactly half the required area.', 'Check the fraction θ/360 — reduce it carefully.'],
-    [(theta / 360) * 3 * r * r, 'pi-as-3', 'π was taken as 3.', `Use π = ${piTxt} (≈ 3.14).`],
+    [pi * r * r, 'full-circle'], [(theta / 360) * 2 * pi * r, 'arc-length'], [(theta / 360) * pi * r, 'not-squared'], [2 * pi * r, 'circumference'],
+    [(theta / 360) * pi * (2 * r) * (2 * r), 'used-diameter'], [theta, 'angle'], [r * r, 'r-squared'], [(theta / 360) * r * r, 'forgot-pi'], [r, 'radius'],
+    [exact * 10, 'decimal'], [exact / 10, 'decimal'], [(360 / theta) * pi * r * r, 'fraction-flipped'], [exact * 2, 'double'], [exact / 2, 'half'],
+    [(theta / 360) * 3 * r * r, 'pi-as-3'],
   ];
-  for (const [target, code, title, tip] of checks) if (near(entered, target) && !near(target, exact, 0.005)) return { code, title, tip, under };
-  const pct = Math.round(Math.abs(entered / exact - 1) * 100);
-  return under ? { code: 'under', title: `About ${pct}% too small.`, tip: `Re-check each step: θ/360, then r², then × ${piTxt}.`, under: true }
-               : { code: 'over', title: `About ${pct}% too large.`, tip: `Re-check each step: θ/360, then r², then × ${piTxt}.`, under: false };
+  for (const [target, code] of checks) if (near(entered, target) && !near(target, exact, 0.005)) return mistake(code, under, code === 'decimal' ? tenTimes(under) : {});
+  return unknownMistake(entered / exact, under);
 }
 /** The same diagnosis for rings answered in terms of π: `entered` is the number in front of π, so every check is in
  *  units of π (the whole circle is r², the circumference 2r …). One mistake only exists here: multiplying by 22/7 (or
@@ -418,84 +457,98 @@ export function diagnosePi(entered, r, theta, coef = sectorCoef(r, theta)) {
   const near = (v, target, rel = 0.02) => Math.abs(v - target) <= Math.max(0.51, Math.abs(target) * rel);
   const under = entered < coef;
   const checks = [
-    [coef * PI.value, 'pi-included', 'π was multiplied in.', 'The π is already beside the answer — enter only the number in front of it.'],
-    [coef * 3.14, 'pi-included', 'π was multiplied in.', 'The π is already beside the answer — enter only the number in front of it.'],
-    [r * r, 'full-circle', 'That is the WHOLE circle (r²π).', 'The open arc is only part of it — multiply r² by θ/360.'],
-    [(theta / 360) * 2 * r, 'arc-length', 'That is the ARC LENGTH, not the area.', 'Area needs r², not 2r.'],
-    [(theta / 360) * r, 'not-squared', 'The radius was not squared.', `r² means r × r. Use ${r} × ${r} = ${r * r}.`],
-    [2 * r, 'circumference', 'That is the circumference (2rπ).', 'Area uses r², not 2r.'],
-    [(theta / 360) * 4 * r * r, 'used-diameter', 'Looks like the diameter was used instead of the radius.', `r is the distance from O to the wall: ${r} m.`],
-    [theta, 'angle', 'You entered the angle itself.', 'Compute (θ/360) × r².'],
-    [r, 'radius', 'That is just the radius.', 'Use (θ/360) × r².'],
-    [coef * 10, 'decimal', 'Ten times too large.', 'Check your place value.'],
-    [coef / 10, 'decimal', 'Ten times too small.', 'Check your place value.'],
-    [(360 / theta) * r * r, 'fraction-flipped', 'The fraction is upside down.', 'Use θ/360, not 360/θ.'],
-    [coef * 2, 'double', 'Exactly double the required area.', 'Is there an extra × 2?'],
-    [coef / 2, 'half', 'Exactly half the required area.', 'Check the fraction θ/360.'],
+    [coef * PI.value, 'pi-included'], [coef * 3.14, 'pi-included'], [r * r, 'full-circle'], [(theta / 360) * 2 * r, 'arc-length'], [(theta / 360) * r, 'not-squared'],
+    [2 * r, 'circumference'], [(theta / 360) * 4 * r * r, 'used-diameter'], [theta, 'angle'], [r, 'radius'], [coef * 10, 'decimal'], [coef / 10, 'decimal'],
+    [(360 / theta) * r * r, 'fraction-flipped'], [coef * 2, 'double'], [coef / 2, 'half'],
   ];
-  for (const [target, code, title, tip] of checks) if (near(entered, target) && !near(target, coef, 0.005)) return { code, title, tip, under };
-  const pct = Math.round(Math.abs(entered / coef - 1) * 100);
-  return { code: under ? 'under' : 'over', title: `About ${pct}% too ${under ? 'small' : 'large'}.`, tip: 'Re-check each step: θ/360, then r².', under };
+  for (const [target, code] of checks) if (near(entered, target) && !near(target, coef, 0.005)) return mistake(code, under, code === 'decimal' ? tenTimes(under) : {});
+  return unknownMistake(entered / coef, under);
+}
+
+/** The shot a wrong answer fires, drawn so the picture matches the mistake (A3): { theta, r } = the wedge's angle and how
+ *  far its beam reaches. A chosen sector formula fires exactly the sector it describes (its angle, its radius); otherwise
+ *  an 'angle' or 'other' mistake keeps the radius and the area sets the sweep, and a 'radius' mistake keeps the angle and
+ *  the area sets the reach (the diameter reaches twice as far, an unsquared radius falls short of the wall). */
+export function shotFor(res, r, theta, expr = null) {
+  if (res.status !== 'under' && res.status !== 'over') return { theta, r };
+  let s = null;
+  if (expr && expr.fp === 1 && expr.rp === 2) s = { theta: Math.min(360, (expr.n / expr.d) * 360), r: expr.r };
+  else if (res.diagnosis && res.diagnosis.type === 'radius') s = { theta, r: r * Math.sqrt(res.ratio) };
+  // (a beam reaches too far only when the area is too big, and falls short only when it is too small)
+  if (!s || (res.status === 'over' && s.r < r) || (res.status === 'under' && s.r > r)) return { theta: res.firedTheta, r };
+  return s;
 }
 
 /* ---------------------------------------------------------------------- */
-/* Scaffolding                                                             */
+/* Scaffolding: the formula, the hint ladder, the beam line, praise          */
 /* ---------------------------------------------------------------------- */
-/** Numbers for the formula above the keypad (user, 2026-10-22). The formula A = θ/360 × π × r² is shown from the start;
- *  the 1st wrong shot substitutes the numbers (θ, π = 22/7, r), crosses out what cancels (θ/360 → n/d; one r against
- *  the 7 of 22/7 → k = r/7) and simplifies (A = n/d × 22 × k × r); the 2nd shows the answer as a fraction. Every LXD
- *  radius is a multiple of 3.5, so k is 1, 1.5, 2, 2.5 or 3. */
+/** Numbers for the formula in the dock (user, 2026-10-22). A = θ/360 × π × r² is shown from the start; the hint ladder
+ *  substitutes part of it on the 2nd miss and works it all out on the 3rd (substituted → crossed out → simplified → the
+ *  answer). With π = 22/7 one r cancels against the 7 (k = r/7); in terms of π: A = n/d × π × r² → n/d × r²π = cn/cd π. */
 export function formulaParts(r, theta) {
   const [n, d] = reduceFraction(theta, 360), k = r / 7, P = 22 * k * r;
   const [an, ad] = reduceFraction(Math.round(n * P * 2), d * 2);
-  // in terms of π (rings 1–3, whole r): A = n/d × π × r × r → n/d × π × r² → n/d × r²π = cn/cd π
   const r2 = r * r, [cn, cd] = Number.isInteger(r2) ? reduceFraction(n * r2, d) : [n * r2, d];
   return { theta, r, n, d, k, P, an, ad, rText: formatNumber(r), kText: formatNumber(k), PText: formatNumber(P), answerFraction: ad === 1 ? `${an}` : `${an}/${ad}`,
     r2Text: formatNumber(r2), cn, cd };
 }
-/** One line near the beam after a WRONG shot: just the numbers (the banner already says too small / too wide). */
-export function beamLine(res, theta) {
+/** The hint ladder (LXD 2026-10-29, A1): misses (wrong shots and timeouts) climb it. 1st: the idea only, never a number.
+ *  2nd: part of the working, the fraction of the turn (or r², after a radius mistake) and "now finish the rest". 3rd, or
+ *  no shields left: the full working, then the game moves on with the right answer. */
+export const MOVE_ON = 3;
+export function hintFor(step, diag, L) {
+  if (step >= MOVE_ON) return 'Here is the full working.';
+  if (step === 2) {
+    const R = formatNumber(L.radius);
+    if (diag && diag.type === 'radius') return `r² = ${R} × ${R}. Now finish the rest.`;
+    return `${L.show && L.show.angle === 'right' ? `The square mark means ${L.theta}°, so ` : ''}θ/360 = ${L.theta}/360. Now finish the rest.`;
+  }
+  return diag ? diag.idea : '';
+}
+/** What share of the needed area an answer is, as a learner reads it: "only 1/28 of …", "2 times …", "about 25% more than …". */
+export function areaShare(k) {
+  if (k < 1) {
+    for (let q = 2; q <= 64; q++) { const p = Math.round(k * q); if (p >= 1 && Math.abs(p / q - k) < 1e-9) { const g = gcd(p, q); return `only ${p / g}/${q / g} of the area needed`; } }
+    return `only about ${Math.max(1, Math.round(k * 100))}% of the area needed`;
+  }
+  const n = Math.round(k);
+  if (Math.abs(k - n) < 1e-9) return `${n} times the area needed`;
+  return k >= 1.95 ? `about ${n} times the area needed` : `about ${Math.round((k - 1) * 100)}% more than the area needed`;
+}
+/** One line beside the arc after a WRONG shot, in the terms of its picture (A3, A4): an angle mistake says how far the
+ *  beam swept, a radius mistake how far it reached; a fraction squared (its sweep, a sliver, is not an angle anyone chose)
+ *  and any sweep past the whole circle compare the areas; an 'other' mistake says it is the size that is wrong, not the
+ *  angle. (The stamp already says too small / too big.) */
+export function beamLine(res, L) {
   if (res.status === 'correct') return '';
-  for (const d of [0, 1, 2]) { const v = +res.firedTheta.toFixed(d); if (v !== theta && v > 0) return `Your beam covered ${formatNumber(v)}° — the arc is ${theta}°.`; }
-  return res.status === 'under' ? `Your beam fell just short of the ${theta}° arc.` : `Your beam went just past the ${theta}° arc.`;
+  const R = L.radius, theta = L.theta, s = res.shot || { theta: res.firedTheta, r: R }, d = res.diagnosis || {};
+  const deg = (v) => { for (const k of [0, 1, 2]) { const x = +v.toFixed(k); if (x !== theta && x > 0) return formatNumber(x); } return formatNumber(v); };
+  const exactLen = Math.abs(s.r * 2 - Math.round(s.r * 2)) < 1e-6, len = formatNumber(s.r);   // (a length chosen or doubled: an unsquared radius's reach is not)
+  const longer = s.r > R + 0.05, shorter = s.r < R - 0.05, swept = Math.abs(s.theta - theta) > 0.05;
+  if ((longer || shorter) && swept) return `Your beam covered ${deg(s.theta)}° and reached ${len} m: the arc is ${theta}°, the radius ${formatNumber(R)} m.`;
+  if (longer) return `Your beam reached ${exactLen ? `${len} m` : 'past the wall'}${d.code === 'used-diameter' ? ', twice the radius' : ''}: the wall is ${formatNumber(R)} m from O.`;
+  if (shorter) return exactLen ? `Your beam stopped at ${len} m: the wall is ${formatNumber(R)} m from O.` : `Your beam stopped far short of the wall, ${formatNumber(R)} m from O.`;
+  if (d.type === 'other') return `The size is wrong, not the angle: your answer is ${d.code === 'pi-included' ? 'π times the area needed' : areaShare(res.ratio)}.`;
+  if (d.code === 'squared-fraction' || theta * res.ratio > 360.5) return `Your answer is ${areaShare(res.ratio)}.`;
+  return `Your beam covered ${deg(s.theta)}°: the arc is ${theta}°.`;
 }
-/** The misconception tip: one line just above the answer field. */
-export function tipLine(diag, r, theta) {
-  if (!diag) return '';
-  const [n, d] = reduceFraction(theta, 360), f = d === 1 ? `${n}` : `${n}/${d}`, rr = formatNumber(r), r2 = formatNumber(r * r);
-  const lines = {
-    'full-circle': `That's the whole circle — now take θ/360 = ${f} of it.`,
-    'arc-length': `That's the arc length — area needs π r², not 2πr.`,
-    'not-squared': `Looks like you didn't square r: ${rr} × ${rr} = ${r2}`,
-    circumference: `That's the circumference — area uses π r², not 2πr.`,
-    'used-diameter': `Looks like you used the diameter — r is ${rr} m.`,
-    angle: `That's just the angle — use (θ/360) × π r².`,
-    'r-squared': `r² = ${r2} is only one step — now × 22/7 × ${f}.`,
-    'forgot-pi': `π is missing — multiply by 22/7.`,
-    radius: `That's just the radius — use (θ/360) × π r².`,
-    decimal: diag.under ? `Ten times too small — check the decimal point.` : `Ten times too big — check the decimal point.`,
-    'fraction-flipped': `The fraction is upside down — use θ/360, not 360/θ.`,
-    double: `Exactly double — is there an extra × 2?`,
-    half: `Exactly half — check θ/360 = ${f}.`,
-    'pi-as-3': `π was taken as 3 — use 22/7.`,
-    'pi-included': `π is already beside your answer — enter only the number in front of it.`,
-  };
-  return lines[diag.code] || '';   // no generic advice: the solution line on the floor already shows the next step
-}
+/** Praise for an arena cleared without a single mistake (LXD 2026-10-29, D): what exactly the learner got right. */
+export function praiseLine(L) { const [n, d] = reduceFraction(L.theta, 360); return `First try, no mistakes! Exactly ${n}/${d} of the circle.`; }
 
 /* ---------------------------------------------------------------------- */
 /* Scoring                                                                 */
 /* ---------------------------------------------------------------------- */
-export const SCORE = { base: 500, timeMax: 300, noDamage: 300, perfectShot: 200 };
-/** Stars (shown on the results card with the reason for each): ★ cleared · ★ at most one miss · ★ first shot. */
-export function computeScore({ timeUsed, timeBudget, shieldsLost, firstTryCorrect }) {
+/** LXD 2026-10-29: a right first answer is worth more than speed (perfect first shot 300, time bonus at most 150). */
+export const SCORE = { base: 500, timeMax: 150, noDamage: 300, perfectShot: 300 };
+/** Stars (the map and the final screen): ★ cleared · ★ at most one miss · ★ first shot. flawless: not a single miss. */
+export function computeScore({ timeUsed, timeBudget, shieldsLost, firstTryCorrect, misses = shieldsLost }) {
   const timeBonus = Math.round(SCORE.timeMax * Math.max(0, 1 - timeUsed / Math.max(1, timeBudget)));
   const rows = [
     { label: 'Arena cleared', value: SCORE.base }, { label: 'Time bonus', value: timeBonus },
     { label: 'No damage', value: shieldsLost === 0 ? SCORE.noDamage : 0 }, { label: 'Perfect first shot', value: firstTryCorrect ? SCORE.perfectShot : 0 },
   ];
   const total = rows.reduce((s, r) => s + r.value, 0);
-  const criteria = [{ label: 'Cleared', ok: true }, { label: 'At most 1 miss', ok: shieldsLost <= 1 }, { label: 'First shot', ok: !!firstTryCorrect }];
+  const criteria = [{ label: 'Cleared', ok: true }, { label: 'At most 1 miss', ok: misses <= 1 }, { label: 'First shot', ok: !!firstTryCorrect }];
   const stars = criteria.filter((c) => c.ok).length;
-  return { rows, total, stars, criteria };
+  return { rows, total, stars, criteria, flawless: misses === 0 };
 }

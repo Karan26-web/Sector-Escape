@@ -93,7 +93,8 @@ export class Roam {
     this.game = game; this.world = game.world; this.hero = game.hero;
     this.cur = null;
     this.autopilot = false;   // tests: walk to the goal by itself (?auto=1, __se.walk(true))
-    this._v = new THREE.Vector3();
+    this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3();
+    this._cam = new THREE.PerspectiveCamera(52, 1, 0.5, 900); this._pose = { pos: new THREE.Vector3(), target: new THREE.Vector3(), fov: 52 };
     game.world.addUpdatable(this);
   }
   get active() { return !!this.cur; }
@@ -109,7 +110,7 @@ export class Roam {
     this.stop();
     return new Promise((res) => {
       const f = polar(o.yawDeg ?? 0, 1);
-      const c = this.cur = { ...o, res, fwd: new THREE.Vector3(f.x, 0, f.z), right: new THREE.Vector3(-f.z, 0, f.x), still: 0, stuck: 0, hl: 0, pinged: true, moved: 0, bumpT: 0, last: this.hero.pos.clone() };
+      const c = this.cur = { ...o, res, fwd: new THREE.Vector3(f.x, 0, f.z), right: new THREE.Vector3(-f.z, 0, f.x), still: 0, stuck: 0, hl: 0, pinged: true, moved: 0, bumpT: 0, last: this.hero.pos.clone(), slide: 0, side: new THREE.Vector3(-f.z, 0, f.x) };
       const h = this.hero;
       h.stop(); h.drive = new THREE.Vector3(); h.bound = (p) => { c.pushed = clampTo(c.region, p); };
       this.game.chain.watchPoint = h.pos;   // no wall between the walk camera and him stays solid
@@ -118,7 +119,28 @@ export class Roam {
       controller.enable(true);
     });
   }
-  follow(c) { const v = c.view || {}, yaw = c.yawDeg ?? 0; this.world.rig.follow((out) => walkPose(this.hero.pos, yaw, v, this.world.camera.aspect, out), v.lambda ?? 3.6); }
+  follow(c) {
+    const v = c.view || {}, yaw = c.yawDeg ?? 0;
+    this.world.rig.follow((out) => {
+      walkPose(this.hero.pos, yaw, v, this.world.camera.aspect, out);
+      if (c.slide) { out.pos.addScaledVector(c.side, -c.slide); out.target.addScaledVector(c.side, -c.slide); }   // (the goal kept clear of the stick)
+      return out;
+    }, v.lambda ?? 3.6);
+  }
+  /** How far (m) the walk camera slides to its left so the goal is not under the stick (LXD 2026-10-29: the spot hid behind
+   *  it in the bottom-left corner). The goal's glow, projected from the pose the camera is heading for, must clear the
+   *  stick's corner. Sideways only: the heading, and so the stick's directions, stay as they are. */
+  stickClear(c) {
+    const keep = controller.keepOut(); if (!keep || c.view === false) return 0;
+    const cam = this._cam, pose = walkPose(this.hero.pos, c.yawDeg ?? 0, c.view || {}, this.world.camera.aspect, this._pose);
+    cam.fov = pose.fov; cam.aspect = this.world.camera.aspect; cam.updateProjectionMatrix(); cam.position.copy(pose.pos); cam.lookAt(pose.target); cam.updateMatrixWorld();
+    c.side.set(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();   // (screen-right, on the floor)
+    const m = c.mark || c.goal.pos, W = window.innerWidth, H = window.innerHeight, v = this._v.set(m.x, 0.1, m.z).project(cam);
+    if (v.z > 1) return 0;
+    const x = ((v.x + 1) / 2) * W, y = ((1 - v.y) / 2) * H, e = this._v2.set(m.x, 0.1, m.z).addScaledVector(c.side, 1).project(cam), ppm = Math.abs(((e.x + 1) / 2) * W - x), rr = ppm * 0.9;   // (px per m beside it; the ring and its glow)
+    if (y + rr < keep.top || y - rr > H || x - rr > keep.right) return 0;
+    return (keep.right - (x - rr)) / Math.max(ppm, 1e-3);
+  }
   /** Take him back from the player (the walk is over, or the scene ended). The stick hides. */
   stop() {
     const c = this.cur; if (!c) return;
@@ -146,7 +168,8 @@ export class Roam {
     c.hl += (want - c.hl) * Math.min(1, dt * 4);
     if (c.highlight) c.highlight(c.hl, dt);
     if (c.onTick) c.onTick(h.pos);
-    const g = c.goal, done = g.reached ? g.reached(h.pos) : Math.hypot(h.pos.x - g.pos.x, h.pos.z - g.pos.z) < (g.r ?? 0.8);
+    c.slide += (this.stickClear(c) - c.slide) * Math.min(1, dt * 3);
+    const g = c.goal, done =g.reached ? g.reached(h.pos) : Math.hypot(h.pos.x - g.pos.x, h.pos.z - g.pos.z) < (g.r ?? 0.8);
     if (done && this.cur === c) { this.stop(); c.res(); }
   }
   /** autopilot: straight for the goal (every walk's region is convex enough), easing in at the end */

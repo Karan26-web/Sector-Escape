@@ -335,6 +335,12 @@ SFX['controller.reveal'] = (A) => {   // the stick appears: a stone thunk and a 
 SFX['tutorial.done'] = (A) => A.seq([[76, 0, 0.12, 1], [83, 0.08, 0.14, 1], [88, 0.16, 0.42, 0.9]], { type: 'triangle', vol: 0.08 });
 SFX['timer.low'] = (A) => A.seq([[69, 0, 0.12, 1], [69, 0.2, 0.12, 1]], { type: 'triangle', vol: 0.07 });   // 15 s left to answer: two soft taps
 SFX['timer.out'] = (A) => { const t = A.now; A.tone({ type: 'triangle', f0: 440, f1: 220, dur: 0.6, vol: 0.1, t0: t }); };   // the answer bar ran out
+SFX['ray.fizzle'] = (A) => {   // a beam too short dies out before the wall: a sputter, falling away
+  const t = A.now;
+  A.burst({ t0: t, dur: 0.45, vol: 0.16, type: 'bandpass', f0: 3200, f1: 500, Q: 1.6, env: { a: 0.005, d: 0.2, s: 0.25, r: 0.2 } });
+  A.tone({ t0: t, type: 'sawtooth', f0: 620, f1: 140, dur: 0.38, vol: 0.05, env: { a: 0.004, d: 0.18, s: 0.2, r: 0.15 } });
+};
+SFX['praise'] = (A) => A.seq([[79, 0, 0.14, 1], [84, 0.1, 0.14, 1], [88, 0.2, 0.18, 1], [91, 0.32, 0.6, 0.9]], { type: 'sine', vol: 0.09 });   // no mistakes: a bright little rising call
 SFX['objective.ping'] = (A) => {   // the goal lights up while the player stands still: a soft, bell-like call
   const t = A.now;
   A.tone({ t0: t, type: 'sine', f0: 1046.5, dur: 0.9, vol: 0.06, env: { a: 0.005, d: 0.25, s: 0.3, r: 0.6 } });

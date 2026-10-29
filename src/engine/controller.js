@@ -54,9 +54,15 @@ export const controller = {
   /** the stick's resting place: its corner, clear of the screen edge (and the phone's safe area: the zone itself sits inside it) */
   layout() {
     if (!this.el) return;
-    const h = this.el.clientHeight, s = window.innerWidth < 760 ? 22 : 30;
-    this.rest = { x: s + 66, y: h - s - 66 };
+    const h = this.el.clientHeight, s = window.innerWidth < 760 ? 22 : 30, e = this.el.getBoundingClientRect();
+    this.rest = { x: s + 66, y: h - s - 66 }; this.restPx = { x: e.left + this.rest.x, y: e.top + this.rest.y };
     if (this.stick.id == null) this.placeBase(this.rest);
+  },
+  /** The screen corner the stick covers at rest, with a margin (px: everything left of `right` and below `top`): a walk's
+   *  goal must never sit under it (LXD 2026-10-29). null while the stick is off. */
+  keepOut(m = 26) {
+    if (!this.on || !this.restPx) return null;
+    return { right: this.restPx.x + 66 + m, top: this.restPx.y - 66 - m };
   },
   placeBase(c) { this.base.style.left = `${c.x}px`; this.base.style.top = `${c.y}px`; },
 

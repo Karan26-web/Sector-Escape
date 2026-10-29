@@ -9,13 +9,15 @@
 //   learner answers → zoom out, the volley → outcome (exact: barrier and squad
 //   destroyed · too small: the barrier breaks, the ones it missed and more behind
 //   them storm in and pile on Karan · too big: everything destroyed, the excess
-//   rays bounce off the wall and knock Karan down)
-//   → results → the player walks him through the cleared gap into the next ring.
+//   rays bounce off the wall and knock Karan down) → a miss climbs the hint
+//   ladder (the idea → part of the working → the full working, and on; LXD
+//   2026-10-29) → the player walks him through the cleared gap into the next ring.
 // Shared world objects (chain, sector, barrier, bots) live in `game`; this class
 // only moves through them.
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
-import { CHAIN, botCountFor, evaluateAnswer, evaluatePick, pickTip, computeScore, beamLine, tipLine, enemyMaxR, SEAL_BEHIND, WALL_HEIGHT } from './levels.js';
+import { CHAIN, botCountFor, evaluateAnswer, evaluatePick, computeScore, beamLine, enemyMaxR, SEAL_BEHIND, WALL_HEIGHT, MOVE_ON, hintFor, mistake, praiseLine, choices, answerFor } from './levels.js';
+import { REACH_CAP } from './sector.js';
 import { Boss } from './boss.js';
 import { SDF, PILLARS, walkPose, ringsFloor } from './roam.js';
 import { playOpening, handoverPoint, CAUSEWAY_VIEW } from './opening.js';
@@ -29,8 +31,11 @@ import { ui } from '../ui/ui.js';
 
 const ABORT = Symbol('abort');
 const TIMEOUT = Symbol('timeout');
-const ANSWER_TIME = 90;   // s to answer each time the question is up (user 2026-10-28), shown only as a draining bar
+const ANSWER_TIME = 90;   // s to answer each time the question is up (user 2026-10-28): a draining bar with the seconds left
 const GUARD_TOP = 3.7;   // from the top view the guardians (1 m beyond the arc) rise this far past the arc toward screen-up
+/** The part of the formula a mistake's idea is about (the hint ladder's 1st rung points at it): the fraction, π or r². */
+const PART = { 'squared-fraction': 'r', 'not-squared': 'r', 'arc-length': 'r', circumference: 'r', 'r-squared': 'r', 'pi-included': 'pi', 'forgot-pi': 'pi', 'pi-as-3': 'pi', both: ['f', 'r'] };
+const partOf = (d) => (d ? PART[d.code] || (d.type === 'angle' ? 'f' : d.type === 'radius' ? 'r' : null) : null);
 
 export class ArenaScene {
   /** mode: 'causeway' (arena 1 from the jungle path) | 'inside' (spawn at the entrance) | 'entering' (Karan just walked in
@@ -40,7 +45,7 @@ export class ArenaScene {
     this.world = game.world; this.fx = game.fx; this.hero = game.hero; this.rig = game.world.rig; this.chain = game.chain; this.sector = game.sector; this.barrier = game.barrier; this.bots = game.bots;
     this.R = this.A.R; this.C = new THREE.Vector3(this.A.center.x, 0, this.A.center.z);
     this.next = index + 1 < CHAIN.arenas.length ? CHAIN.arenas[index + 1] : CHAIN.sanctuary;
-    this.shields = 3; this.maxShields = 3; this.misses = 0; this.firstTry = null; this.timeUsed = 0; this.attempt = 0;
+    this.shields = 3; this.maxShields = 3; this.misses = 0; this.firstTry = null; this.timeUsed = 0; this.attempt = 0; this.hintText = ''; this.solved = false;
     this.phase = 'init'; this.aborted = false; this.disposed = false; this._resolveFire = null; this.boss = null; this.pathDots = []; this.heroDown = null; this.storm = null;
     this.watch = this.V(this.A.watch); this.gapMid = this.W(this.A.exitDeg, this.R);
     this.world.addUpdatable(this);
@@ -98,17 +103,27 @@ export class ArenaScene {
   /** Points along the gap beyond the arc where the guardians' sprites end (they stand toward screen-up from above). */
   guardTops() { const A = this.A, out = []; for (let d = -A.theta / 2; d <= A.theta / 2 + 0.01; d += A.theta / 6) out.push(this.W(A.exitDeg + d, this.R + GUARD_TOP)); return out; }
   /** The whole circle (the construction, the shot, the result): the ring floor plus a sliver of wall and the guardians
-   *  behind the barrier. Every ring, r 7 or r 21, fills the view the same way. */
-  tacticalPose() {
+   *  behind the barrier. Every ring, r 7 or r 21, fills the view the same way. extra: more points to keep in frame. */
+  tacticalPose(extra = []) {
     const R = this.R, u = this.dirDeg(this.A.exitDeg), pts = [this.C.clone()];
     for (let a = 0; a < 360; a += 10) pts.push(this.C.clone().addScaledVector(this.dirDeg(a), R + 0.5));
-    pts.push(...this.guardTops());
+    pts.push(...this.guardTops(), ...extra);
     if (this.boss && this.boss.alive) pts.push(this.wardenTop());
     const p = this.fitPose(pts);
-    // TOO SMALL / TOO WIDE hang just below Karan's feet, in the empty half of the ring, so they never cover him
+    // TOO SMALL / TOO BIG / PERFECT hang just below Karan's feet, in the empty half of the ring, so they never cover him
     const v = this.C.clone().addScaledVector(u, -(this.A.watchR + 0.9)).project(p.cam);
     ui.setArenaCentre(((v.x + 1) / 2) * p.vw, ((1 - v.y) / 2) * p.vh);
     return { pos: p.pos, target: p.target, fov: p.fov };
+  }
+  /** How far a shot's beam is drawn: a beam that reaches past the wall (a radius mistake, A3) shows its red overshoot up to
+   *  REACH_CAP × R (an angle typed in as the radius, 120 m, would leave the ring a dot). */
+  reach(shot) { return shot ? Math.min(shot.r, REACH_CAP * this.R) : this.R; }
+  /** The lesson after a miss, from above: the whole ring, and for a beam that reached too far, all of its overshoot. */
+  lessonPose(res) {
+    const s = res.shot; if (!s || s.r <= this.R + 0.05) return this.tacticalPose();
+    const A = this.A, far = this.reach(s), span = Math.min(s.theta, A.theta), pts = [this.W(A.exitDeg, far + 2.6)];   // (+ the beam line beyond it)
+    for (let d = -span / 2; d <= span / 2 + 0.01; d += span / 6) pts.push(this.W(A.exitDeg + d, far + 0.6));
+    return this.tacticalPose(pts);
   }
   /** Zoomed in on the sector (LXD: the learner answers looking at the sector): O, both radii, the arc, the barrier and
    *  the guardians behind it, with room for the O, r and θ labels beside their lines. */
@@ -126,7 +141,7 @@ export class ArenaScene {
     const p = this.fitPose(pts, 0.94);
     return { pos: p.pos, target: p.target, fov: p.fov };
   }
-  /** A closer look at Karan when he takes a hit (LXD: the consequence must be evident). TOO SMALL / TOO WIDE move to just
+  /** A closer look at Karan when he takes a hit (LXD: the consequence must be evident). TOO SMALL / TOO BIG move to just
    *  below him in this view. near: how much floor around him stays in frame (m). */
   heroPose(near = 3.2, at = this.hero.pos) {
     const h = at.clone().setY(0), u = this.dirDeg(this.A.exitDeg), pts = [h.clone()];
@@ -215,10 +230,9 @@ export class ArenaScene {
     if (this.mode === 'causeway') await this.s(this.causeway());
     else if (this.mode === 'inside') await this.s(this.placeInside());
     audio.ambient.setMode(L.boss ? 'boss' : 'arena');
-    const ok = await this.s(this.battle());
+    await this.s(this.battle());   // (it always ends cleared: the hint ladder's last rung moves on, LXD 2026-10-29)
     this.game.lastShields = this.shields;
-    if (!ok) { this.setPhase('gameover'); return { outcome: 'gameover' }; }
-    const score = computeScore({ timeUsed: this.timeUsed, timeBudget: L.timeBudget, shieldsLost: this.maxShields - this.shields, firstTryCorrect: this.firstTry === true });
+    const score = computeScore({ timeUsed: this.timeUsed, timeBudget: L.timeBudget, shieldsLost: this.maxShields - this.shields, firstTryCorrect: this.firstTry === true, misses: this.misses });
     // cleared: straight on to the way out (user 2026-10-27: no results card; the stars are still kept for the map)
     await this.s(this.exitRun(score));
     this.setPhase('done');
@@ -314,8 +328,11 @@ export class ArenaScene {
     const A = this.A, M = this.game.markers;
     this.bots.calm = true;   // the pounding eases while he walks over (it is the player's walk: it may take a while)
     M.spotAt(this.watch);
+    // the walk looks toward the spot, its goal (LXD 2026-10-29, F2): along the gap's heading, a spot well off to one side
+    // started off-screen (ring 6) and slid into view in the bottom-left corner, under the stick
+    const to = this.watch.clone().sub(this.hero.pos), yaw = Math.hypot(to.x, to.z) > 2 ? toDeg(to.x, to.z) : A.exitDeg;
     await this.s(this.game.roam.run({
-      region: SDF.minus(ringsFloor(this.index), PILLARS), yawDeg: A.exitDeg, view: this.walkView(),   // (this ring, and back through the cleared ones)
+      region: SDF.minus(ringsFloor(this.index), PILLARS), yawDeg: yaw, view: this.walkView(),   // (this ring, and back through the cleared ones)
       goal: { pos: this.watch, r: 0.75 }, near: 2.5, far: 10, highlight: (k, dt) => M.spotSet(k, dt), onBump: (p) => this.edgeBump(p),
     }));
     M.spotOff();
@@ -359,63 +376,72 @@ export class ArenaScene {
     await this.s(this.rig.moveTo(this.sectorPose(), 0.9, Ease.inOutCubic));    // zoom in on the sector: the learner answers here
     const arcTop = this.W(A.exitDeg, R + GUARD_TOP, 0.6), outward = this.dirDeg(A.exitDeg);
     // ---- back to the sector for the next answer (after a missed shot or a timeout): Karan returns to his spot, the barrier
-    //      forms again and a fresh squad charges it; typed arenas work the formula one step further (1st miss → substitute,
-    //      cross out, simplify; 2nd miss → the answer as a fraction)
-    const regroup = async () => {
+    //      forms again and a fresh squad charges it while the dock's formula climbs the hint ladder (work); the choices come
+    //      back in a new order (A2). Before the full working (the ladder's last rung) the dock stays locked.
+    const regroup = async (work = null) => {
       const back = this.hero.distTo(this.watch) > 0.15 ? this.hero.runTo(this.watch, 3.2, { face: this.gapMid, within: 0.06 }) : null;
       this.rig.moveTo(this.sectorPose(), 0.8, Ease.inOutCubic);
       this.spawnSquad(); this.bots.calm = false;
       const arrived = this.squadArrives();
-      if (!picking && this.misses === 1) await this.s(ui.formula.walkthrough());
-      else if (!picking && this.misses === 2) await this.s(ui.formula.solve());
+      if (work) await this.s(work);
       await this.s(arrived); if (back) await this.s(back); this.hero.faceTo(this.gapMid);
       this.bots.calm = true;
+      if (this.moveOn()) return;
+      if (picking) ui.pick.reshuffle();
       ui.panel.unlock();
     };
     // a tablet turned (or the window resized) mid-question: frame the sector again once the dock has its new layout
     this.world.onResize = this._onResize = () => { this.refitIn = 0.25; };
     // ---- input loop (the dock opens once: re-opening it after an unreadable first entry wiped the tip that says so)
-    ui.panel.open({ piForm, level: L, onFire: (v) => this._resolveFire && this._resolveFire(v), onType: () => ui.beamline.hide() });
+    ui.panel.open({ piForm, level: L, onFire: (v) => this._resolveFire && this._resolveFire(v), onType: () => { ui.beamline.hide(); ui.panel.clearMistake(); } });
     while (true) {
       this.attempt++;
-      this.setPhase('input');
-      if (this.answerLeft == null) {   // (an unreadable entry keeps the time it had)
-        // a new question: the last shot's numbers line fades out, then the bar opens where it was (user 2026-10-28)
-        const after = ui.beamline.shown ? 0.32 : 0; ui.beamline.hide(true);
-        this.answerLeft = ANSWER_TIME; this.answerWarned = false; ui.timer.start(after);
-      }
-      const t0 = this.world.elapsed;
-      const answer = await new Promise((res) => { this._resolveFire = res; });
-      this._resolveFire = null; this.timeUsed += this.world.elapsed - t0;
-      if (answer === ABORT) throw ABORT;
-      if (answer === TIMEOUT) {
-        this.answerLeft = null; ui.timer.hide();
-        if (!(await this.s(this.timeUp()))) return this.gameOver();
-        ui.panel.setTip(''); await this.s(regroup()); continue;
+      let answer;
+      if (this.moveOn()) answer = await this.s(this.solution(picking));   // the hint ladder's last rung: the full working, then on
+      else {
+        this.setPhase('input');
+        if (this.answerLeft == null) {   // (an unreadable entry keeps the time it had)
+          // a new question: the last shot's numbers line fades out, then the bar opens where it was (user 2026-10-28)
+          const after = ui.beamline.shown ? 0.32 : 0; ui.beamline.hide(true);
+          this.answerLeft = ANSWER_TIME; this.answerWarned = false; ui.timer.start(after, ANSWER_TIME);
+        }
+        const t0 = this.world.elapsed;
+        answer = await new Promise((res) => { this._resolveFire = res; });
+        this._resolveFire = null; this.timeUsed += this.world.elapsed - t0;
+        if (answer === ABORT) throw ABORT;
+        if (answer === TIMEOUT) {
+          this.answerLeft = null; ui.timer.hide();
+          await this.s(this.timeUp());
+          await this.s(regroup(this.coach(mistake('timeout'))));
+          continue;
+        }
       }
       let res;
       if (picking) {
         // the chosen formula is worked out on screen, right or wrong, and what it gives is fired (LXD 2026-10-27)
-        this.setPhase('solve'); ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false); this.answerLeft = null; ui.timer.hide();
+        this.setPhase('solve'); ui.panel.lock(); ui.panel.clearMistake(); ui.beamline.hide(false); this.answerLeft = null; ui.timer.hide();
         await this.s(ui.formula.solveExpr(answer.expr));
-        res = evaluatePick(answer.expr, R, A.theta); res.tip = res.status === 'correct' ? '' : pickTip(L, answer.sel);
+        res = evaluatePick(answer.expr, R, A.theta, L, answer.sel);
       } else {
         res = evaluateAnswer(answer, R, A.theta, { piForm });
-        if (res.status === 'invalid') { ui.panel.setTip(piForm ? 'Enter the number that goes in front of π' : 'Enter a number like 38.5 or 77/2'); audio.play('ui.error'); this.attempt--; ui.panel.unlock(); continue; }
+        if (res.status === 'invalid') { ui.panel.setFeedback({ mistake: piForm ? 'Enter the number that goes in front of π.' : 'Enter a number like 38.5 or 77/2.', hint: this.hintText }); audio.play('ui.error'); this.attempt--; ui.panel.unlock(); continue; }
       }
       this.answerLeft = null; ui.timer.hide();
-      // ---- the charge: zoom out to the whole circle, O charges and fires its rays all at once across the wedge the
-      //      answer asks for; they break the barrier and strike the guardians behind the part of the arc they cover
-      this.setPhase('firing'); this.heroDown = null; ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false);
+      // ---- the charge: zoom out to the whole circle, O charges and fires its rays all at once across the wedge the answer
+      //      asks for, drawn the way the mistake was made (A3: a wider or narrower sweep, a longer or shorter beam); they
+      //      break the barrier and strike the guardians behind the part of the arc they cover. A beam that falls short of
+      //      the wall reaches neither: the guardians smash the glass themselves.
+      this.setPhase('firing'); this.heroDown = null; ui.panel.lock(); ui.panel.clearMistake(); ui.beamline.hide(false);
       await this.s(this.rig.moveTo(this.tacticalPose(), 0.8, Ease.inOutCubic));
       this.hero.faceTo(this.gapMid); this.hero.cast(); await this.s(delay(0.25));   // Karan casts toward the gap; the charge gathers at O as his palm reaches out
       await this.s(this.sector.charge());
-      const covered = Math.min(res.firedTheta, A.theta);
+      const covered = Math.min(res.shot.theta, A.theta), short = res.shot.r < R - 0.05;
       this.storm = null;
       await this.s(this.sector.fire({ ...res, theta: A.theta, breachDeg: A.exitDeg }, {
         onArc: () => {   // the rays hit the glass: the camera drops to see it crack (Karan in frame after a wrong answer), and
                          // every guardian at it hammers away as it cracks
           this.bots.rally(); this.rig.moveTo(this.breakPose(res.status !== 'correct'), 0.28, Ease.outCubic);
+          if (short) return delay(0.45).then(() => this.barrier.breakAt({ fromDeg: A.exitDeg - A.theta / 2, spanDeg: A.theta }));   // (no ray reached it)
           return this.barrier.breakAt({ fromDeg: A.exitDeg - covered / 2, spanDeg: covered });
         },
         onBreak: () => {   // it gives way. Too small: the ones the shot missed storm in that instant, more pouring in behind them
@@ -424,7 +450,7 @@ export class ArenaScene {
         },
         // too big: the bounced rays have just knocked Karan down and the camera is pushing in on him; otherwise the whole ring
         onSlowEnd: () => (res.status === 'over' ? null : this.rig.moveTo(this.tacticalPose(), 0.6, Ease.inOutCubic)),
-        targets: () => this.chargeTargets(res.status, covered),
+        targets: () => this.chargeTargets(res.status, covered, short),
         kill: (b, at) => this.bots.kill(b, at, 0.7),
         reflectTo: () => this.hero.pos.clone(),
         onReflect: () => this.hitHero('reflect'),
@@ -435,7 +461,13 @@ export class ArenaScene {
       if (res.status === 'correct') {
         if (this.firstTry === null) this.firstTry = this.attempt === 1;
         audio.play('sting.perfect');
-        await this.s(delay(1.6));   // let the gold snap of the wedge read before the way on lights up
+        // PERFECT, the word How to play uses too (A5: TOO SMALL / PERFECT / TOO BIG); not a single mistake: praise (D). The
+        // worked solution's shot gets no stamp: the learner did not choose it.
+        const flawless = this.misses === 0;
+        await this.s(delay(0.6));   // (the camera is back over the whole ring: the stamp hangs below Karan, clear of the sector)
+        const stamp = this.solved ? null : ui.stamp('perfect', 'PERFECT!', flawless ? praiseLine(L) : '', flawless ? 2.6 : 1.4);
+        if (flawless) audio.play('praise');
+        await this.s(Promise.all([delay(1.0), stamp]));   // let the gold snap of the wedge (and the praise) read before the way on lights up
         this.sector.releaseGhost(0.6); ui.panel.close(); ui.beamline.hide(); ui.setArenaCentre(null);
         this.sector.clearOverlays(true); await this.s(delay(0.3));
         return true;
@@ -449,51 +481,78 @@ export class ArenaScene {
         const storm = this.storm, got = storm ? await this.s(storm.contact) : false; this.storm = null;
         const stamp = ui.stamp('under', 'TOO SMALL', '', 1.5);
         if (got) { await this.s(Promise.race([storm.allIn, delay(1.8)])); await this.s(delay(0.9)); }   // the pile-on: the whole crowd on him, blows from every side
-        if (this.shields <= 0) { this.bots.halt(); await this.s(stamp); return this.gameOver(); }
         this.sector.pulse(); this.bots.pulseKill(); await this.s(delay(0.45));
         await this.s(this.hero.recover()); await this.s(stamp);
       } else {
         // too big: every guardian fell, but the excess rays bounced off the wall into Karan (during the shot); he gets up
-        await this.s(ui.stamp('over', 'TOO WIDE', '', 1.3));
+        await this.s(ui.stamp('over', 'TOO BIG', '', 1.3));
         if (this.heroDown) await this.s(this.heroDown);
-        if (this.shields <= 0) return this.gameOver();
       }
-      // the lesson, from above, once the action is over: the shot against the sector (the dashed target around it / its red
-      // excess) and the numbers line beside the arc (during the push-in it would only collide with the r label)
-      await this.s(this.rig.moveTo(this.tacticalPose(), 0.6, Ease.inOutCubic));
-      ui.beamline.show(beamLine(res, A.theta), res.status, arcTop, outward); await this.s(delay(0.7));
+      // the lesson, from above, once the action is over: the shot against the sector (the dashed target around it, its red
+      // excess, the overshoot or the gap a short beam left) and the numbers line beside the arc, or past an overshoot
+      await this.s(this.rig.moveTo(this.lessonPose(res), 0.6, Ease.inOutCubic));
+      const far = this.reach(res.shot), lineAt = far > R + 0.05 ? this.W(A.exitDeg, far + 1.2, 0.6) : arcTop;
+      ui.beamline.show(beamLine(res, L), res.status, lineAt, outward); await this.s(delay(0.7));
       this.sector.releaseGhost(0.8);
-      // ---- the one-line tip goes above the answer. Chosen: the wrong choices are struck out and the plain formula returns
-      //      (each try already showed its working)
-      ui.panel.setTip(picking ? res.tip : tipLine(res.diagnosis, R, A.theta));
-      if (picking) { ui.pick.markWrong(answer.sel); ui.formula.show(R, A.theta, { piForm }); }
-      await this.s(regroup());
+      // ---- one rung up the hint ladder (LXD 2026-10-29). Chosen: the choice lets go (nothing is struck out) and the plain
+      //      formula returns, for the ladder to work on
+      if (picking) { ui.pick.afterMiss(answer.sel); ui.formula.show(R, A.theta, { piForm }); }
+      await this.s(regroup(this.coach(res.diagnosis)));
     }
   }
+  /** The ladder's last rung is due: the 3rd miss, or no shields left (in arenas 1–4 the last one holds). */
+  moveOn() { return this.misses >= MOVE_ON || this.shields <= 0; }
+  /** One rung up the hint ladder after a miss, a wrong shot or a timeout (LXD 2026-10-29, A1): the dock says what went
+   *  wrong (⚠) and gives the rung's hint (💡). 1st: the idea only, no numbers, and the formula points at its part. 2nd:
+   *  part of the working, worked into the formula and "now finish the rest". After that, or with no shields left, the
+   *  full working: solution(). Returns the formula's animation (it plays while the squad charges back in). */
+  coach(diag) {
+    const step = Math.min(this.misses, MOVE_ON), last = this.moveOn();
+    this.hintText = last ? '' : hintFor(step, diag, this.level);
+    ui.panel.setFeedback({ mistake: diag ? diag.title : '', note: (diag && diag.note) || '', hint: this.hintText });
+    if (last) return null;
+    if (step <= 1) { ui.formula.point(partOf(diag)); return null; }
+    return ui.formula.partial(diag && diag.type === 'radius' ? 'radius' : 'theta');
+  }
+  /** The hint ladder's last rung (LXD 2026-10-29): the full working and the right answer, then the game moves on. That
+   *  answer is fired (as the learner's would be), the barrier and the squad fall and the way on opens; no stamp, and the
+   *  stars count the misses. No arena ends in a game over any more. */
+  async solution(picking) {
+    const L = this.level;
+    this.setPhase('solution'); this.solved = true; this.answerLeft = null; ui.timer.hide(); ui.panel.lock(); ui.beamline.hide(false);
+    this.hintText = hintFor(MOVE_ON); ui.panel.setFeedback({ hint: this.hintText }); audio.play('ui.panel');
+    if (picking) {   // the right choice lights up; its working follows as any choice's does (solveExpr), and it is fired
+      const right = choices(L).find((c) => c.right); ui.pick.reveal(right.sel); await this.s(delay(0.9));
+      return { expr: right.expr, sel: right.sel };
+    }
+    ui.panel.setValue('');   // (the last wrong entry does not stand beside the working)
+    await this.s(ui.formula.full()); ui.panel.setValue(answerFor(L)); await this.s(delay(1.6));
+    return answerFor(L);
+  }
   /** The answer bar ran out (user 2026-10-28): the guardians have pounded the glass long enough. It gives way and they storm
-   *  Karan as after a too-small shot (−1 shield, a miss), until O's pulse throws them off. False if that was his last shield. */
+   *  Karan as after a too-small shot (−1 shield, a miss: one rung up the hint ladder), until O's pulse throws them off. */
   async timeUp() {
     const A = this.A;
     this.setPhase('timeup'); ui.panel.lock(); ui.panel.setTip(''); ui.beamline.hide(false); ui.pick.closeMenu();
     if (this.firstTry === null) this.firstTry = false;
     this.misses++;
     audio.play('timer.out'); audio.play('sting.fail');
-    const stamp = ui.stamp('under', 'TIME’S UP', '', 1.5);
+    const stamp = ui.stamp('timeup', 'TIME’S UP', '', 1.5);
     await this.s(this.rig.moveTo(this.tacticalPose(), 0.7, Ease.inOutCubic));
     this.bots.calm = false; this.bots.rally();
     await this.s(this.barrier.breakAt({ fromDeg: A.exitDeg - A.theta / 2, spanDeg: A.theta }));
     this.bots.idle = true;
     const storm = this.bots.swarm(this.hero.pos, { extra: this.reinforcements(), onContact: () => this.hitHero('swarm'), onBlow: (b) => this.blowOnHero(b) });
     if (await this.s(storm.contact)) { await this.s(Promise.race([storm.allIn, delay(1.8)])); await this.s(delay(0.9)); }
-    if (this.shields <= 0) { this.bots.halt(); await this.s(stamp); return false; }
     this.sector.pulse(); this.bots.pulseKill(); await this.s(delay(0.45));
     await this.s(this.hero.recover()); await this.s(stamp);
-    return true;
   }
   /** Who the charge destroys. Exact or wider: the whole squad. Too small (LXD): only the guardians fully inside the covered
-   *  part of the arc (one it merely grazes slips past), and never all of them, however close the answer. */
-  chargeTargets(status, covered) {
+   *  part of the arc (one it merely grazes slips past), and never all of them, however close the answer; a beam that falls
+   *  short of the wall reaches none of them. */
+  chargeTargets(status, covered, short = false) {
     const alive = this.bots.alive, A = this.A;
+    if (short) return [];
     if (status !== 'under') return alive;
     let hit = alive.filter((b) => this.bots.inSector(b, A.exitDeg, covered / 2 - (0.6 / (this.R + 1)) / DEG));
     if (alive.length > 1 && hit.length >= alive.length - 1) {
@@ -508,15 +567,15 @@ export class ArenaScene {
   /** Karan takes a hit: the bounced rays (he is knocked down) or the swarm reaching him (down under the pile). −1 shield. */
   hitHero(kind) {
     if (this.shields <= 0 || this.aborted) return;
-    // the chosen arenas (1–4) can never end in a game over (GDD): their last shield takes the blow and holds. A drop-down
-    // miss strikes out only its wrong part, so three or four misses (and now timeouts) can come before the right pair
+    // the chosen arenas (1–4) keep their last shield: it takes the blow and holds (their third miss moves on, as a typed
+    // arena's does when its shields run out: the hint ladder's last rung, LXD 2026-10-29)
     const holds = !!this.level.ask && this.shields === 1;
     if (!holds) { this.shields--; ui.hud.setShields(this.shields, this.maxShields); }
     ui.damage();
     audio.play(kind === 'reflect' ? 'reflect.hit' : 'bot.hit'); audio.play('player.hurt'); if (!holds) audio.play('shield.break');
     this.fx.hit(this.hero.pos.clone().add(new THREE.Vector3(0, 1, 0))); this.rig.shake(0.6, 0.6);
     if (kind === 'reflect') {
-      // thrown back away from the gap: frame (and hang TOO WIDE below) where he will land, not where he stood
+      // thrown back away from the gap: frame (and hang TOO BIG below) where he will land, not where he stood
       const land = this.hero.pos.clone().add(this.hero.pos.clone().sub(this.gapMid).setY(0).normalize().multiplyScalar(1.4));
       this.heroDown = this.hero.knockdown(this.gapMid);
       this.rig.moveTo(this.heroPose(3.2, land), 0.55, Ease.outCubic);
@@ -531,7 +590,6 @@ export class ArenaScene {
     audio.play('swarm.blow', { pan: this.bots.pan(b), minGap: 0.07 });
     this.fx.sparks(this.hero.pos.clone().setY(0.4), 3, 0xff6040, 3, 0.4, 0.28); this.hero.flash(0xff6050, 0.18); this.rig.shake(0.1, 0.12);
   }
-  gameOver() { this.bots.halt(); this.chain.setFocus(this.index, false, 0.6, { cull: false }); audio.play('sting.gameover'); audio.music.setMode('calm'); ui.panel.close(); ui.beamline.hide(); ui.setArenaCentre(null); this.sector.clearOverlays(true); return false; }
 
   /* ---------------------------------------------------------------- reward + progression: through the cleared gap into the next ring */
   lightPath(points) {
@@ -612,7 +670,7 @@ export class ArenaScene {
     if (this.boss) this.boss.update(dt);
     if (this.refitIn > 0 && (this.refitIn -= Math.max(dt, 1 / 60)) <= 0 && this.phase === 'input') this.rig.moveTo(this.sectorPose(), 0.35, Ease.outCubic);
     if (this.answerLeft != null && this.phase === 'input' && dt > 0) {
-      this.answerLeft = Math.max(0, this.answerLeft - dt); ui.timer.set(this.answerLeft / ANSWER_TIME);
+      this.answerLeft = Math.max(0, this.answerLeft - dt); ui.timer.set(this.answerLeft / ANSWER_TIME, this.answerLeft);
       if (!this.answerWarned && this.answerLeft < 15) { this.answerWarned = true; audio.play('timer.low'); }
       if (this.answerLeft === 0 && this._resolveFire) this._resolveFire(TIMEOUT);
     }

@@ -2,7 +2,7 @@
 
 A 2.5D maths adventure that teaches the **area of a sector**, `A = (θ/360) × π × r²`, every area in terms of π: arenas 1–4 by choosing the right values (the game works the formula out, then fires it), arenas 5–7 by typing the number in front of π.
 
-On a magical evening, Karan is stranded on an islet in a jungle lake. A beam of light rises from a lost temple far away, and the only way there is a stone causeway into a chain of seven overlapping stone rings. Every game starts from the very start: Play always plays that opening (Skip › jumps it; there is no Continue), then the player walks Karan with an on-screen stick or W A S D. Each ring has a gap in its wall, which is the arc of a sector. When Karan arrives, guardians charge in from beyond the gap and pound on a thin barrier across it. The player walks him to a glowing spot behind the centre, and the camera goes top-down: a point O lights up, a radius grows from it and sweeps along the arc into the sector. The learner types the sector's area, and the answer sets the width of a volley of rays that O fires all at once. Exact: the barrier and every guardian are destroyed. Too small: the barrier breaks, and the guardians the rays missed storm in at once with more behind them, surround Karan and pile on. Too big: everything is destroyed, but the excess rays strike the wall beside the gap and those same rays bounce back and knock Karan down. A wrong answer costs a shield and works the formula through, one step per miss, right above the keypad.
+On a magical evening, Karan is stranded on an islet in a jungle lake. A beam of light rises from a lost temple far away, and the only way there is a stone causeway into a chain of seven overlapping stone rings. Every game starts from the very start: Play always plays that opening (Skip › jumps it; there is no Continue), then the player walks Karan with an on-screen stick or W A S D. Each ring has a gap in its wall, which is the arc of a sector. When Karan arrives, guardians charge in from beyond the gap and pound on a thin barrier across it. The player walks him to a glowing spot behind the centre, and the camera goes top-down: a point O lights up, a radius grows from it and sweeps along the arc into the sector. The learner types the sector's area, and the answer sets the width of a volley of rays that O fires all at once. Exact: the barrier and every guardian are destroyed. Too small: the barrier breaks, and the guardians the rays missed storm in at once with more behind them, surround Karan and pile on. Too big: everything is destroyed, but the excess rays strike the wall beside the gap and those same rays bounce back and knock Karan down. The shot is drawn the way the mistake was made: a wrong angle sweeps wider or narrower, a wrong radius keeps the angle and reaches past the wall or falls short of it. A wrong answer costs a shield and climbs a hint ladder in the dock: the idea first (no numbers), then part of the working, and after the third miss the full working, after which the game moves on.
 
 Vanilla ES modules, HTML/CSS UI, procedural Web Audio and the open-source Three.js renderer (one vendored file). No game engine, no framework, no build step.
 
@@ -25,7 +25,7 @@ The player walks Karan between the action beats: along the causeway to ring 1's 
 
 ## Dev and QA
 - URL parameters: `?level=5` start at arena 5 · `?skip=1` skip the causeway · `?mute=1` · `?reset=1` wipe saved progress (the opening plays again) · `?auto=1` Karan walks each walk by himself (the playtests use it).
-- Console: `__se.phase` (opening.stranded → opening.temple → opening.path → causeway → gate → inside → arrive → observe → tactical → scan → input (the answer bar runs; timeup if it runs out) → solve (arenas 1–4: the working) → firing → result → exit), `__se.answer('correct' | 'under' | 'over')` (any arena, chosen or typed), `__se.walk(true)` (the autopilot), `__se.scene.answerLeft = 3` (run the answer bar out), `__se.controller.read()`, `__se.scene`, `__se.CHAIN`.
+- Console: `__se.phase` (opening.stranded → opening.temple → opening.path → causeway → gate → inside → arrive → observe → tactical → scan → input (the answer bar runs; timeup if it runs out) → solve (arenas 1–4: the working) → firing → result → exit; solution: the hint ladder's last rung, the full working before the right answer is fired), `__se.answer('correct' | 'under' | 'over')` (any arena, chosen or typed), `__se.pick({ opt })` / `__se.pick({ a, r })` (arenas 1–4: exactly that choice), `__se.walk(true)` (the autopilot), `__se.scene.answerLeft = 3` (run the answer bar out), `__se.controller.read()`, `__se.scene`, `__se.CHAIN`.
 
 ## Project layout
 ```
@@ -70,8 +70,8 @@ Caching: the page, code and art are revalidated on every load (unchanged files c
 
 ## Playtests
 ```bash
-python3 playtest/smoke_chain.py    # title → map → causeway → arena 1 (the gap, the guardians at the barrier, too small, too wide, exact) → results → arena 2
-python3 playtest/chain_full.py     # arenas 6–7, the Warden, the temple finale, game over / retry / quit, phone layout
+python3 playtest/smoke_chain.py    # title → map → causeway → arena 1 (the gap, the guardians at the barrier, too small, too big, perfect) → arena 2
+python3 playtest/chain_full.py     # arenas 6–7, the Warden, the temple finale, the hint ladder's last rung (three misses → the full working → on), quit, phone layout
 ```
 To check loading like a player, throttle the network in the browser's dev tools (e.g. Fast 3G, cache disabled): the logo appears at once, the bar fills steadily and only moves forward, and the title buttons pop in at 100 %.
 Needs Python Playwright with Chromium. Screenshots go to `playtest/screens/`.

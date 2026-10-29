@@ -45,6 +45,20 @@ function waitClick(map) {
 /** (n/d)^fp × π × r^rp as the LXD writes it: (90/360) × π × (7)² */
 const exprHtml = (e) => { const f = `(<span class="frac"><span>${e.n}</span><span>${e.d}</span></span>)`, r = formatNumber(e.r); return `${f}${e.fp === 2 ? '<sup>2</sup>' : ''} × π × ${e.rp === 2 ? `(${r})<sup>2</sup>` : r}`; };
 const starsHtml = (n, max = 3) => [...Array(max)].map((_, i) => `<img src="${frameUrl('ui_icons', i < n ? 1 : 2)}" alt="">`).join('');
+/** Inline icons, cartoon style (bold outline, flat fill). LXD 2026-10-29: ⚠ marks a mistake and 💡 a hint (H2); the outcomes
+ *  carry a shape as well as a colour (H3): arrows closing in = too small, arrows opening out = too big, a tick = perfect;
+ *  the hourglass labels the time to answer (B1). */
+export const ICONS = {
+  warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6 L22.6 21 H1.4 Z" fill="#ffb02e" stroke="#3a1606" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 9 V14.2" stroke="#3a1606" stroke-width="2.8" stroke-linecap="round"/><circle cx="12" cy="17.6" r="1.6" fill="#3a1606"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4 a7 7 0 0 1 4.2 12.6 c-.8.6-1.2 1.4-1.2 2.3 V18 H9 v-.7 c0-.9-.4-1.7-1.2-2.3 A7 7 0 0 1 12 2.4 Z" fill="#ffe36b" stroke="#3a2a06" stroke-width="2" stroke-linejoin="round"/><path d="M9.2 20.2 H14.8 M10.2 22.4 H13.8" stroke="#3a2a06" stroke-width="2" stroke-linecap="round"/><path d="M10 8.2 a2.6 2.6 0 0 1 2-1.8" fill="none" stroke="#fff8d0" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  shrink: '<svg viewBox="0 0 40 24" aria-hidden="true"><path d="M2 12 H15 M9 5.5 L15.5 12 L9 18.5 M38 12 H25 M31 5.5 L24.5 12 L31 18.5" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  expand: '<svg viewBox="0 0 40 24" aria-hidden="true"><path d="M17 12 H3 M9.5 5.5 L3 12 L9.5 18.5 M23 12 H37 M30.5 5.5 L37 12 L30.5 18.5" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5 L9.5 18.5 L20.5 6" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  hourglass: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.8 H18 M6 21.2 H18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M7.4 3 C7.4 8 12 9.6 12 12 C12 14.4 7.4 16 7.4 21 H16.6 C16.6 16 12 14.4 12 12 C12 9.6 16.6 8 16.6 3 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.6 19.4 C10.4 17.4 12 16.6 12 16.6 C12 16.6 13.6 17.4 14.4 19.4 Z" fill="currentColor"/></svg>',
+};
+/** The icon an outcome carries (stamps, the beam line, How to play). */
+const OUTCOME_ICON = { under: ICONS.shrink, over: ICONS.expand, perfect: ICONS.check, correct: ICONS.check, timeup: ICONS.hourglass };
+const shuffled = (a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 
 export const ui = {
   init(g) {
@@ -54,6 +68,8 @@ export const ui = {
     // no speaker or pause button on screen (user, 2026-10-23): M toggles the sound, Esc pauses; the map's settings menu
     // and the pause menu also switch the sound
     $('#btn-pause-mute').addEventListener('click', () => audio.toggleMute());
+    $('#answer-timer .at-ico').innerHTML = ICONS.hourglass;
+    $('#feedback .fb-mistake .fb-ico').innerHTML = ICONS.warn; $('#feedback .fb-hint .fb-ico').innerHTML = ICONS.bulb;
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyM' && !(e.target instanceof HTMLInputElement)) audio.toggleMute(); if (e.code === 'Escape') game.togglePause(); });
     this.panel.init();
     // an <img> / SVG <image> shown by its blob: URL that ever fails to load falls back, once, to the file's own URL (data-file)
@@ -126,16 +142,17 @@ export const ui = {
         <text x="${C}" y="${C - 34}" class="d-lbl cy" text-anchor="middle">θ</text>
         <text x="${(C + x1) / 2 + 12}" y="${(C + y1) / 2 + 10}" class="d-lbl">r</text>
         <text x="${C}" y="${C - Rr - 8}" class="d-lbl small" text-anchor="middle">open arc</text></svg>`;
-      // 3 · Fire!: the three outcomes side by side
+      // 3 · Fire!: the three outcomes side by side, labelled as in the game (LXD 2026-10-29: TOO SMALL / PERFECT / TOO BIG),
+      //     each with its shape as well as its colour: the missing part dashed, the excess hatched, an icon by the name
       const mini = (kind) => {
         const c = 50, r = 38, wedge = (s, l, cls) => { const [ax, ay] = [c + r * Math.cos(s * Math.PI / 180), 54 + r * Math.sin(s * Math.PI / 180)], e = s + l, [bx, by] = [c + r * Math.cos(e * Math.PI / 180), 54 + r * Math.sin(e * Math.PI / 180)]; return `<path d="M${c} 54 L${ax} ${ay} A${r} ${r} 0 ${l > 180 ? 1 : 0} 1 ${bx} ${by} Z" class="${cls}"/>`; };
         const ring = `<circle cx="${c}" cy="54" r="${r}" class="m-ring"/>`;
         if (kind === 'small') return `<svg viewBox="0 0 100 100">${ring}${wedge(-135, 90, 'm-target')}${wedge(-112, 44, 'm-beam')}<circle cx="27" cy="31" r="5" class="m-bot"/><circle cx="73" cy="31" r="5" class="m-bot"/></svg>`;
         if (kind === 'right') return `<svg viewBox="0 0 100 100">${ring}${wedge(-135, 90, 'm-gold')}<text x="50" y="40" text-anchor="middle" class="m-star">★</text></svg>`;
-        return `<svg viewBox="0 0 100 100">${ring}${wedge(-160, 25, 'm-excess')}${wedge(-135, 90, 'm-beam')}${wedge(-45, 25, 'm-excess')}<path d="M86 34 Q74 52 56 54" class="m-bounce"/><path d="M56 54 l7 -6 M56 54 l8 3" class="m-bounce"/></svg>`;
+        return `<svg viewBox="0 0 100 100"><defs><pattern id="hw-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="rgba(225, 35, 85, 0.45)"/><rect width="3" height="6" fill="rgba(160, 10, 55, 0.95)"/></pattern></defs>${ring}${wedge(-160, 25, 'm-excess')}${wedge(-135, 90, 'm-beam')}${wedge(-45, 25, 'm-excess')}<path d="M86 34 Q74 52 56 54" class="m-bounce"/><path d="M56 54 l7 -6 M56 54 l8 3" class="m-bounce"/></svg>`;
       };
-      $('#hw-pic-2').innerHTML = [['small', 'Too small', 'The barrier breaks, but some guardians get through'], ['right', 'Just right', 'The barrier and every guardian destroyed'], ['big', 'Too big', 'The extra charge bounces back and knocks Karan down']]
-        .map(([k, t, d]) => `<figure class="hw-out ${k}">${mini(k)}<figcaption><b>${t}</b>${d}</figcaption></figure>`).join('');
+      $('#hw-pic-2').innerHTML = [['small', 'under', 'Too small', 'The barrier breaks, but some guardians get through'], ['right', 'perfect', 'Perfect', 'The barrier and every guardian destroyed'], ['big', 'over', 'Too big', 'The extra charge bounces back and knocks Karan down']]
+        .map(([k, o, t, d]) => `<figure class="hw-out ${k}">${mini(k)}<figcaption><b><span class="hw-ico">${OUTCOME_ICON[o]}</span>${t}</b>${d}</figcaption></figure>`).join('');
       $('#hw-shields').innerHTML = [0, 1, 2].map(() => `<img src="${frameUrl('ui_shield', 0)}" alt="">`).join('');
       // swipe / keys / dots
       const vp = $('.hw-viewport'); let x0s = null;
@@ -222,15 +239,18 @@ export const ui = {
       await delay(0.3);
     },
   },
-  /** The time to answer (user 2026-10-28): a thin bar at the top centre of the screen, no numbers, draining toward its
-   *  middle. set(f): f of the time left (1 → 0); amber in its last third, red and breathing in its last 15 s. */
+  /** The time to answer (user 2026-10-28): a thin bar at the top centre of the screen, draining toward its middle, labelled
+   *  with an hourglass and the seconds left (LXD 2026-10-29: the plain bar said nothing). set(f, left): f of the time left
+   *  (1 → 0) and the seconds; amber in its last third, red and breathing in its last 15 s. */
   timer: {
     /** A new question: the bar opens from its middle to full, `after` s from now (the last shot's numbers line first fades
      *  out where the bar runs: they ran into each other, user 2026-10-28). */
-    start(after = 0) { const el = $('#answer-timer'); this.f = null; el.style.setProperty('--timer-after', `${after}s`); el.classList.remove('intro'); void el.offsetWidth; el.classList.add('intro'); },
-    set(f) {
-      const el = $('#answer-timer'); if (this.f === f && el.classList.contains('on')) return; this.f = f;
-      el.classList.add('on'); el.firstElementChild.style.transform = `scaleX(${f.toFixed(4)})`;
+    start(after = 0, total = 90) { const el = $('#answer-timer'); this.f = null; this.secs = total; $('#answer-secs').textContent = String(total); el.style.setProperty('--timer-after', `${after}s`); el.classList.remove('intro'); void el.offsetWidth; el.classList.add('intro'); },
+    set(f, left) {
+      const el = $('#answer-timer'), s = Math.max(0, Math.ceil(left - 1e-6));
+      if (s !== this.secs) { this.secs = s; $('#answer-secs').textContent = String(s); }
+      if (this.f === f && el.classList.contains('on')) return; this.f = f;
+      el.classList.add('on'); el.querySelector('.at-bar > i').style.transform = `scaleX(${f.toFixed(4)})`;
       el.classList.toggle('low', f < 1 / 3); el.classList.toggle('last', f < 15 / 90);
     },
     hide() { this.f = null; $('#answer-timer').classList.remove('on', 'low', 'last', 'intro'); },
@@ -356,9 +376,14 @@ export const ui = {
     async show({ perArena, sessionTotal }) {
       ui.hud.hide(); ui.show('results'); $('#screen-results').classList.add('dim');
       const rows = $('#res-rows'); rows.innerHTML = ''; $('#res-total').textContent = '0';
+      // praise for no mistakes (LXD 2026-10-29): each arena cleared without one is marked; a run without one is praised
+      const praise = $('#res-praise'), flawless = perArena.length > 0 && perArena.every((r) => r.flawless);
+      const n = perArena.length, where = n === 1 ? 'the arena' : n === 2 ? 'both arenas' : `all ${n} arenas`;
+      praise.innerHTML = flawless ? `${ICONS.check}<span>Not a single mistake in ${where}. Outstanding work!</span>` : ''; praise.classList.remove('show');
       const btn = $('#btn-next'); btn.style.visibility = 'hidden';
       await sleep(400);
-      for (const r of perArena) { const tr = document.createElement('tr'); tr.innerHTML = `<td>Arena ${r.id} · ${r.name}<span class="st">${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}</span></td><td>+${r.score}</td>`; tr.style.opacity = 0; rows.appendChild(tr); await sleep(60); tr.style.transition = 'opacity .3s'; tr.style.opacity = 1; audio.play('ui.count'); await sleep(220); }
+      for (const r of perArena) { const tr = document.createElement('tr'); tr.innerHTML = `<td>Arena ${r.id} · ${r.name}<span class="st">${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}</span>${r.flawless ? '<span class="res-flawless">No mistakes</span>' : ''}</td><td>+${r.score}</td>`; tr.style.opacity = 0; rows.appendChild(tr); await sleep(60); tr.style.transition = 'opacity .3s'; tr.style.opacity = 1; audio.play('ui.count'); await sleep(220); }
+      if (flawless) { praise.classList.add('show'); audio.play('praise'); }
       const t0 = performance.now(), dur = 800; await new Promise((res) => { const tick = (t) => { const k = Math.min(1, (t - t0) / dur); $('#res-total').textContent = Math.round(sessionTotal * k); if (k < 1) { if (Math.random() < 0.5) audio.play('ui.count', { minGap: 0.05 }); requestAnimationFrame(tick); } else res(); }; requestAnimationFrame(tick); });
       btn.style.visibility = 'visible';
       await once(btn, 'click'); ui.hide('results');
@@ -382,8 +407,10 @@ export const ui = {
       for (let i = from; i < to; i++) { const im = box.children[i]; im.src = frameUrl('ui_shield', 0); im.dataset.full = '1'; im.classList.remove('refill'); void im.offsetWidth; im.classList.add('refill'); await sleep(180); }
     },
   },
+  /** kind: 'under' (TOO SMALL) · 'over' (TOO BIG) · 'perfect' · 'timeup': its colour and its icon (H3: never colour alone). */
   stamp(kind, title, sub = '', duration = 1.7) {
-    const el = $('#stamp'); el.className = kind; el.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`; void el.offsetWidth; el.classList.add('show'); audio.play('ui.stamp');
+    const el = $('#stamp'), ico = OUTCOME_ICON[kind];
+    el.className = kind; el.innerHTML = `<span class="st-title">${ico ? `<span class="st-ico">${ico}</span>` : ''}${title}</span>${sub ? `<small>${sub}</small>` : ''}`; void el.offsetWidth; el.classList.add('show'); audio.play('ui.stamp');
     clearTimeout(timers.stamp); return new Promise((res) => { timers.stamp = setTimeout(() => { el.classList.remove('show'); setTimeout(res, 200); }, duration * 1000); });
   },
   damage() { const el = $('#damage'); el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); },
@@ -437,8 +464,8 @@ export const ui = {
       else { const next = this.clean(inp.value + k); if (next === inp.value) { audio.play('ui.error', { minGap: 0.1 }); return; } inp.value = next; }
       audio.play('ui.type', { minGap: 0.02 }); this.changed();
     },
-    /** the student started a new answer: old feedback goes (LXD) */
-    changed() { this.refresh(); if (!this.typed && $('#answer').value.length) { this.typed = true; this.setTip(''); this.cfg && this.cfg.onType && this.cfg.onType(); } },
+    /** the student started a new answer: the old mistake line goes (LXD); the hint stays, it is for this try */
+    changed() { this.refresh(); if (!this.typed && $('#answer').value.length) { this.typed = true; this.clearMistake(); this.cfg && this.cfg.onType && this.cfg.onType(); } },
     refresh() { $('#answer-dock').classList.toggle('ready', $('#answer').value.trim().length > 0 && !this.locked); },
     open(cfg) {
       this.cfg = cfg; this.locked = false; this.typed = false;
@@ -447,12 +474,21 @@ export const ui = {
       if (picking) ui.pick.build(cfg.level, (choice) => { if (this.locked) return; audio.play('ui.confirm'); this.cfg.onFire && this.cfg.onFire(choice); });
       const pi = !!cfg.piForm; $('#answer-dock').classList.toggle('pi-form', pi);
       $('#answer').placeholder = pi ? '?' : 'Area'; $('#answer-sr').textContent = pi ? 'Area in square metres, as a number of π' : 'Area in square metres';
-      $('#answer-dock').classList.add('open'); $('#answer-dock').classList.remove('locked'); audio.play('ui.panel');
+      $('#answer-dock').classList.add('open'); $('#answer-dock').classList.remove('locked', 'solving'); audio.play('ui.panel');
       $('#answer').value = ''; this.setTip(''); this.refresh();
       if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 350);
     },
-    close() { $('#answer-dock').classList.remove('open', 'ready'); $('#answer').blur(); this.setTip(''); },
-    setTip(text) { const el = $('#tip'); el.textContent = text || ''; el.classList.toggle('show', !!text); },
+    close() { $('#answer-dock').classList.remove('open', 'ready', 'solving'); $('#answer').blur(); this.setTip(''); },
+    /** The feedback under the formula (LXD 2026-10-29, H2: at least 16 px, ⚠ for a mistake, 💡 for a hint): the mistake
+     *  (with an optional note, a line after it) and the hint ladder's current rung. Either may be empty. */
+    setFeedback({ mistake = '', note = '', hint = '' } = {}) {
+      const box = $('#feedback'), m = box.querySelector('.fb-mistake'), h = box.querySelector('.fb-hint'), mt = m.querySelector('.fb-text');
+      mt.textContent = mistake; if (note) { const s = document.createElement('span'); s.className = 'fb-note'; s.textContent = note; mt.appendChild(s); }
+      h.querySelector('.fb-text').textContent = hint;
+      m.classList.toggle('show', !!mistake); h.classList.toggle('show', !!hint); box.classList.toggle('show', !!(mistake || hint));
+    },
+    clearMistake() { const box = $('#feedback'); box.querySelector('.fb-mistake').classList.remove('show'); box.classList.toggle('show', box.querySelector('.fb-hint').classList.contains('show')); },
+    setTip(text) { this.setFeedback({ mistake: text || '' }); },
     lock() { this.locked = true; $('#answer-dock').classList.add('locked'); $('#answer-dock').classList.remove('ready'); },
     unlock() { this.locked = false; this.typed = false; $('#answer-dock').classList.remove('locked'); $('#answer').value = ''; this.refresh(); if (!$('#answer').hasAttribute('readonly')) setTimeout(() => $('#answer').focus({ preventScroll: true }), 50); },
     setValue(v) { $('#answer').value = String(v); this.refresh(); },
@@ -468,16 +504,20 @@ export const ui = {
 
   /* ---------------------------------------------------------- arenas 1–4 (LXD 2026-10-27): the answer is chosen
      mcq: three substituted formulas, a tap answers. pick: the formula with two drop-downs (the angle, or the fraction
-     θ/360, and the radius) and FIRE once both are set. After a wrong shot its wrong parts are struck out (the right part of
-     a half-right answer stays set), so every try has one guess fewer. Answers { expr, sel }. */
+     θ/360, and the radius) and FIRE once both are set. LXD 2026-10-29: nothing is struck out after a wrong shot. Every
+     option stays open and the order is shuffled each time the question is shown (and again after each miss), so the
+     learner thinks again instead of taking what is left; a half-right drop-down answer keeps its right part. No option
+     looks chosen before it is touched: hover only for a real pointer that has moved, the press on a tap. Answers
+     { expr, sel }. */
   pick: {
-    L: null, sel: {}, wrong: null, onChoose: null, menuSlot: null,
+    L: null, sel: {}, onChoose: null, menuSlot: null, order: null,
     build(L, onChoose) {
-      this.L = L; this.onChoose = onChoose; this.sel = {}; this.wrong = { opt: new Set(), a: new Set(), r: new Set() };
-      const ask = L.ask, box = $('#pick'); this.closeMenu();
+      this.L = L; this.onChoose = onChoose; this.sel = {};
+      const ask = L.ask, box = $('#pick'), idx = (list) => (list ? shuffled(list.map((_, i) => i)) : null); this.closeMenu();
+      this.order = { opt: idx(ask.options), a: idx(ask.a), r: idx(ask.r) };
       if (ask.kind === 'mcq') {
-        box.innerHTML = `<p class="pk-q">Which one gives the area of the sector?</p><div class="pk-opts">${ask.options.map((e, i) => `<button class="pk-opt silent" data-i="${i}"><span class="pk-x">${exprHtml(e)}</span></button>`).join('')}</div>`;
-        box.querySelectorAll('.pk-opt').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.i; if (!this.wrong.opt.has(i)) this.choose({ opt: i }); }));
+        box.innerHTML = `<p class="pk-q">Which one gives the area of the sector?</p><div class="pk-opts">${this.order.opt.map((i) => `<button class="pk-opt silent" data-i="${i}"><span class="pk-x">${exprHtml(ask.options[i])}</span></button>`).join('')}</div>`;
+        box.querySelectorAll('.pk-opt').forEach((b) => b.addEventListener('click', () => this.choose({ opt: +b.dataset.i })));
       } else {
         const chip = (slot) => `<button class="pk-chip silent" data-slot="${slot}" aria-haspopup="listbox" aria-label="${slot === 'r' ? 'the radius' : ask.form === 'theta' ? 'the angle' : 'the fraction of the circle'}">?</button>`;
         const first = ask.form === 'theta' ? `(<span class="frac"><span>${chip('a')}</span><span>360</span></span>)` : chip('a');
@@ -487,6 +527,26 @@ export const ui = {
         if (!this._outside) { this._outside = true; document.addEventListener('pointerdown', (e) => { if (this.menuSlot && !e.target.closest('.pk-menu, .pk-chip')) this.closeMenu(); }); }
         requestAnimationFrame(() => this.fit());
       }
+      this.disarm();
+    },
+    /** Hover highlights wait for the pointer to really move over the choices: an option that appears under a resting
+     *  cursor, or under the finger that has just chosen, must not look selected (H1). */
+    disarm() {
+      const box = $('#pick'); box.classList.remove('armed');
+      if (!this._arm) this._arm = () => box.classList.add('armed');
+      box.removeEventListener('pointermove', this._arm); box.addEventListener('pointermove', this._arm, { once: true });
+    },
+    /** the question is back after a miss: a new order (A2), the formulas sliding to their new places */
+    reshuffle() {
+      const list = $('#pick .pk-opts');
+      if (list) {
+        const btns = [...list.children], top = new Map(btns.map((b) => [b, b.getBoundingClientRect().top])), was = btns.map((b) => b.dataset.i).join();
+        let order = shuffled(btns); while (btns.length > 1 && order.map((b) => b.dataset.i).join() === was) order = shuffled(btns);
+        order.forEach((b) => list.appendChild(b));
+        order.forEach((b) => { const dy = top.get(b) - b.getBoundingClientRect().top; if (Math.abs(dy) > 1 && b.animate) b.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)' }); });
+      }
+      for (const slot of ['a', 'r']) if (this.order[slot]) this.order[slot] = shuffled(this.order[slot]);
+      this.disarm();
     },
     /** the formula stays on one line inside the dock: it scales down when a chosen value makes it longer (10.5 m) */
     fit() {
@@ -495,11 +555,12 @@ export const ui = {
       while (f.scrollWidth > f.clientWidth && fs > 13) { fs -= 1; f.style.fontSize = fs + 'px'; }
     },
     label(slot, v) { if (slot === 'r') return `${formatNumber(v)} m`; return this.L.ask.form === 'theta' ? `${v}°` : `<span class="frac"><span>${v[0]}</span><span>${v[1]}</span></span>`; },
-    /** the drop-down: below its chip, or above it when the dock sits at the bottom of the screen (phones) */
+    /** the drop-down: below its chip, or above it when the dock sits at the bottom of the screen (phones); its options in
+     *  this question's shuffled order, all of them open */
     openMenu(chip) {
       const slot = chip.dataset.slot, opts = this.L.ask[slot], menu = $('#pick .pk-menu'), dock = $('#answer-dock');
-      menu.innerHTML = opts.map((v, i) => `<button class="silent${this.wrong[slot].has(i) ? ' wrong' : ''}${this.sel[slot] === i ? ' on' : ''}" role="option" data-i="${i}">${this.label(slot, v)}</button>`).join('');
-      menu.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.i; if (this.wrong[slot].has(i)) return; this.set(slot, i); this.closeMenu(); }));
+      menu.innerHTML = this.order[slot].map((i) => `<button class="silent${this.sel[slot] === i ? ' on' : ''}" role="option" data-i="${i}">${this.label(slot, opts[i])}</button>`).join('');
+      menu.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this.set(slot, +b.dataset.i); this.closeMenu(); }));
       menu.hidden = false; this.menuSlot = slot; chip.classList.add('open'); audio.play('ui.click');
       const d = dock.getBoundingClientRect(), c = chip.getBoundingClientRect(), below = window.innerHeight - c.bottom > menu.offsetHeight + 14, half = menu.offsetWidth / 2;
       menu.style.left = `${Math.max(half + 8, Math.min(d.width - half - 8, c.left - d.left + c.width / 2))}px`;   // under its chip, inside the dock
@@ -517,34 +578,45 @@ export const ui = {
       if (sel.opt != null) $(`#pick .pk-opt[data-i="${sel.opt}"]`).classList.add('chosen');
       this.closeMenu(); this.onChoose({ expr: c.expr, sel });
     },
-    /** after a wrong shot: strike out what was wrong; a half-right drop-down answer keeps its right part */
-    markWrong(sel) {
-      if (sel.opt != null) { this.wrong.opt.add(sel.opt); const b = $(`#pick .pk-opt[data-i="${sel.opt}"]`); b.classList.remove('chosen'); b.classList.add('wrong'); return; }
+    /** after a wrong shot (LXD 2026-10-29: nothing is struck out): the chosen formula lets go; a drop-down answer's wrong
+     *  part empties again, marked to look at again, and its right part stays set */
+    afterMiss(sel) {
+      if (sel.opt != null) { const b = $(`#pick .pk-opt[data-i="${sel.opt}"]`); if (b) b.classList.remove('chosen'); return; }
       const truth = pickTruth(this.L);
       for (const slot of ['a', 'r']) if (sel[slot] !== truth[slot]) {
-        this.wrong[slot].add(sel[slot]); this.sel[slot] = null;
+        this.sel[slot] = null;
         const chip = $(`#pick .pk-chip[data-slot="${slot}"]`); chip.innerHTML = '?'; chip.classList.remove('set'); chip.classList.add('again');
       }
       $('#pick .pk-fire').disabled = !this.ready(); this.fit();
     },
-    /** tests / DEV: a choice with the wanted outcome that is still open (the diagram's own values first, for 'correct') */
-    answer(kind) {
-      const open = choices(this.L).filter((c) => (c.sel.opt != null ? !this.wrong.opt.has(c.sel.opt) : !this.wrong.a.has(c.sel.a) && !this.wrong.r.has(c.sel.r)));
-      const c = (kind === 'correct' && open.find((x) => x.right)) || open.find((x) => evaluatePick(x.expr, this.L.radius, this.L.theta).status === kind) || open[0];
-      if (c.sel.opt == null) { this.set('a', c.sel.a); this.set('r', c.sel.r); }
-      this.choose(c.sel); return true;
+    /** the hint ladder's last rung: the right choice is shown, then worked out and fired */
+    reveal(sel) {
+      this.closeMenu(); $('#answer-dock').classList.add('solving');
+      if (sel.opt != null) { const b = $(`#pick .pk-opt[data-i="${sel.opt}"]`); if (b) b.classList.add('solution'); return; }
+      for (const slot of ['a', 'r']) {
+        this.sel[slot] = sel[slot]; const chip = $(`#pick .pk-chip[data-slot="${slot}"]`);
+        chip.innerHTML = this.label(slot, this.L.ask[slot][sel[slot]]); chip.classList.remove('again'); chip.classList.add('set', 'solution');
+      }
+      $('#pick .pk-fire').disabled = true; this.fit();
     },
+    /** tests / DEV: a choice with the wanted outcome (the diagram's own values for 'correct') */
+    answer(kind) {
+      const all = choices(this.L), c = (kind === 'correct' && all.find((x) => x.right)) || all.find((x) => !x.right && evaluatePick(x.expr, this.L.radius, this.L.theta).status === kind) || all[0];
+      return this.choosePick(c.sel);
+    },
+    /** tests / DEV: exactly this choice ({ opt } or { a, r }) */
+    choosePick(sel) { if (sel.opt == null) { this.set('a', sel.a); this.set('r', sel.r); } this.choose(sel); return true; },
   },
 
   /** Centre of the arena area (left of the dock) for stamps: set by the puzzle camera, cleared afterwards. */
   setArenaCentre(x, y) { const st = document.documentElement.style; if (x == null) { st.removeProperty('--arena-cx'); st.removeProperty('--arena-cy'); } else { st.setProperty('--arena-cx', `${Math.round(x)}px`); st.setProperty('--arena-cy', `${Math.round(y)}px`); } },
 
   /* ---------------------------------------------------------- the formula above the keypad (user, 2026-10-22)
-     A = θ/360 × π × r² from the start. 1st wrong shot: the numbers are substituted (θ, π = 22/7, r), what cancels is
-     crossed out with the small result written beside it (θ/360 → n/d; the 7 of 22/7 against one r → k), then it
-     simplifies to A = n/d × 22 × k × r. 2nd wrong shot: A = n/d × P = the answer as a fraction.
-     Arenas 1–3 (piForm, user 2026-10-27): π stays π throughout — θ/360 is crossed out to n/d, r × r becomes r², and the
-     2nd miss shows A = n/d × r²π = kπ. */
+     A = θ/360 × π × r² from the start. It carries the hint ladder (LXD 2026-10-29): after the 1st miss it points at the
+     part the idea is about, no numbers (point); after the 2nd it works part of itself out, the fraction of the turn or
+     r × r (partial); after the 3rd the full working: substituted (θ, r), what cancels crossed out with the small result
+     beside it (θ/360 → n/d), simplified (r × r → r²), then the answer A = n/d × r²π = kπ (full).
+     (Without piForm, unused since 2026-10-27: π = 22/7 is substituted and the 7 cancels against one r.) */
   formula: {
     p: null, cur: [], piForm: false,
     row() { return $('#formula .row'); },
@@ -554,6 +626,9 @@ export const ui = {
     tokens(stage) {
       const p = this.p, V = (t, n) => this.V(t, n), F = (a, b) => this.F(a, b), X = (k) => [k, '×'];
       const f0 = F(V('θ'), V('360')), f1 = F(V(p.theta, p.n), V('360', p.d)), pi1 = F(V('22'), V('7', '1')), r2 = `${V('r')}<sup>2</sup>`;
+      // part of the working (the ladder's 2nd rung): the fraction of the turn, or r × r; the rest still in letters
+      if (stage === 'theta') return [['A', 'A ='], ['f', f1], X('x1'), ['pi', V('π')], X('x2'), ['r', r2]];
+      if (stage === 'radius') return [['A', 'A ='], ['f', f0], X('x1'), ['pi', V('π')], X('x2'), ['r1', V(p.rText)], X('x3'), ['r2', V(p.rText)]];
       if (this.piForm) switch (stage) {
         case 'formula': return [['A', 'A ='], ['f', f0], X('x1'), ['pi', V('π')], X('x2'), ['r', r2]];
         case 'sub': return [['A', 'A ='], ['f', f1], X('x1'), ['pi', V('π')], X('x2'), ['r1', V(p.rText)], X('x3'), ['r2', V(p.rText)]];
@@ -611,10 +686,22 @@ export const ui = {
       }
       await sleep(350);
     },
-    /** 1st wrong shot: substitute → cross out → simplify */
+    /** The ladder's 1st rung: the part of the formula its idea is about glows (key: 'f' the fraction, 'pi', 'r' the r², or
+     *  a list of them; null: none). */
+    point(key) {
+      const row = this.row(); if (!row) return;
+      row.querySelectorAll('.tok.point').forEach((n) => n.classList.remove('point'));
+      const ts = [].concat(key || []).map((k) => row.querySelector(`.tok[data-k="${k}"]`)).filter(Boolean);
+      ts.forEach((t) => t.classList.add('point')); if (ts.length) audio.play('label.pop');
+    },
+    /** The 2nd rung: part of the working, in place: 'theta' the fraction of the turn, 'radius' r × r */
+    async partial(kind) { if (!this.p) return; this.point(null); await this.morph(this.tokens(kind === 'radius' ? 'radius' : 'theta')); },
+    /** substitute → cross out → simplify */
     async walkthrough() { if (!this.p) return; await this.morph(this.tokens('sub')); await sleep(250); await this.cancel(); await this.morph(this.tokens('reduced'), { glow: false }); },
-    /** 2nd wrong shot: the answer as a fraction */
+    /** the answer, as a fraction of π */
     async solve() { if (!this.p) return; await this.morph(this.tokens('solved')); },
+    /** The last rung, typed arenas: the full working, through to the answer */
+    async full() { if (!this.p) return; this.point(null); await this.walkthrough(); await sleep(450); await this.solve(); },
     /** Arenas 1–4 (LXD 2026-10-27): the chosen formula worked out step by step, right or wrong, before it is fired: as
      *  chosen → a decimal radius as a fraction → the fraction reduced and the power worked out → A = kπ m² (never a
      *  decimal). The answer stays on the line, in amber, while the shot plays. */
@@ -633,9 +720,12 @@ export const ui = {
       for (const st of steps.slice(1)) { await this.morph(line(st)); await sleep(st.k ? 900 : 450); }
     },
   },
-  /** One line near the beam after a shot (LXD), in the game's language. */
+  /** One line near the beam after a shot (LXD), in the game's language, with its outcome's icon (H3). */
   beamline: {
-    show(text, status, worldPos, push) { game.world.labels.add('beamline', text, { className: `beamline ${status}`, worldPos, push, clampTop: window.innerWidth < 760 ? 64 : 16 }); },   // below the shields on phones
+    show(text, status, worldPos, push) {
+      const el = document.createElement('span'); el.textContent = text;   // (the line is plain text; the icon is ours)
+      game.world.labels.add('beamline', `${OUTCOME_ICON[status] ? `<span class="bl-ico">${OUTCOME_ICON[status]}</span>` : ''}${el.innerHTML}`, { className: `beamline ${status}`, worldPos, push, clampTop: window.innerWidth < 760 ? 64 : 16 });   // below the shields on phones
+    },
     hide(fade = true) { game.world.labels.remove('beamline', fade); },
     get shown() { return !!game.world.labels.get('beamline'); },
   },

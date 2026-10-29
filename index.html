@@ -23,7 +23,8 @@
 <div id="ui">
   <!-- HUD: the shields only (user, 2026-10-23: no arena number / name, star counter, speaker or pause button) -->
   <div id="hud" class="layer">
-    <div id="answer-timer" class="answer-timer" aria-hidden="true"><i></i></div>   <!-- the time to answer: a bar at the top centre, no numbers (user 2026-10-28) -->
+    <!-- the time to answer: a bar at the top centre (user 2026-10-28), labelled with an hourglass and the seconds left (LXD 2026-10-29) -->
+    <div id="answer-timer" class="answer-timer" aria-hidden="true"><span class="at-label"><span class="at-ico"></span><b id="answer-secs">90</b><small>s</small></span><span class="at-bar"><i></i></span></div>
     <div class="hud-right">
       <div id="hud-shields" class="shields"></div>
     </div>
@@ -45,7 +46,8 @@
        one-line misconception tip, the answer bar and a compact keypad. The beam feedback stays in the arena. -->
   <section id="answer-dock" class="dock" aria-label="Sector area answer">
     <div id="formula" class="dock-formula" aria-live="polite"></div>
-    <div id="tip" class="dock-tip" role="status" aria-live="polite"></div>
+    <!-- feedback (LXD 2026-10-29): ⚠ what went wrong, 💡 the hint ladder's current rung -->
+    <div id="feedback" class="dock-feedback" role="status" aria-live="polite"><p class="fb fb-mistake"><span class="fb-ico"></span><span class="fb-text"></span></p><p class="fb fb-hint"><span class="fb-ico"></span><span class="fb-text"></span></p></div>
     <div id="pick" class="pick"></div>   <!-- arenas 1–4 (LXD 2026-10-27): the answer is chosen (three formulas, or two drop-downs) -->
     <label class="np-display"><span id="answer-sr" class="sr-only">Area in square metres</span><input id="answer" type="text" inputmode="decimal" autocomplete="off" placeholder="Area"><span class="pi-fixed" aria-hidden="true">π</span><span class="unit">m²</span></label>
     <div id="keypad" class="keypad"></div>
@@ -95,6 +97,7 @@
   <section id="screen-results" class="screen">
     <div class="card results">
       <h2>You escaped the jungle!</h2>
+      <p id="res-praise" class="res-praise" role="status"></p>
       <table id="res-rows"></table>
       <div class="total"><span>This run</span><span id="res-total">0</span></div>
       <button id="btn-next" class="btn primary">Back to the jungle ›</button>
@@ -124,7 +127,7 @@
           <h3>Find the sector area</h3>
           <p class="hw-formula">A = <span class="frac"><span>θ</span><span>360</span></span> × π × r²</p>
           <p class="hw-small">Every area is in terms of π: keep π in the answer.</p>
-          <p class="hw-small">The guardians freeze while you think, so take your time. Each miss shows you the next step of the working.</p>
+          <p class="hw-small">Each try has 90 seconds: watch the hourglass at the top. A miss gives you a hint; after three misses you see the full working.</p>
         </article>
         <article class="hw-card">
           <div class="hw-pic hw-three" id="hw-pic-2"></div>

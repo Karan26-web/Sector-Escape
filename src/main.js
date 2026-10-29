@@ -143,7 +143,7 @@ class Game {
       const level = CHAIN.arenas[index].level;
       if (res.outcome === 'cleared') {
         save.clearedLevel(level.id, res.score.stars, res.score.total, TOTAL_LEVELS); this.sessionScore += res.score.total;
-        this.runLog.push({ id: level.id, name: level.name, stars: res.score.stars, score: res.score.total });
+        this.runLog.push({ id: level.id, name: level.name, stars: res.score.stars, score: res.score.total, flawless: res.score.flawless });
         scene.dispose();
         if (index === CHAIN.arenas.length - 1) {
           this.scene = null; this.phase = 'finale';
@@ -187,6 +187,8 @@ window.__se = {
   fire(v) { ui.panel.setValue(v); ui.panel.fire(); },
   /** tests / DEV: answer the question with the wanted outcome ('correct' · 'under' · 'over'), chosen or typed */
   answer(kind = 'correct') { return ui.panel.answer(kind); },
+  /** tests / DEV, arenas 1–4: exactly this choice, { opt: i } or { a: i, r: j } (indices into the level's lists) */
+  pick(sel) { return ui.pick.choosePick(sel); },
   /** tests / DEV: Karan walks to each goal by himself (the same as ?auto=1) */
   walk(on = true) { game.roam.autopilot = on; },
   controller,

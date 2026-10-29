@@ -1,4 +1,5 @@
-"""Late-chain checks: arena 6 → 7 (boss) → temple finale → final results; game over + retry; pause/quit; mobile overview."""
+"""Late-chain checks: arena 6 → 7 (boss) → temple finale → final results; the hint ladder's last rung (three misses: the full
+working, then on); pause/quit; mobile overview."""
 import asyncio, sys, time, os
 from playwright.async_api import async_playwright
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8321/"
@@ -38,21 +39,22 @@ async def main():
             print("✅ late chain + finale OK")
         except Exception as e:
             print("❌ late:", repr(e)); await shot("zz_failure")
-        # game over + retry on arena 2 (close the finished page first: headless SwiftShader is CPU-bound)
+        # the hint ladder's last rung on arena 5 (close the finished page first: headless SwiftShader is CPU-bound). LXD 2026-10-29:
+        # the third miss (here also the last shield) shows the full working and the game moves on: no game over any more
         await pg.close()
-        pg2 = await ctx.new_page(); hook(pg2, "gameover")
+        pg2 = await ctx.new_page(); hook(pg2, "ladder")
         try:
             await pg2.goto(BASE + "index.html?level=5&skip=1&mute=1&reset=1&auto=1", wait_until="load", timeout=180000)   # software rendering: boot takes ~25–30 s
-            for i, a in enumerate(["400", "999", "10"]):   # arena 5 = 80π (typed): the whole circle (400π), too wide, too small (the chosen arenas 1–4 strike out wrong choices, so they never end in a game over)
+            for i, a in enumerate(["400", "999", "10"]):   # arena 5 = 80π (typed): the whole circle (400π), too big, too small
                 if not await wait_phase(pg2, "input", 150): break
                 await pg2.wait_for_timeout(400); await pg2.evaluate(f"__se.fire('{a}')"); await wait_phase(pg2, "result", 40); await pg2.wait_for_timeout(800)
                 if i == 0: await pg2.wait_for_timeout(2500); await pg2.screenshot(path=f"{OUT}late_11_feedback_full_circle.png")
-            await pg2.wait_for_selector("#screen-gameover.active", timeout=90000); await pg2.wait_for_timeout(800); await pg2.screenshot(path=f"{OUT}late_12_gameover.png"); print("📸 gameover")
-            await pg2.click("#btn-retry"); await wait_phase(pg2, "input", 150); await pg2.wait_for_timeout(900); await pg2.screenshot(path=f"{OUT}late_13_retry_input.png"); print("📸 retry")
+            await wait_phase(pg2, "solution", 120); await pg2.wait_for_timeout(6500); await pg2.screenshot(path=f"{OUT}late_12_full_working.png"); print("📸 full working")
+            await wait_phase(pg2, "exit", 90); await pg2.wait_for_timeout(1500); await pg2.screenshot(path=f"{OUT}late_13_moved_on.png"); print("📸 moved on")
             await pg2.keyboard.press("Escape"); await pg2.wait_for_timeout(600); await pg2.click("#btn-pause-map"); await pg2.wait_for_selector("#screen-map.active", timeout=30000); await settle(pg2); await pg2.screenshot(path=f"{OUT}late_14_quit_overview.png"); print("📸 quit→overview")
-            print("✅ game over / retry / quit OK")
+            print("✅ hint ladder → full working → moved on / quit OK")
         except Exception as e:
-            print("❌ gameover:", repr(e)); await pg2.screenshot(path=f"{OUT}late_zz_gameover.png")
+            print("❌ ladder:", repr(e)); await pg2.screenshot(path=f"{OUT}late_zz_ladder.png")
         # mobile overview + input (close the desktop pages first: headless SwiftShader is CPU-bound)
         await pg2.close(); await ctx.close()
         m = await b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True, is_mobile=True); pm = await m.new_page(); hook(pm, "mobile")

@@ -101,13 +101,16 @@ button.corner { position: absolute; left: 24px; top: 22px; }
 .hw-diagram .d-lbl.cy { fill: #0f7f7a; } .hw-diagram .d-lbl.small { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; fill: #0f7f7a; }
 .hw-three { display: flex; gap: 12px; justify-content: center; align-items: flex-start; }
 .hw-out { margin: 0; width: 176px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.hw-out svg { width: 124px; height: 124px; }
+.hw-out > svg { width: 124px; height: 124px; }   /* (the diagram only: the caption's icon keeps its own size) */
 .hw-out figcaption { font-size: 13.5px; line-height: 1.3; color: #4a3518; font-weight: 500; }
 .hw-out figcaption b { display: block; font-family: var(--font-head); font-size: 21px; letter-spacing: 0.04em; text-transform: uppercase; }
 .hw-out.small b { color: #b23b2a; } .hw-out.right b { color: #a8740f; } .hw-out.big b { color: #b0265f; }
+.hw-out figcaption b { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.hw-ico { display: inline-grid; width: 1.15em; height: 0.75em; } .hw-ico svg { width: 100%; height: 100%; overflow: visible; }
+.hw-out.right .hw-ico { width: 0.8em; height: 0.8em; }
 .m-ring { fill: rgba(94, 87, 71, 0.14); stroke: #5e5747; stroke-width: 3; }
 .m-target { fill: none; stroke: #c9900f; stroke-width: 2.4; stroke-dasharray: 5 4; }
-.m-beam { fill: rgba(30, 175, 170, 0.6); } .m-gold { fill: rgba(240, 190, 60, 0.8); stroke: #a8740f; stroke-width: 1.5; } .m-excess { fill: rgba(225, 35, 85, 0.7); }
+.m-beam { fill: rgba(30, 175, 170, 0.6); } .m-gold { fill: rgba(240, 190, 60, 0.8); stroke: #a8740f; stroke-width: 1.5; } .m-excess { fill: url(#hw-hatch) rgba(225, 35, 85, 0.7); }   /* (hatched, as in the arena: not told by its red alone) */
 .m-bot { fill: #b23b2a; stroke: #4a1208; stroke-width: 1.5; } .m-star { font-size: 24px; fill: #fff6cf; } .m-bounce { fill: none; stroke: #d81f56; stroke-width: 3; stroke-linecap: round; }
 
 /* loading */
@@ -240,15 +243,23 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 /* ---------- HUD (quiet) ---------- */
 .layer { position: absolute; inset: 0; opacity: 0; transition: opacity 0.4s; }
 .layer.show { opacity: 1; }
-/* the time to answer (user 2026-10-28): a thin bar at the top centre, level with the shields, no numbers; it drains toward its middle */
-.answer-timer { position: absolute; left: 50%; top: 35px; width: min(44vw, 520px); height: 6px; transform: translateX(-50%); border-radius: 4px; background: rgba(9, 17, 15, 0.6); box-shadow: 0 0 0 1px rgba(243, 235, 216, 0.14), 0 2px 8px rgba(0, 0, 0, 0.45); overflow: hidden; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+/* the time to answer (user 2026-10-28): a thin bar at the top centre, level with the shields, draining toward its middle;
+   LXD 2026-10-29: labelled with an hourglass and the seconds left, so it says what it is */
+.answer-timer { position: absolute; left: 50%; top: 26px; display: flex; align-items: center; gap: 10px; transform: translateX(-50%); opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 .answer-timer.on { opacity: 1; transition-delay: var(--timer-after, 0s); }
-.answer-timer > i { position: absolute; inset: 0; border-radius: inherit; background: var(--cyan); transform-origin: center; transition: background-color 0.6s; }
-.answer-timer.intro > i { animation: timerIn 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) var(--timer-after, 0s) backwards; }   /* (opens from its middle; `last` below takes over the animation) */
+.at-label { display: inline-flex; align-items: center; gap: 4px; min-width: 64px; padding: 2px 10px 2px 7px; border-radius: 999px; background: rgba(9, 17, 15, 0.72); box-shadow: 0 0 0 1px rgba(243, 235, 216, 0.16), 0 2px 8px rgba(0, 0, 0, 0.45); color: var(--ivory); font-family: var(--font-head); font-weight: 800; font-size: 19px; line-height: 20px; letter-spacing: 0.02em; transition: color 0.6s; }
+.at-label small { font-size: 13px; font-weight: 700; opacity: 0.8; }
+.at-ico { display: inline-grid; width: 17px; height: 17px; color: var(--cyan); transition: color 0.6s; }
+.at-ico svg { width: 100%; height: 100%; }
+.at-bar { position: relative; width: min(40vw, 470px); height: 6px; border-radius: 4px; background: rgba(9, 17, 15, 0.6); box-shadow: 0 0 0 1px rgba(243, 235, 216, 0.14), 0 2px 8px rgba(0, 0, 0, 0.45); overflow: hidden; }
+.at-bar > i { position: absolute; inset: 0; border-radius: inherit; background: var(--cyan); transform-origin: center; transition: background-color 0.6s; }
+.answer-timer.intro .at-bar > i { animation: timerIn 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) var(--timer-after, 0s) backwards; }   /* (opens from its middle; `last` below takes over the animation) */
 @keyframes timerIn { from { transform: scaleX(0); } }
-.answer-timer.low > i { background: var(--amber); }
-.answer-timer.last > i { background: #ff7a66; animation: timerLast 1.2s ease-in-out infinite; }
+.answer-timer.low .at-bar > i { background: var(--amber); } .answer-timer.low .at-ico { color: var(--amber); }
+.answer-timer.last .at-bar > i { background: #ff7a66; animation: timerLast 1.2s ease-in-out infinite; }
+.answer-timer.last .at-label { color: #ffb3a6; } .answer-timer.last .at-ico { color: #ff7a66; animation: timerTip 1.2s ease-in-out infinite; }
 @keyframes timerLast { 50% { opacity: 0.45; } }
+@keyframes timerTip { 0%, 60% { transform: none; } 80% { transform: rotate(180deg); } 100% { transform: rotate(180deg); } }
 .hud-right { position: absolute; right: 20px; top: 18px; display: flex; flex-direction: row-reverse; align-items: center; gap: 10px; }
 .shields { display: flex; gap: 4px; } .shields img { width: 40px; height: 40px; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5)); transition: transform 0.3s; }
 .shields img.lost { animation: lost 0.9s ease-out both; }
@@ -259,9 +270,14 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 #skip { bottom: 22px; right: 22px; left: auto; transform: none; font-size: 13px; cursor: pointer; pointer-events: none; }
 #skip.show { opacity: 0.9; pointer-events: auto; }
 #stamp { position: absolute; left: var(--arena-cx, 50%); top: var(--arena-cy, 50%); transform: translate(-50%, 26px) scale(1.5); transform-origin: 50% 0; opacity: 0; font-family: var(--font-head); font-weight: 800; font-size: clamp(34px, 4.4vw, 58px); letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 36px 14px; border-radius: 14px; color: var(--ink); box-shadow: var(--shadow); transition: transform 0.3s cubic-bezier(0.2, 1.3, 0.4, 1), opacity 0.2s; text-align: center; }
-#stamp small { display: block; font-family: var(--font-body); font-weight: 600; font-size: clamp(13px, 1.4vw, 17px); letter-spacing: 0; text-transform: none; margin-top: 2px; }
+#stamp small { display: block; font-family: var(--font-body); font-weight: 600; font-size: clamp(15px, 1.5vw, 18px); letter-spacing: 0; text-transform: none; margin-top: 4px; white-space: nowrap; }
 #stamp.show { opacity: 1; transform: translate(-50%, 26px) scale(1); }
-#stamp.under { background: var(--red); color: var(--ivory); } #stamp.over { background: var(--magenta); color: var(--ivory); }
+/* the outcomes: a colour and a shape each (LXD 2026-10-29, H3): arrows closing in, arrows opening out, a tick, an hourglass */
+#stamp .st-title { display: inline-flex; align-items: center; gap: 0.32em; white-space: nowrap; }
+#stamp .st-ico { display: inline-grid; width: 1.15em; height: 0.75em; } #stamp .st-ico svg { width: 100%; height: 100%; overflow: visible; }
+#stamp.perfect .st-ico, #stamp.timeup .st-ico { width: 0.72em; height: 0.72em; }
+#stamp.under, #stamp.timeup { background: var(--red); color: var(--ivory); } #stamp.over { background: var(--magenta); color: var(--ivory); }
+#stamp.perfect { background: linear-gradient(180deg, #ffe39a, var(--amber) 55%, #d99a2b); color: #2a1704; }
 #damage { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(220, 102, 87, 0) 42%, rgba(220, 102, 87, 0.7) 100%); opacity: 0; pointer-events: none; }
 #damage.hit { animation: dmg 0.7s ease-out; }
 @keyframes dmg { 0% { opacity: 1; } 100% { opacity: 0; } }
@@ -302,6 +318,10 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 .dock-formula .tok.out, .dock-formula .given.out { animation: dissolveOut 0.45s ease-in forwards; }
 .dock-formula .tok.in { animation: dissolveIn 0.55s ease-out both; }
 .dock-formula .tok.key { color: var(--amber); }
+/* the hint ladder's 1st rung points at the part of the formula its idea is about: amber, underlined, breathing */
+.dock-formula .tok.point { color: var(--amber); text-shadow: 0 0 12px rgba(244, 191, 85, 0.75); }
+.dock-formula .tok.point::after { content: ''; position: absolute; left: 0; right: 0; bottom: -7px; height: 2.5px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--amber) 0 5px, transparent 5px 8px); animation: pointBreathe 1.4s ease-in-out infinite; }
+@keyframes pointBreathe { 50% { opacity: 0.35; } }
 .dock.locked .keypad, .dock.locked .np-display, .dock.locked .pick { opacity: 0.5; pointer-events: none; }
 /* arenas 1–4 (LXD 2026-10-27): the answer is chosen: three formulas, or the formula with two drop-downs and FIRE */
 .pick { display: none; }
@@ -310,10 +330,16 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 .pk-q { margin: 2px 0 10px; text-align: center; font-weight: 600; font-size: 14px; color: var(--muted); }
 .pk-opts { display: flex; flex-direction: column; gap: 9px; }
 .pk-opt { display: flex; align-items: center; justify-content: center; min-height: 60px; padding: 8px 10px; border-radius: 12px; border: 2px solid rgba(82, 222, 216, 0.45); background: linear-gradient(180deg, #0f231f, #081512); color: var(--ivory); font-family: var(--font-body); font-weight: 600; font-size: 18px; cursor: pointer; transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s, opacity 0.2s; }
-.pk-opt:hover { border-color: var(--cyan); box-shadow: 0 0 12px rgba(82, 222, 216, 0.35); }
-.pk-opt:active { transform: translateY(1px); }
+/* no option looks chosen before it is touched (LXD 2026-10-29, H1): no default focus ring (only for keyboard focus), the
+   hover glow only on a device that hovers and once the pointer has moved over the choices (.armed), the press on a tap */
+.pk-opt:focus, .pk-chip:focus, .pk-menu button:focus { outline: none; }
+.pk-opt:focus-visible, .pk-chip:focus-visible, .pk-menu button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+@media (hover: hover) { .pick.armed .pk-opt:hover { border-color: var(--cyan); box-shadow: 0 0 12px rgba(82, 222, 216, 0.35); } }
+.pk-opt:active { transform: translateY(1px); border-color: var(--cyan); box-shadow: 0 0 12px rgba(82, 222, 216, 0.35); }
 .pk-opt.chosen { border-color: var(--amber); box-shadow: 0 0 16px rgba(244, 191, 85, 0.5); }
-.pk-opt.wrong { opacity: 0.38; text-decoration: line-through; text-decoration-color: #ff7a66; border-color: rgba(220, 102, 87, 0.6); pointer-events: none; }
+/* the hint ladder's last rung: the right formula, shown before it is worked out and fired (full strength, the rest dimmed) */
+.pk-opt.solution, .pk-chip.solution { border-color: #ffd36b; border-style: solid; box-shadow: 0 0 0 2px rgba(255, 211, 107, 0.35), 0 0 18px rgba(255, 211, 107, 0.6); color: #fff3c9; }
+.dock.locked.solving .pick { opacity: 1; } .dock.solving .pk-opt:not(.solution), .dock.solving .pk-q, .dock.solving .pk-fire { opacity: 0.4; }
 .pk-opt sup, .pk-formula sup { font-size: 0.62em; vertical-align: 0.65em; }
 .pk-x { white-space: nowrap; }   /* one line of maths: its pieces sit as typeset, the ² against its bracket */
 .pk-formula { min-height: 76px; padding: 14px 4px; border-radius: 12px; background: rgba(243, 235, 216, 0.04); font-size: 20px; font-weight: 600; color: var(--ivory); white-space: nowrap; text-align: center; line-height: 1.2; overflow: hidden; }
@@ -322,20 +348,27 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 .pk-chip::after { content: '▾'; margin-left: 3px; font-size: 0.55em; opacity: 0.8; }
 .pk-chip.set { border-style: solid; color: var(--ivory); background: rgba(243, 235, 216, 0.07); animation: none; }
 .pk-chip.open { border-color: var(--cyan); box-shadow: 0 0 10px rgba(82, 222, 216, 0.45); }
-.pk-chip.again { border-color: #ff7a66; color: #ffb3a6; }
+.pk-chip.again { position: relative; border-color: #ff7a66; color: #ffb3a6; }
+.pk-chip.again::before { content: '!'; position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: #dc6657; border: 1.5px solid #2a0c08; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; }   /* (look at this one again: a mark, not only the red) */
 .pk-chip .frac { font-size: 0.8em; }
 @keyframes chipPulse { 0%, 100% { box-shadow: 0 0 0 rgba(244, 191, 85, 0); } 50% { box-shadow: 0 0 12px rgba(244, 191, 85, 0.5); } }
 .pk-menu { position: absolute; z-index: 5; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; background: #0b1a17; border: 1px solid rgba(244, 191, 85, 0.55); box-shadow: var(--shadow); }
 .pk-menu[hidden] { display: none; }
 .pk-menu button { min-width: 104px; min-height: 40px; padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(243, 235, 216, 0.2); background: rgba(243, 235, 216, 0.06); color: var(--ivory); font-family: var(--font-body); font-weight: 700; font-size: 17px; cursor: pointer; }
-.pk-menu button:hover { border-color: var(--cyan); }
+@media (hover: hover) { .pk-menu button:hover { border-color: var(--cyan); } }
+.pk-menu button:active { border-color: var(--cyan); }
 .pk-menu button.on { border-color: var(--amber); }
-.pk-menu button.wrong { opacity: 0.35; text-decoration: line-through; text-decoration-color: #ff7a66; pointer-events: none; }
 .pk-fire { display: block; width: 100%; margin-top: 12px; }
 .pk-fire:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
-.dock-tip { font-size: 13.5px; font-weight: 600; line-height: 1.35; color: #ffc2b8; max-height: 0; overflow: hidden; transition: max-height 0.3s, margin 0.3s, opacity 0.3s; opacity: 0; }
-.dock-tip.show { max-height: 60px; margin: 0 2px 9px; opacity: 1; }
-.dock-tip::before { content: '!'; display: inline-grid; place-items: center; width: 17px; height: 17px; margin-right: 7px; border-radius: 50%; background: #dc6657; color: #fff; font-size: 12px; font-weight: 800; vertical-align: 1px; }
+/* the feedback under the formula (LXD 2026-10-29, H2): at least 16 px, ⚠ for the mistake, 💡 for the hint */
+.dock-feedback { display: flex; flex-direction: column; gap: 6px; max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.3s, margin 0.3s, opacity 0.3s; }
+.dock-feedback.show { max-height: 220px; margin: 0 2px 10px; opacity: 1; }
+.dock-feedback .fb { display: none; margin: 0; gap: 8px; align-items: flex-start; font-size: 16px; font-weight: 600; line-height: 1.38; }
+.dock-feedback .fb.show { display: flex; }
+.dock-feedback .fb-ico { flex: none; width: 21px; height: 21px; margin-top: 0; } .dock-feedback .fb-ico svg { display: block; width: 100%; height: 100%; }
+.dock-feedback .fb-mistake { color: #ffc8bf; }
+.dock-feedback .fb-hint { color: #fff0bf; padding: 7px 9px; border-radius: 10px; background: rgba(255, 227, 107, 0.08); border: 1px solid rgba(255, 227, 107, 0.22); }
+.dock-feedback .fb-note { display: block; margin-top: 2px; color: var(--ivory); }
 .np-display { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px; border-radius: 11px; background: linear-gradient(180deg, #051110, #0a1a18); border: 2px solid var(--cyan); box-shadow: 0 0 10px rgba(82, 222, 216, 0.45), inset 0 0 12px rgba(82, 222, 216, 0.18); cursor: text; }
 .np-display input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--ivory); font-family: var(--font-head); font-weight: 700; font-size: 30px; letter-spacing: 0.05em; caret-color: var(--cyan); padding: 0; }
 .np-display input::placeholder { color: rgba(82, 222, 216, 0.5); font-size: 19px; font-weight: 600; letter-spacing: 0.06em; }
@@ -368,8 +401,9 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 .frac { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: 1.05; margin: 0 3px; text-align: center; }
 .frac > span:first-child { border-bottom: 2px solid currentColor; padding: 0 3px 1px; }
 .frac > span:last-child { padding-top: 1px; }
-/* the arena keeps the beam line near the beam and the centre O */
+/* the arena keeps the beam line near the beam and the centre O; its outcome's icon leads it (H3) */
 .wlabel.beamline { font-size: 17px; font-weight: 600; padding: 6px 16px; white-space: nowrap; }
+.wlabel.beamline .bl-ico { display: inline-block; width: 1.5em; height: 0.95em; margin-right: 0.4em; vertical-align: -0.12em; } .wlabel.beamline .bl-ico svg { width: 100%; height: 100%; overflow: visible; }
 .wlabel.beamline.under { border-color: rgba(255, 130, 110, 0.7); color: #ffd2c9; }
 .wlabel.beamline.over { border-color: rgba(255, 80, 140, 0.75); color: #ffd0e2; }
 .wlabel.beamline.correct { border-color: rgba(255, 211, 107, 0.8); color: #ffe7a8; }
@@ -382,6 +416,11 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
 /* ---------- toast ---------- */
 .card.results td:first-child { font-weight: 500; }
 .card.results td .st { color: var(--amber); letter-spacing: 2px; margin-left: 8px; }
+/* praise for no mistakes (LXD 2026-10-29) */
+.res-flawless { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: rgba(82, 222, 216, 0.14); border: 1px solid rgba(82, 222, 216, 0.45); color: var(--cyan); font-size: 12px; font-weight: 700; letter-spacing: 0.02em; vertical-align: 1px; }
+.res-praise { display: none; align-items: center; justify-content: center; gap: 8px; margin: -2px 0 6px; color: #ffe39a; font-weight: 700; font-size: 17px; }
+.res-praise.show { display: flex; animation: dissolveIn 0.6s ease-out both; }
+.res-praise svg { flex: none; width: 20px; height: 20px; color: var(--cyan); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 760px) {
@@ -393,15 +432,17 @@ button.icon-btn.svg { display: grid; place-items: center; color: var(--ivory); p
   .dock-formula { min-height: 56px; padding: 15px 4px 13px; margin-bottom: 8px; font-size: 17px; gap: 12px; }
   .dock-formula .given { font-size: 14px; padding-left: 12px; }
   .keypad .k { height: 44px; }
-  .wlabel.beamline { font-size: 13px; white-space: normal; max-width: 86vw; text-align: center; }
+  .wlabel.beamline { font-size: 14px; white-space: normal; max-width: 86vw; text-align: center; }
+  #stamp small { white-space: normal; max-width: 80vw; }
   .shields img { width: 32px; height: 32px; }
-  .answer-timer { top: 31px; width: 34vw; }   /* (clear of the shields on the right) */
+  .answer-timer { top: 22px; left: calc(50% - 34px); gap: 6px; }   /* (clear of the shields on the right) */
+  .at-bar { width: 22vw; } .at-label { min-width: 52px; padding: 1px 8px 1px 5px; font-size: 17px; } .at-ico { width: 15px; height: 15px; }
   .hud-right { flex-direction: column; align-items: flex-end; gap: 6px; } button.icon-btn { width: 36px; height: 36px; }
   .mt-name { font-size: 21px; } .map-tag { min-width: 170px; padding: 10px 12px 12px; }
   .cine-dialog { gap: 10px; padding: 10px 28px 12px 10px; } .cine-dialog img { width: 50px; height: 50px; }
   .howto-deck { padding: 18px 14px 14px; } .hw-pic { height: 176px; } .hw-gap { width: 170px; height: 182px; } .hw-diagram { width: 190px; height: 176px; }
   .hw-card h3 { font-size: 26px; } .hw-card p { font-size: 15px; } .hw-card p.hw-formula { font-size: 18px; }
-  .hw-three { gap: 4px; } .hw-out { width: 32%; } .hw-out svg { width: 84px; height: 84px; } .hw-out figcaption { font-size: 11.5px; } .hw-out figcaption b { font-size: 16px; }
+  .hw-three { gap: 4px; } .hw-out { width: 32%; } .hw-out > svg { width: 84px; height: 84px; } .hw-out figcaption { font-size: 11.5px; } .hw-out figcaption b { font-size: 16px; }
   .hw-nav .btn { min-width: 92px; padding: 11px 16px; font-size: 17px; }
   .wlabel { font-size: 13px; padding: 2px 9px; }
 }
