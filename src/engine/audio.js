@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Sector Escape – procedural audio (Web Audio API)
-// Every sound is synthesised: there are no audio files to download.
+// Every sound and the music are synthesised; the only audio files are the voice-over's lines (engine/vo.js), which
+// play through voBus and duck the music and the jungle bed while they speak.
 // ---------------------------------------------------------------------------
 
 const SFX = {};
@@ -15,7 +16,7 @@ export class AudioEngine {
   constructor() {
     this.ctx = null;
     this.muted = safeStorage('se_muted', '0') === '1';
-    this.volumes = { master: 0.9, sfx: 0.85, music: 0.26, ambient: 0.4 };
+    this.volumes = { master: 0.9, sfx: 0.85, music: 0.26, ambient: 0.4, voice: 1.0 };
     this.music = new MusicPlayer(this);
     this.ambient = new AmbientPlayer(this);
     this.lastPlayed = new Map();
@@ -36,6 +37,7 @@ export class AudioEngine {
     this.sfxBus = ctx.createGain(); this.sfxBus.gain.value = this.volumes.sfx; this.sfxBus.connect(this.master);
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = this.volumes.music; this.musicBus.connect(this.master);
     this.ambBus = ctx.createGain(); this.ambBus.gain.value = this.volumes.ambient; this.ambBus.connect(this.master);
+    this.voBus = ctx.createGain(); this.voBus.gain.value = this.volumes.voice; this.voBus.connect(this.master);
     // 2 s white-noise buffer reused by every noisy sound
     const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -64,6 +66,11 @@ export class AudioEngine {
     if (this.master) this.master.gain.setTargetAtTime(m ? 0 : this.volumes.master, this.now, 0.05);
   }
   toggleMute() { this.setMuted(!this.muted); return this.muted; }
+  /** A voice is speaking: the music and the jungle bed step back (quickly), and come back (slowly) once it is done. */
+  duck(on) {
+    if (!this.ctx) return;
+    for (const [bus, v] of [[this.musicBus, this.volumes.music], [this.ambBus, this.volumes.ambient]]) bus.gain.setTargetAtTime(v * (on ? 0.35 : 1), this.now, on ? 0.08 : 0.4);
+  }
 
   /* ----------------------------------------------------------- playback */
   play(name, o = {}) {

@@ -1,0 +1,678 @@
+{
+ "_readme": "The game's voice-over, cut from one recording (tools/cut_vo.py). Each cue: who speaks, the words, and where it sits in the source (seconds). The tool snaps each cut into the silence around it, so a re-recording only needs these times nudged.",
+ "source": "escape game voices.mp3",
+ "cues": [
+  {
+   "id": "title-welcome",
+   "who": "narrator",
+   "text": "Welcome to Sector Escape. Deep in the jungle, an ancient temple is waiting.",
+   "from": 0.0,
+   "to": 5.96
+  },
+  {
+   "id": "title-choose",
+   "who": "narrator",
+   "text": "Press Play to begin, or tap How to play to learn first.",
+   "from": 6.39,
+   "to": 10.53
+  },
+  {
+   "id": "howto-1",
+   "who": "narrator",
+   "text": "Stone guardians stand behind a broken wall. The open part of the wall is called the arc. Walk Karan to the glowing spot. A beam will sweep out from the centre.",
+   "from": 11.12,
+   "to": 23.12
+  },
+  {
+   "id": "howto-2",
+   "who": "narrator",
+   "text": "The beam covers a sector, like a slice of pizza. Its area is θ over 360 times π times r squared. Always keep π in your answer. Write 12π, not 37.7.",
+   "from": 23.55,
+   "to": 38.4
+  },
+  {
+   "id": "howto-3",
+   "who": "narrator",
+   "text": "Too small, and some guardians get through. Too big, and the beam bounces back. Just right, and every guardian is destroyed. You have three shields. Each wrong shot costs one. Ready?",
+   "from": 38.77,
+   "to": 52.99
+  },
+  {
+   "id": "open-lost",
+   "who": "narrator",
+   "text": "Karan has lost his way deep inside an ancient jungle island.",
+   "from": 53.8,
+   "to": 58.16
+  },
+  {
+   "id": "open-guarded",
+   "who": "narrator",
+   "text": "But the temple is guarded. Seven stone courts stand in his way.",
+   "from": 58.52,
+   "to": 63.28
+  },
+  {
+   "id": "tut-move",
+   "who": "narrator",
+   "text": "Use the joystick or the WASD keys to move Karan.",
+   "from": 63.7,
+   "to": 67.84
+  },
+  {
+   "id": "tut-try",
+   "who": "narrator",
+   "text": "Try it. Push the joystick forward.",
+   "from": 68.21,
+   "to": 70.58
+  },
+  {
+   "id": "tut-good",
+   "who": "narrator",
+   "text": "Good.",
+   "from": 70.91,
+   "to": 71.49
+  },
+  {
+   "id": "tut-gate",
+   "who": "narrator",
+   "text": "Head through the glowing gate.",
+   "from": 71.79,
+   "to": 73.45
+  },
+  {
+   "id": "arena-1",
+   "who": "narrator",
+   "text": "The Mossy Gate. A small gate, but a big trap.",
+   "from": 73.99,
+   "to": 78.32
+  },
+  {
+   "id": "arena-2",
+   "who": "narrator",
+   "text": "The Fallen Idol. A third of the wall is missing.",
+   "from": 78.78,
+   "to": 82.48
+  },
+  {
+   "id": "arena-3",
+   "who": "narrator",
+   "text": "Serpent Court. The guardians are getting restless.",
+   "from": 83.02,
+   "to": 86.58
+  },
+  {
+   "id": "arena-4",
+   "who": "narrator",
+   "text": "Crimson Ruins. A wide gap and little time.",
+   "from": 87.14,
+   "to": 91.1
+  },
+  {
+   "id": "arena-5",
+   "who": "narrator",
+   "text": "Twin Falls. No more choices. Now you type the answer.",
+   "from": 91.69,
+   "to": 96.29
+  },
+  {
+   "id": "arena-6",
+   "who": "narrator",
+   "text": "Thunder Well. The largest ring in the jungle.",
+   "from": 96.89,
+   "to": 100.25
+  },
+  {
+   "id": "arena-7",
+   "who": "narrator",
+   "text": "The Warden's Court. The last ring before the temple.",
+   "from": 100.87,
+   "to": 104.53
+  },
+  {
+   "id": "spot-first",
+   "who": "narrator",
+   "text": "See that glowing spot? Walk Karan into it. From there, the beam can reach the whole arc.",
+   "from": 105.14,
+   "to": 111.36
+  },
+  {
+   "id": "spot-hint-1",
+   "who": "narrator",
+   "text": "Move to the spotlight.",
+   "from": 111.88,
+   "to": 113.19
+  },
+  {
+   "id": "spot-hint-2",
+   "who": "narrator",
+   "text": "Find the glowing spot to take aim.",
+   "from": 113.5,
+   "to": 115.68
+  },
+  {
+   "id": "spot-hint-3",
+   "who": "narrator",
+   "text": "The spotlight is behind the centre point.",
+   "from": 116.1,
+   "to": 118.53
+  },
+  {
+   "id": "trail-hint",
+   "who": "narrator",
+   "text": "Follow the light beam on the floor.",
+   "from": 118.97,
+   "to": 120.93
+  },
+  {
+   "id": "scan-radius",
+   "who": "narrator",
+   "text": "This line from the centre to the edge is the radius. Here, it's 7 metres.",
+   "from": 121.22,
+   "to": 126.54
+  },
+  {
+   "id": "scan-theta",
+   "who": "narrator",
+   "text": "The beam sweeps through an angle called theta. Here, it's 90 degrees.",
+   "from": 126.96,
+   "to": 132.21
+  },
+  {
+   "id": "scan-sector",
+   "who": "narrator",
+   "text": "The open arc, the radius, and the angle together make a sector.",
+   "from": 132.64,
+   "to": 137.16
+  },
+  {
+   "id": "look-2",
+   "who": "narrator",
+   "text": "Look closely. Find the angle and the radius.",
+   "from": 137.65,
+   "to": 140.84
+  },
+  {
+   "id": "look-3",
+   "who": "narrator",
+   "text": "No angle number this time. What does that small square mark tell you?",
+   "from": 141.19,
+   "to": 145.51
+  },
+  {
+   "id": "look-4",
+   "who": "narrator",
+   "text": "A wider angle this time. Think about what fraction of the circle it is.",
+   "from": 145.93,
+   "to": 150.39
+  },
+  {
+   "id": "ask-mcq",
+   "who": "narrator",
+   "text": "Which expression gives the area of this sector? Choose carefully.",
+   "from": 150.88,
+   "to": 155.01
+  },
+  {
+   "id": "ask-theta",
+   "who": "narrator",
+   "text": "Fill in the angle and the radius to complete the formula.",
+   "from": 155.53,
+   "to": 158.83
+  },
+  {
+   "id": "ask-fraction",
+   "who": "narrator",
+   "text": "Choose the fraction of the circle, then choose the radius.",
+   "from": 159.26,
+   "to": 162.71
+  },
+  {
+   "id": "ask-typed",
+   "who": "narrator",
+   "text": "Type the number in front of π. For 12π, just type 12.",
+   "from": 163.14,
+   "to": 167.75
+  },
+  {
+   "id": "ask-typed-short",
+   "who": "narrator",
+   "text": "Type your answer in terms of π.",
+   "from": 168.18,
+   "to": 170.19
+  },
+  {
+   "id": "time-low",
+   "who": "narrator",
+   "text": "The guardians are stirring!",
+   "from": 170.75,
+   "to": 172.44
+  },
+  {
+   "id": "fire",
+   "who": "narrator",
+   "text": "Time to fire!",
+   "from": 172.66,
+   "to": 173.74
+  },
+  {
+   "id": "out-small",
+   "who": "narrator",
+   "text": "Too small. The beam didn't cover the whole arc.",
+   "from": 174.26,
+   "to": 177.59
+  },
+  {
+   "id": "out-big",
+   "who": "narrator",
+   "text": "Too big! The extra energy came back at Karan.",
+   "from": 178.0,
+   "to": 181.34
+  },
+  {
+   "id": "fb-squared-fraction",
+   "who": "narrator",
+   "text": "Only the radius is squared, not the fraction.",
+   "from": 181.88,
+   "to": 184.85
+  },
+  {
+   "id": "fb-half-turn",
+   "who": "narrator",
+   "text": "A full circle is 360 degrees, not 180.",
+   "from": 185.23,
+   "to": 189.6
+  },
+  {
+   "id": "fb-diameter",
+   "who": "narrator",
+   "text": "That's the diameter. The radius is half of it.",
+   "from": 189.93,
+   "to": 193.21
+  },
+  {
+   "id": "fb-not-squared",
+   "who": "narrator",
+   "text": "Don't forget to square the radius.",
+   "from": 193.57,
+   "to": 195.54
+  },
+  {
+   "id": "fb-circumference",
+   "who": "narrator",
+   "text": "That's 2πr, the distance around. Area needs r squared.",
+   "from": 195.76,
+   "to": 200.8
+  },
+  {
+   "id": "fb-arc-length",
+   "who": "narrator",
+   "text": "That's the length of the arc, not the area inside it.",
+   "from": 201.04,
+   "to": 204.44
+  },
+  {
+   "id": "fb-whole-circle",
+   "who": "narrator",
+   "text": "That's the whole circle. We only need a slice of it.",
+   "from": 204.73,
+   "to": 208.27
+  },
+  {
+   "id": "fb-pi",
+   "who": "narrator",
+   "text": "Keep π as a symbol. Type only the number in front of it.",
+   "from": 208.63,
+   "to": 212.75
+  },
+  {
+   "id": "fb-radius",
+   "who": "narrator",
+   "text": "That's only the radius. Use θ over 360 times r squared.",
+   "from": 212.96,
+   "to": 218.71
+  },
+  {
+   "id": "fb-not-quite",
+   "who": "narrator",
+   "text": "Not quite. Check your angle fraction and your radius again.",
+   "from": 218.99,
+   "to": 222.99
+  },
+  {
+   "id": "fb-which-squared",
+   "who": "narrator",
+   "text": "Look at the formula again. Which part is squared?",
+   "from": 223.37,
+   "to": 226.49
+  },
+  {
+   "id": "help-start",
+   "who": "narrator",
+   "text": "Start with θ over 360. Now multiply by π and by the radius squared.",
+   "from": 226.84,
+   "to": 233.42
+  },
+  {
+   "id": "help-together",
+   "who": "narrator",
+   "text": "Let's work it out together.",
+   "from": 233.78,
+   "to": 235.09
+  },
+  {
+   "id": "shield-last",
+   "who": "narrator",
+   "text": "Last shield, Karan. Slow down and check each step.",
+   "from": 235.48,
+   "to": 239.72
+  },
+  {
+   "id": "shields-restored",
+   "who": "narrator",
+   "text": "Your shields are restored. Fresh start!",
+   "from": 240.02,
+   "to": 242.98
+  },
+  {
+   "id": "right-just",
+   "who": "narrator",
+   "text": "Just right. The sector is perfectly covered.",
+   "from": 243.28,
+   "to": 246.54
+  },
+  {
+   "id": "right-perfect",
+   "who": "narrator",
+   "text": "Perfect shot! The barrier is gone.",
+   "from": 246.82,
+   "to": 249.53
+  },
+  {
+   "id": "work-1",
+   "who": "narrator",
+   "text": "90 over 360 is one quarter. One quarter of 49π.",
+   "from": 249.87,
+   "to": 255.4
+  },
+  {
+   "id": "well-done",
+   "who": "narrator",
+   "text": "Well done!",
+   "from": 255.63,
+   "to": 256.51
+  },
+  {
+   "id": "work-2",
+   "who": "narrator",
+   "text": "120 degrees is one third of the circle. Then square 10.5.",
+   "from": 256.84,
+   "to": 262.45
+  },
+  {
+   "id": "work-3",
+   "who": "narrator",
+   "text": "A right angle is 90 degrees. So that's one quarter of the circle.",
+   "from": 262.79,
+   "to": 267.13
+  },
+  {
+   "id": "work-4",
+   "who": "narrator",
+   "text": "135 over 360 simplifies to three eighths.",
+   "from": 267.49,
+   "to": 272.19
+  },
+  {
+   "id": "praise-first",
+   "who": "narrator",
+   "text": "Nice work! First try! That's a perfect shot bonus.",
+   "from": 272.45,
+   "to": 277.04
+  },
+  {
+   "id": "exit-first",
+   "who": "narrator",
+   "text": "One gate down. Follow the glowing trail to the next court.",
+   "from": 277.32,
+   "to": 281.09
+  },
+  {
+   "id": "fb-right-angle",
+   "who": "narrator",
+   "text": "Remember, a right angle means one quarter of the circle.",
+   "from": 281.38,
+   "to": 285.06
+  },
+  {
+   "id": "praise-typed",
+   "who": "narrator",
+   "text": "No choices, no help, and you still did it.",
+   "from": 285.37,
+   "to": 288.69
+  },
+  {
+   "id": "fb-learn",
+   "who": "narrator",
+   "text": "Every mistake teaches something.",
+   "from": 288.97,
+   "to": 290.88
+  },
+  {
+   "id": "fb-hint",
+   "who": "narrator",
+   "text": "Check the hint and try again.",
+   "from": 291.13,
+   "to": 292.95
+  },
+  {
+   "id": "end-escaped",
+   "who": "narrator",
+   "text": "Karan escaped the jungle, one sector at a time.",
+   "from": 293.41,
+   "to": 296.88
+  },
+  {
+   "id": "end-key",
+   "who": "narrator",
+   "text": "Remember the key: θ over 360 times π times r squared.",
+   "from": 297.23,
+   "to": 303.1
+  },
+  {
+   "id": "end-know",
+   "who": "narrator",
+   "text": "Now you know how to find the area of any slice of a circle.",
+   "from": 303.46,
+   "to": 307.3
+  },
+  {
+   "id": "k-no-way",
+   "who": "karan",
+   "text": "There's no way back. I need to find another way out.",
+   "from": 307.57,
+   "to": 311.32
+  },
+  {
+   "id": "k-light",
+   "who": "karan",
+   "text": "Wait. What's that light?",
+   "from": 311.9,
+   "to": 313.56
+  },
+  {
+   "id": "k-temple",
+   "who": "karan",
+   "text": "There's a temple ahead. If there's a way off this island, it must be there.",
+   "from": 314.02,
+   "to": 318.58
+  },
+  {
+   "id": "k-maths",
+   "who": "karan",
+   "text": "Looks like I'll have to fight my way through. With maths!",
+   "from": 319.09,
+   "to": 322.67
+  },
+  {
+   "id": "k-huge",
+   "who": "karan",
+   "text": "Whoa! Those guardians are huge! I need to stop them.",
+   "from": 323.16,
+   "to": 327.22
+  },
+  {
+   "id": "k-corner",
+   "who": "karan",
+   "text": "No angle number this time, but I know that corner shape.",
+   "from": 327.67,
+   "to": 331.27
+  },
+  {
+   "id": "k-formula",
+   "who": "karan",
+   "text": "Okay. Just me and the formula.",
+   "from": 331.8,
+   "to": 334.13
+  },
+  {
+   "id": "k-last-ring",
+   "who": "karan",
+   "text": "This is it. One more and I'm out!",
+   "from": 334.52,
+   "to": 337.01
+  },
+  {
+   "id": "k-spotlight",
+   "who": "karan",
+   "text": "There's the spotlight. Let's go!",
+   "from": 337.47,
+   "to": 339.4
+  },
+  {
+   "id": "k-think",
+   "who": "karan",
+   "text": "Come on. Think! Quickly!",
+   "from": 339.83,
+   "to": 341.81
+  },
+  {
+   "id": "k-not-enough",
+   "who": "karan",
+   "text": "Not enough! Some got through.",
+   "from": 342.26,
+   "to": 344.29
+  },
+  {
+   "id": "k-too-much",
+   "who": "karan",
+   "text": "Whoa! Too much power! It bounced back.",
+   "from": 344.69,
+   "to": 347.88
+  },
+  {
+   "id": "k-try-again",
+   "who": "karan",
+   "text": "Okay, let me try that again.",
+   "from": 348.38,
+   "to": 350.26
+  },
+  {
+   "id": "k-see-mistake",
+   "who": "karan",
+   "text": "I see my mistake now.",
+   "from": 350.7,
+   "to": 352.11
+  },
+  {
+   "id": "k-one-more-try",
+   "who": "karan",
+   "text": "One more try.",
+   "from": 352.51,
+   "to": 353.3
+  },
+  {
+   "id": "k-got-this",
+   "who": "karan",
+   "text": "I've got this!",
+   "from": 353.55,
+   "to": 354.48
+  },
+  {
+   "id": "k-ouch",
+   "who": "karan",
+   "text": "Ouch!",
+   "from": 354.94,
+   "to": 355.47
+  },
+  {
+   "id": "k-lost-shield",
+   "who": "karan",
+   "text": "I lost a shield!",
+   "from": 355.67,
+   "to": 356.86
+  },
+  {
+   "id": "k-yes",
+   "who": "karan",
+   "text": "Yes! Every single one.",
+   "from": 357.22,
+   "to": 359.34
+  },
+  {
+   "id": "k-bullseye",
+   "who": "karan",
+   "text": "Bullseye! That's how it's done.",
+   "from": 359.51,
+   "to": 361.81
+  },
+  {
+   "id": "k-easier",
+   "who": "karan",
+   "text": "That was easier once I spotted the angle and the radius.",
+   "from": 362.3,
+   "to": 365.45
+  },
+  {
+   "id": "k-halfway",
+   "who": "karan",
+   "text": "Halfway there.",
+   "from": 365.88,
+   "to": 366.81
+  },
+  {
+   "id": "k-closer",
+   "who": "karan",
+   "text": "The temple's getting closer.",
+   "from": 367.1,
+   "to": 368.61
+  },
+  {
+   "id": "k-one-court",
+   "who": "karan",
+   "text": "Just one more court.",
+   "from": 368.91,
+   "to": 370.23
+  },
+  {
+   "id": "k-got-me",
+   "who": "karan",
+   "text": "The guardians got me.",
+   "from": 370.68,
+   "to": 372.03
+  },
+  {
+   "id": "k-did-it",
+   "who": "karan",
+   "text": "I did it!",
+   "from": 372.48,
+   "to": 373.24
+  },
+  {
+   "id": "k-door-open",
+   "who": "karan",
+   "text": "The temple door is open.",
+   "from": 373.44,
+   "to": 375.223
+  }
+ ]
+}

@@ -18,15 +18,18 @@ import { Ease, polar } from '../engine/util.js';
 import { audio } from '../engine/audio.js';
 import { ui } from '../ui/ui.js';
 
-// The lines as written for the scenes. mood picks Karan's portrait: 0 worried · 1 surprised · 2 determined.
+// The lines, each with its recorded voice-over (user 2026-11-05) and the caption shown with it, word for word what is said
+// (scene 3's two lines follow the recording: "But the temple is guarded…" and "…fight my way through. With maths!").
+// mood picks Karan's portrait: 0 worried · 1 surprised · 2 determined.
 const LINES = {
-  stranded: 'Karan has lost his way deep inside an ancient jungle island.',
-  noWayBack: 'There’s no way back… I need to find another way out.',
-  light: 'Wait… what’s that light?',
-  temple: 'There’s a temple ahead. If there’s a way off this island, it must be there.',
-  arenas: 'But the only path to the temple passes through a series of ancient arenas.',
-  cross: 'Looks like I’ll have to cross these arenas to reach the temple.',
+  stranded: { who: 'narrator', line: 'open-lost', text: 'Karan has lost his way deep inside an ancient jungle island.' },
+  noWayBack: { who: 'karan', line: 'k-no-way', mood: 0, text: 'There’s no way back… I need to find another way out.' },
+  light: { who: 'karan', line: 'k-light', mood: 1, text: 'Wait… what’s that light?' },
+  temple: { who: 'karan', line: 'k-temple', mood: 2, text: 'There’s a temple ahead. If there’s a way off this island, it must be there.' },
+  guarded: { who: 'narrator', line: 'open-guarded', text: 'But the temple is guarded. Seven stone courts stand in his way.' },
+  maths: { who: 'karan', line: 'k-maths', mood: 2, text: 'Looks like I’ll have to fight my way through. With maths!' },
 };
+const say = (k) => { const l = LINES[k]; return ui.cine.say(l.who, l.text, { mood: l.mood ?? 0, line: l.line }); };
 const SKIP = Symbol('skip');
 
 /** The walk to the gate's camera (low behind him, the gate ahead); the opening ends on it. */
@@ -55,7 +58,7 @@ export async function playOpening(scene) {
     rig.setPose({ pos: at(I, -12, 22, 26), target: at(I, 0, 0.5, 0), fov: fov(46) });
     rig.moveTo({ pos: at(start, -9, 9.5, 12), target: at(start, 0, 1.0, 0), fov: fov(44) }, 7, Ease.inOutSine);
     await go(delay(0.8));
-    await go(ui.cine.say('narrator', LINES.stranded));
+    await go(say('stranded'));
     // he looks around (the camera circles him, low): water on every side
     const t0 = world.elapsed, a0 = 235, a1 = 112, T = 6;
     rig.follow((out) => {
@@ -67,7 +70,7 @@ export async function playOpening(scene) {
     // he faces us, the water behind him
     hero.face(V(0, 0, -1));
     await go(rig.moveTo({ pos: at(hero.pos, 0, 1.75, -4.4), target: at(hero.pos, 0, 1.2, 0), fov: fov(42) }, 1.4, Ease.inOutCubic));
-    await go(ui.cine.say('karan', LINES.noWayBack, { mood: 0 }));
+    await go(say('noWayBack'));
 
     // ---- 2 KARAN NOTICES THE TEMPLE: over his shoulder toward it; a beam of light rises from it
     scene.setPhase('opening.temple');
@@ -75,12 +78,12 @@ export async function playOpening(scene) {
     await go(rig.moveTo({ pos: at(hero.pos, -4.4 * ahead.x + 2 * side.x, 2.0, -4.4 * ahead.z + 2 * side.z), target: V(cw.gate.x + ahead.x * 30, 9, cw.gate.z + ahead.z * 30), fov: fov(46) }, 1.8, Ease.inOutCubic));
     const beam = chain.riseBeam(2.6);
     await go(delay(0.8));
-    await go(ui.cine.say('karan', LINES.light, { mood: 1 }));
+    await go(say('light'));
     // the camera closes in a little on the temple
     const peak = chain.templePeak();
     rig.moveTo({ pos: at(hero.pos, -3.2 * ahead.x + 1.4 * side.x, 2.2, -3.2 * ahead.z + 1.4 * side.z), target: peak.setY(peak.y - 26), fov: fov(24) }, 3.2, Ease.inOutSine);
     await go(delay(0.6));
-    await go(ui.cine.say('karan', LINES.temple, { mood: 2 }));
+    await go(say('temple'));
     await go(beam);
 
     // ---- 3 THE PATH IS BLOCKED: he sets off along the causeway…
@@ -93,10 +96,10 @@ export async function playOpening(scene) {
     // (the rings fill the middle of the frame, the temple and its beam close it at the top)
     rig.moveTo({ pos: at(hand, -10 * ahead.x + 26 * side.x, 30, -10 * ahead.z + 26 * side.z), target: V(cw.gate.x + ahead.x * 95 - side.x * 2, 6, cw.gate.z + ahead.z * 95 - side.z * 2), fov: fov(52) }, 6.5, Ease.inOutSine);
     await go(delay(0.9));
-    await go(ui.cine.say('narrator', LINES.arenas));
+    await go(say('guarded'));
     // down behind him again: the pose the player's walk camera starts from
     await go(rig.moveTo(walkPose(hand, cw.dirDeg, CAUSEWAY_VIEW, world.camera.aspect), 2.2, Ease.inOutCubic));
-    await go(ui.cine.say('karan', LINES.cross, { mood: 2 }));
+    await go(say('maths'));
   };
   const played = scenes().catch((e) => { if (e !== SKIP) throw e; });
   await Promise.race([played, skipP]);

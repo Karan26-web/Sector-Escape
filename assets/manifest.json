@@ -1,6 +1,6 @@
 {
   "_readme": "Every image listed here is optional. If the file is missing the game draws a procedural placeholder. Sheets: cols × rows grid; anims map a name to a row, a frame count and fps. worldHeight = metres the full frame height spans in the 3D arena. Gate frames: \"opening\" = transparent arch width as a fraction of the image width, \"top\" = arch top as a fraction of the height. \"baseline\" = fraction of the cell height where the feet / trunk base sit (measured); the game anchors sprites there so nothing floats. bytes: the file's size on disk (tools/manifest_sizes.py writes it; the loading bar weighs each download by it). version: added to every asset URL (?v=...) so browsers fetch fresh files; bump it whenever art is replaced under the same file name.",
-  "version": "2026-10-27.3",
+  "version": "2026-11-05.vo",
   "images": {
     "hero_front": {
       "path": "sprites/hero_front.webp",
@@ -506,5 +506,679 @@
     }
   },
   "sfx": {},
-  "music": {}
+  "music": {},
+  "vo": {
+    "title-welcome": {
+      "path": "audio/vo/title-welcome.mp3",
+      "who": "narrator",
+      "text": "Welcome to Sector Escape. Deep in the jungle, an ancient temple is waiting.",
+      "dur": 6.16,
+      "bytes": 74292
+    },
+    "title-choose": {
+      "path": "audio/vo/title-choose.mp3",
+      "who": "narrator",
+      "text": "Press Play to begin, or tap How to play to learn first.",
+      "dur": 4.46,
+      "bytes": 53917
+    },
+    "howto-1": {
+      "path": "audio/vo/howto-1.mp3",
+      "who": "narrator",
+      "text": "Stone guardians stand behind a broken wall. The open part of the wall is called the arc. Walk Karan to the glowing spot. A beam will sweep out from the centre.",
+      "dur": 12.32,
+      "bytes": 148271
+    },
+    "howto-2": {
+      "path": "audio/vo/howto-2.mp3",
+      "who": "narrator",
+      "text": "The beam covers a sector, like a slice of pizza. Its area is θ over 360 times π times r squared. Always keep π in your answer. Write 12π, not 37.7.",
+      "dur": 15.15,
+      "bytes": 182126
+    },
+    "howto-3": {
+      "path": "audio/vo/howto-3.mp3",
+      "who": "narrator",
+      "text": "Too small, and some guardians get through. Too big, and the beam bounces back. Just right, and every guardian is destroyed. You have three shields. Each wrong shot costs one. Ready?",
+      "dur": 14.54,
+      "bytes": 174916
+    },
+    "open-lost": {
+      "path": "audio/vo/open-lost.mp3",
+      "who": "narrator",
+      "text": "Karan has lost his way deep inside an ancient jungle island.",
+      "dur": 4.655,
+      "bytes": 56425
+    },
+    "open-guarded": {
+      "path": "audio/vo/open-guarded.mp3",
+      "who": "narrator",
+      "text": "But the temple is guarded. Seven stone courts stand in his way.",
+      "dur": 5.08,
+      "bytes": 61440
+    },
+    "tut-move": {
+      "path": "audio/vo/tut-move.mp3",
+      "who": "narrator",
+      "text": "Use the joystick or the WASD keys to move Karan.",
+      "dur": 4.44,
+      "bytes": 53603
+    },
+    "tut-try": {
+      "path": "audio/vo/tut-try.mp3",
+      "who": "narrator",
+      "text": "Try it. Push the joystick forward.",
+      "dur": 2.65,
+      "bytes": 32287
+    },
+    "tut-good": {
+      "path": "audio/vo/tut-good.mp3",
+      "who": "narrator",
+      "text": "Good.",
+      "dur": 0.85,
+      "bytes": 10658
+    },
+    "tut-gate": {
+      "path": "audio/vo/tut-gate.mp3",
+      "who": "narrator",
+      "text": "Head through the glowing gate.",
+      "dur": 1.98,
+      "bytes": 24137
+    },
+    "arena-1": {
+      "path": "audio/vo/arena-1.mp3",
+      "who": "narrator",
+      "text": "The Mossy Gate. A small gate, but a big trap.",
+      "dur": 4.65,
+      "bytes": 56425
+    },
+    "arena-2": {
+      "path": "audio/vo/arena-2.mp3",
+      "who": "narrator",
+      "text": "The Fallen Idol. A third of the wall is missing.",
+      "dur": 4.02,
+      "bytes": 48588
+    },
+    "arena-3": {
+      "path": "audio/vo/arena-3.mp3",
+      "who": "narrator",
+      "text": "Serpent Court. The guardians are getting restless.",
+      "dur": 3.88,
+      "bytes": 47020
+    },
+    "arena-4": {
+      "path": "audio/vo/arena-4.mp3",
+      "who": "narrator",
+      "text": "Crimson Ruins. A wide gap and little time.",
+      "dur": 4.28,
+      "bytes": 51722
+    },
+    "arena-5": {
+      "path": "audio/vo/arena-5.mp3",
+      "who": "narrator",
+      "text": "Twin Falls. No more choices. Now you type the answer.",
+      "dur": 4.92,
+      "bytes": 59559
+    },
+    "arena-6": {
+      "path": "audio/vo/arena-6.mp3",
+      "who": "narrator",
+      "text": "Thunder Well. The largest ring in the jungle.",
+      "dur": 3.68,
+      "bytes": 44513
+    },
+    "arena-7": {
+      "path": "audio/vo/arena-7.mp3",
+      "who": "narrator",
+      "text": "The Warden's Court. The last ring before the temple.",
+      "dur": 3.98,
+      "bytes": 48274
+    },
+    "spot-first": {
+      "path": "audio/vo/spot-first.mp3",
+      "who": "narrator",
+      "text": "See that glowing spot? Walk Karan into it. From there, the beam can reach the whole arc.",
+      "dur": 6.54,
+      "bytes": 78994
+    },
+    "spot-hint-1": {
+      "path": "audio/vo/spot-hint-1.mp3",
+      "who": "narrator",
+      "text": "Move to the spotlight.",
+      "dur": 1.58,
+      "bytes": 19435
+    },
+    "spot-hint-2": {
+      "path": "audio/vo/spot-hint-2.mp3",
+      "who": "narrator",
+      "text": "Find the glowing spot to take aim.",
+      "dur": 2.5,
+      "bytes": 30407
+    },
+    "spot-hint-3": {
+      "path": "audio/vo/spot-hint-3.mp3",
+      "who": "narrator",
+      "text": "The spotlight is behind the centre point.",
+      "dur": 2.75,
+      "bytes": 33541
+    },
+    "trail-hint": {
+      "path": "audio/vo/trail-hint.mp3",
+      "who": "narrator",
+      "text": "Follow the light beam on the floor.",
+      "dur": 2.22,
+      "bytes": 26958
+    },
+    "scan-radius": {
+      "path": "audio/vo/scan-radius.mp3",
+      "who": "narrator",
+      "text": "This line from the centre to the edge is the radius. Here, it's 7 metres.",
+      "dur": 5.64,
+      "bytes": 68023
+    },
+    "scan-theta": {
+      "path": "audio/vo/scan-theta.mp3",
+      "who": "narrator",
+      "text": "The beam sweeps through an angle called theta. Here, it's 90 degrees.",
+      "dur": 5.57,
+      "bytes": 67396
+    },
+    "scan-sector": {
+      "path": "audio/vo/scan-sector.mp3",
+      "who": "narrator",
+      "text": "The open arc, the radius, and the angle together make a sector.",
+      "dur": 4.84,
+      "bytes": 58619
+    },
+    "look-2": {
+      "path": "audio/vo/look-2.mp3",
+      "who": "narrator",
+      "text": "Look closely. Find the angle and the radius.",
+      "dur": 3.48,
+      "bytes": 42318
+    },
+    "look-3": {
+      "path": "audio/vo/look-3.mp3",
+      "who": "narrator",
+      "text": "No angle number this time. What does that small square mark tell you?",
+      "dur": 4.64,
+      "bytes": 56111
+    },
+    "look-4": {
+      "path": "audio/vo/look-4.mp3",
+      "who": "narrator",
+      "text": "A wider angle this time. Think about what fraction of the circle it is.",
+      "dur": 4.78,
+      "bytes": 57678
+    },
+    "ask-mcq": {
+      "path": "audio/vo/ask-mcq.mp3",
+      "who": "narrator",
+      "text": "Which expression gives the area of this sector? Choose carefully.",
+      "dur": 4.45,
+      "bytes": 53917
+    },
+    "ask-theta": {
+      "path": "audio/vo/ask-theta.mp3",
+      "who": "narrator",
+      "text": "Fill in the angle and the radius to complete the formula.",
+      "dur": 3.62,
+      "bytes": 43886
+    },
+    "ask-fraction": {
+      "path": "audio/vo/ask-fraction.mp3",
+      "who": "narrator",
+      "text": "Choose the fraction of the circle, then choose the radius.",
+      "dur": 3.77,
+      "bytes": 45767
+    },
+    "ask-typed": {
+      "path": "audio/vo/ask-typed.mp3",
+      "who": "narrator",
+      "text": "Type the number in front of π. For 12π, just type 12.",
+      "dur": 4.93,
+      "bytes": 59559
+    },
+    "ask-typed-short": {
+      "path": "audio/vo/ask-typed-short.mp3",
+      "who": "narrator",
+      "text": "Type your answer in terms of π.",
+      "dur": 2.33,
+      "bytes": 28526
+    },
+    "time-low": {
+      "path": "audio/vo/time-low.mp3",
+      "who": "narrator",
+      "text": "The guardians are stirring!",
+      "dur": 1.915,
+      "bytes": 23510
+    },
+    "fire": {
+      "path": "audio/vo/fire.mp3",
+      "who": "narrator",
+      "text": "Time to fire!",
+      "dur": 1.39,
+      "bytes": 17241
+    },
+    "out-small": {
+      "path": "audio/vo/out-small.mp3",
+      "who": "narrator",
+      "text": "Too small. The beam didn't cover the whole arc.",
+      "dur": 3.65,
+      "bytes": 44199
+    },
+    "out-big": {
+      "path": "audio/vo/out-big.mp3",
+      "who": "narrator",
+      "text": "Too big! The extra energy came back at Karan.",
+      "dur": 3.66,
+      "bytes": 44513
+    },
+    "fb-squared-fraction": {
+      "path": "audio/vo/fb-squared-fraction.mp3",
+      "who": "narrator",
+      "text": "Only the radius is squared, not the fraction.",
+      "dur": 3.275,
+      "bytes": 39811
+    },
+    "fb-half-turn": {
+      "path": "audio/vo/fb-half-turn.mp3",
+      "who": "narrator",
+      "text": "A full circle is 360 degrees, not 180.",
+      "dur": 4.65,
+      "bytes": 56425
+    },
+    "fb-diameter": {
+      "path": "audio/vo/fb-diameter.mp3",
+      "who": "narrator",
+      "text": "That's the diameter. The radius is half of it.",
+      "dur": 3.575,
+      "bytes": 43259
+    },
+    "fb-not-squared": {
+      "path": "audio/vo/fb-not-squared.mp3",
+      "who": "narrator",
+      "text": "Don't forget to square the radius.",
+      "dur": 2.195,
+      "bytes": 26958
+    },
+    "fb-circumference": {
+      "path": "audio/vo/fb-circumference.mp3",
+      "who": "narrator",
+      "text": "That's 2πr, the distance around. Area needs r squared.",
+      "dur": 5.265,
+      "bytes": 63634
+    },
+    "fb-arc-length": {
+      "path": "audio/vo/fb-arc-length.mp3",
+      "who": "narrator",
+      "text": "That's the length of the arc, not the area inside it.",
+      "dur": 3.66,
+      "bytes": 44513
+    },
+    "fb-whole-circle": {
+      "path": "audio/vo/fb-whole-circle.mp3",
+      "who": "narrator",
+      "text": "That's the whole circle. We only need a slice of it.",
+      "dur": 3.835,
+      "bytes": 46393
+    },
+    "fb-pi": {
+      "path": "audio/vo/fb-pi.mp3",
+      "who": "narrator",
+      "text": "Keep π as a symbol. Type only the number in front of it.",
+      "dur": 4.34,
+      "bytes": 52663
+    },
+    "fb-radius": {
+      "path": "audio/vo/fb-radius.mp3",
+      "who": "narrator",
+      "text": "That's only the radius. Use θ over 360 times r squared.",
+      "dur": 5.99,
+      "bytes": 72411
+    },
+    "fb-not-quite": {
+      "path": "audio/vo/fb-not-quite.mp3",
+      "who": "narrator",
+      "text": "Not quite. Check your angle fraction and your radius again.",
+      "dur": 4.305,
+      "bytes": 52036
+    },
+    "fb-which-squared": {
+      "path": "audio/vo/fb-which-squared.mp3",
+      "who": "narrator",
+      "text": "Look at the formula again. Which part is squared?",
+      "dur": 3.41,
+      "bytes": 41378
+    },
+    "help-start": {
+      "path": "audio/vo/help-start.mp3",
+      "who": "narrator",
+      "text": "Start with θ over 360. Now multiply by π and by the radius squared.",
+      "dur": 6.875,
+      "bytes": 83069
+    },
+    "help-together": {
+      "path": "audio/vo/help-together.mp3",
+      "who": "narrator",
+      "text": "Let's work it out together.",
+      "dur": 1.62,
+      "bytes": 20062
+    },
+    "shield-last": {
+      "path": "audio/vo/shield-last.mp3",
+      "who": "narrator",
+      "text": "Last shield, Karan. Slow down and check each step.",
+      "dur": 4.505,
+      "bytes": 54544
+    },
+    "shields-restored": {
+      "path": "audio/vo/shields-restored.mp3",
+      "who": "narrator",
+      "text": "Your shields are restored. Fresh start!",
+      "dur": 3.225,
+      "bytes": 39184
+    },
+    "right-just": {
+      "path": "audio/vo/right-just.mp3",
+      "who": "narrator",
+      "text": "Just right. The sector is perfectly covered.",
+      "dur": 3.515,
+      "bytes": 42632
+    },
+    "right-perfect": {
+      "path": "audio/vo/right-perfect.mp3",
+      "who": "narrator",
+      "text": "Perfect shot! The barrier is gone.",
+      "dur": 2.995,
+      "bytes": 36362
+    },
+    "work-1": {
+      "path": "audio/vo/work-1.mp3",
+      "who": "narrator",
+      "text": "90 over 360 is one quarter. One quarter of 49π.",
+      "dur": 5.76,
+      "bytes": 69590
+    },
+    "well-done": {
+      "path": "audio/vo/well-done.mp3",
+      "who": "narrator",
+      "text": "Well done!",
+      "dur": 1.155,
+      "bytes": 14420
+    },
+    "work-2": {
+      "path": "audio/vo/work-2.mp3",
+      "who": "narrator",
+      "text": "120 degrees is one third of the circle. Then square 10.5.",
+      "dur": 5.895,
+      "bytes": 71158
+    },
+    "work-3": {
+      "path": "audio/vo/work-3.mp3",
+      "who": "narrator",
+      "text": "A right angle is 90 degrees. So that's one quarter of the circle.",
+      "dur": 4.635,
+      "bytes": 56111
+    },
+    "work-4": {
+      "path": "audio/vo/work-4.mp3",
+      "who": "narrator",
+      "text": "135 over 360 simplifies to three eighths.",
+      "dur": 4.945,
+      "bytes": 59873
+    },
+    "praise-first": {
+      "path": "audio/vo/praise-first.mp3",
+      "who": "narrator",
+      "text": "Nice work! First try! That's a perfect shot bonus.",
+      "dur": 4.845,
+      "bytes": 58619
+    },
+    "exit-first": {
+      "path": "audio/vo/exit-first.mp3",
+      "who": "narrator",
+      "text": "One gate down. Follow the glowing trail to the next court.",
+      "dur": 4.035,
+      "bytes": 48901
+    },
+    "fb-right-angle": {
+      "path": "audio/vo/fb-right-angle.mp3",
+      "who": "narrator",
+      "text": "Remember, a right angle means one quarter of the circle.",
+      "dur": 3.95,
+      "bytes": 47961
+    },
+    "praise-typed": {
+      "path": "audio/vo/praise-typed.mp3",
+      "who": "narrator",
+      "text": "No choices, no help, and you still did it.",
+      "dur": 3.575,
+      "bytes": 43259
+    },
+    "fb-learn": {
+      "path": "audio/vo/fb-learn.mp3",
+      "who": "narrator",
+      "text": "Every mistake teaches something.",
+      "dur": 2.15,
+      "bytes": 26331
+    },
+    "fb-hint": {
+      "path": "audio/vo/fb-hint.mp3",
+      "who": "narrator",
+      "text": "Check the hint and try again.",
+      "dur": 2.14,
+      "bytes": 26018
+    },
+    "end-escaped": {
+      "path": "audio/vo/end-escaped.mp3",
+      "who": "narrator",
+      "text": "Karan escaped the jungle, one sector at a time.",
+      "dur": 3.76,
+      "bytes": 45453
+    },
+    "end-key": {
+      "path": "audio/vo/end-key.mp3",
+      "who": "narrator",
+      "text": "Remember the key: θ over 360 times π times r squared.",
+      "dur": 6.165,
+      "bytes": 74606
+    },
+    "end-know": {
+      "path": "audio/vo/end-know.mp3",
+      "who": "narrator",
+      "text": "Now you know how to find the area of any slice of a circle.",
+      "dur": 4.09,
+      "bytes": 49528
+    },
+    "k-no-way": {
+      "path": "audio/vo/k-no-way.mp3",
+      "who": "karan",
+      "text": "There's no way back. I need to find another way out.",
+      "dur": 4.07,
+      "bytes": 49215
+    },
+    "k-light": {
+      "path": "audio/vo/k-light.mp3",
+      "who": "karan",
+      "text": "Wait. What's that light?",
+      "dur": 1.98,
+      "bytes": 24137
+    },
+    "k-temple": {
+      "path": "audio/vo/k-temple.mp3",
+      "who": "karan",
+      "text": "There's a temple ahead. If there's a way off this island, it must be there.",
+      "dur": 4.88,
+      "bytes": 58932
+    },
+    "k-maths": {
+      "path": "audio/vo/k-maths.mp3",
+      "who": "karan",
+      "text": "Looks like I'll have to fight my way through. With maths!",
+      "dur": 3.9,
+      "bytes": 47334
+    },
+    "k-huge": {
+      "path": "audio/vo/k-huge.mp3",
+      "who": "karan",
+      "text": "Whoa! Those guardians are huge! I need to stop them.",
+      "dur": 4.38,
+      "bytes": 52976
+    },
+    "k-corner": {
+      "path": "audio/vo/k-corner.mp3",
+      "who": "karan",
+      "text": "No angle number this time, but I know that corner shape.",
+      "dur": 3.92,
+      "bytes": 47647
+    },
+    "k-formula": {
+      "path": "audio/vo/k-formula.mp3",
+      "who": "karan",
+      "text": "Okay. Just me and the formula.",
+      "dur": 2.64,
+      "bytes": 32287
+    },
+    "k-last-ring": {
+      "path": "audio/vo/k-last-ring.mp3",
+      "who": "karan",
+      "text": "This is it. One more and I'm out!",
+      "dur": 2.81,
+      "bytes": 34168
+    },
+    "k-spotlight": {
+      "path": "audio/vo/k-spotlight.mp3",
+      "who": "karan",
+      "text": "There's the spotlight. Let's go!",
+      "dur": 2.25,
+      "bytes": 27585
+    },
+    "k-think": {
+      "path": "audio/vo/k-think.mp3",
+      "who": "karan",
+      "text": "Come on. Think! Quickly!",
+      "dur": 2.3,
+      "bytes": 28212
+    },
+    "k-not-enough": {
+      "path": "audio/vo/k-not-enough.mp3",
+      "who": "karan",
+      "text": "Not enough! Some got through.",
+      "dur": 2.345,
+      "bytes": 28526
+    },
+    "k-too-much": {
+      "path": "audio/vo/k-too-much.mp3",
+      "who": "karan",
+      "text": "Whoa! Too much power! It bounced back.",
+      "dur": 3.51,
+      "bytes": 42632
+    },
+    "k-try-again": {
+      "path": "audio/vo/k-try-again.mp3",
+      "who": "karan",
+      "text": "Okay, let me try that again.",
+      "dur": 2.2,
+      "bytes": 26958
+    },
+    "k-see-mistake": {
+      "path": "audio/vo/k-see-mistake.mp3",
+      "who": "karan",
+      "text": "I see my mistake now.",
+      "dur": 1.725,
+      "bytes": 21316
+    },
+    "k-one-more-try": {
+      "path": "audio/vo/k-one-more-try.mp3",
+      "who": "karan",
+      "text": "One more try.",
+      "dur": 1.03,
+      "bytes": 12852
+    },
+    "k-got-this": {
+      "path": "audio/vo/k-got-this.mp3",
+      "who": "karan",
+      "text": "I've got this!",
+      "dur": 1.25,
+      "bytes": 15360
+    },
+    "k-ouch": {
+      "path": "audio/vo/k-ouch.mp3",
+      "who": "karan",
+      "text": "Ouch!",
+      "dur": 0.745,
+      "bytes": 9404
+    },
+    "k-lost-shield": {
+      "path": "audio/vo/k-lost-shield.mp3",
+      "who": "karan",
+      "text": "I lost a shield!",
+      "dur": 1.465,
+      "bytes": 18181
+    },
+    "k-yes": {
+      "path": "audio/vo/k-yes.mp3",
+      "who": "karan",
+      "text": "Yes! Every single one.",
+      "dur": 2.32,
+      "bytes": 28212
+    },
+    "k-bullseye": {
+      "path": "audio/vo/k-bullseye.mp3",
+      "who": "karan",
+      "text": "Bullseye! That's how it's done.",
+      "dur": 2.585,
+      "bytes": 31347
+    },
+    "k-easier": {
+      "path": "audio/vo/k-easier.mp3",
+      "who": "karan",
+      "text": "That was easier once I spotted the angle and the radius.",
+      "dur": 3.47,
+      "bytes": 42005
+    },
+    "k-halfway": {
+      "path": "audio/vo/k-halfway.mp3",
+      "who": "karan",
+      "text": "Halfway there.",
+      "dur": 1.19,
+      "bytes": 14733
+    },
+    "k-closer": {
+      "path": "audio/vo/k-closer.mp3",
+      "who": "karan",
+      "text": "The temple's getting closer.",
+      "dur": 1.775,
+      "bytes": 21629
+    },
+    "k-one-court": {
+      "path": "audio/vo/k-one-court.mp3",
+      "who": "karan",
+      "text": "Just one more court.",
+      "dur": 1.64,
+      "bytes": 20062
+    },
+    "k-got-me": {
+      "path": "audio/vo/k-got-me.mp3",
+      "who": "karan",
+      "text": "The guardians got me.",
+      "dur": 1.67,
+      "bytes": 20376
+    },
+    "k-did-it": {
+      "path": "audio/vo/k-did-it.mp3",
+      "who": "karan",
+      "text": "I did it!",
+      "dur": 0.975,
+      "bytes": 12225
+    },
+    "k-door-open": {
+      "path": "audio/vo/k-door-open.mp3",
+      "who": "karan",
+      "text": "The temple door is open.",
+      "dur": 1.883,
+      "bytes": 23197
+    }
+  }
 }

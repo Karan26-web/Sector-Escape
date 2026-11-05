@@ -104,7 +104,8 @@ export class Roam {
    * o: { region (x, z) → signed distance · goal: { pos, r?, reached?(pos) } · mark?: where "near" is measured (the door;
    *      default goal.pos) · near?, far?: the highlight is full within near m, nothing beyond far · highlight?(k, dt) ·
    *      yawDeg: the heading the camera looks along (toward the goal) · view?: { dist, height, ahead, fov } ·
-   *      onTick?(pos) · onMove?(metres walked) · onBump?(point on the edge he pushes into) }
+   *      onTick?(pos) · onMove?(metres walked) · onBump?(point on the edge he pushes into) · onIdle?() (the goal's chime:
+   *      he stood still or kept pushing into an edge) }
    */
   run(o) {
     this.stop();
@@ -162,7 +163,7 @@ export class Roam {
     // the goal: brighter the nearer he gets; full, with a chime once per pause, when he stands still or is stuck
     const m = c.mark || c.goal.pos, dist = Math.hypot(h.pos.x - m.x, h.pos.z - m.z);
     const idle = c.still > IDLE_HINT || c.stuck > STUCK_HINT;
-    if (idle && !c.pinged) { c.pinged = true; audio.play('objective.ping'); }
+    if (idle && !c.pinged) { c.pinged = true; audio.play('objective.ping'); if (c.onIdle) c.onIdle(); }   // (onIdle: a spoken hint)
     if (!idle && (pushing || c.still < 0.5)) c.pinged = false;
     const want = Math.max(1 - smooth(c.near ?? 4, c.far ?? 12, dist), idle ? 1 : 0);
     c.hl += (want - c.hl) * Math.min(1, dt * 4);

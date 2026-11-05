@@ -6,6 +6,7 @@ import * as THREE from '../vendor/three.module.js';
 import { World } from './engine/world.js';
 import { assets } from './engine/assets.js';
 import { audio } from './engine/audio.js';
+import { vo } from './engine/vo.js';
 import { FX } from './engine/fx.js';
 import { Hero } from './game/hero.js';
 import { ChainWorld } from './game/chain.js';
@@ -63,9 +64,20 @@ class Game {
     this.world.start();
     const direct = parseInt(params.get('level') || '', 10);
     if (direct >= 1 && direct <= TOTAL_LEVELS) { ui.hideAll(); const r = await this.playFrom(direct); return this.mapLoop(r.lastId); }
+    await this.soundGate(unlock);
     while (await ui.title.show() === 'howto') await ui.howto.show();
     ui.hideAll(); const r = await this.playFromStart();
     return this.mapLoop(r.lastId);
+  }
+  /** The title greets the player aloud (user 2026-11-05: the voice-over). Browsers keep sound off until the page is touched,
+   *  so when it is off the finished loading screen asks for one tap; muted, or where sound may already play, the title
+   *  comes straight up. unlock: the first-touch handler (it starts the title's music and jungle bed). */
+  async soundGate(unlock) {
+    if (audio.muted) return;
+    audio.unlock(); await new Promise((r) => setTimeout(r, 150));
+    if (!(audio.ctx && audio.ctx.state === 'running')) await ui.loading.tapToStart();
+    unlock();
+    for (let i = 0; i < 20 && !(audio.ctx && audio.ctx.state === 'running'); i++) await new Promise((r) => setTimeout(r, 50));
   }
   /** Load the UI fonts, every weight the CSS uses, so no screen swaps fonts later. Their stylesheet loads without blocking
    *  the first paint (index.html), so it is awaited first. Boot caps the wait once the art is in. */
@@ -167,15 +179,15 @@ class Game {
     this.chain.resetStartGate(false);
     this.sector.reset(); this.barrier.hide();
   }
-  finish() { this.scene = null; this.nextScene = null; this.roam.stop(); this.markers.clear(); ui.hud.hide(); this.showIdle(); audio.music.setMode('title'); audio.ambient.setMode('jungle'); }
+  finish() { vo.stop(); this.scene = null; this.nextScene = null; this.roam.stop(); this.markers.clear(); ui.hud.hide(); this.showIdle(); audio.music.setMode('title'); audio.ambient.setMode('jungle'); }
   onPhase(p) { this.phase = p; }
   async togglePause() {
     if (!this.scene || this.pausing || this.world.paused) return;
-    const mode = audio.music.mode; this.pausing = true; this.world.paused = true; audio.music.setMode('calm');
+    const mode = audio.music.mode; this.pausing = true; this.world.paused = true; audio.music.setMode('calm'); vo.pause();   // (a line stops mid-word and goes on from there)
     const c = await ui.pause.show();
     this.world.paused = false; this.pausing = false;
-    if (c === 'map' && this.scene) this.scene.abort();
-    else audio.music.setMode(mode);   // (whatever was playing: the boss theme, a walk's explore, the answer's tension)
+    if (c === 'map' && this.scene) { vo.stop(); this.scene.abort(); }
+    else { audio.music.setMode(mode); vo.resume(); }   // (whatever was playing: the boss theme, a walk's explore, the answer's tension)
   }
 }
 
@@ -191,7 +203,7 @@ window.__se = {
   pick(sel) { return ui.pick.choosePick(sel); },
   /** tests / DEV: Karan walks to each goal by himself (the same as ?auto=1) */
   walk(on = true) { game.roam.autopilot = on; },
-  controller,
+  controller, vo,
   assets, audio, THREE, ui,
 };
 game.boot().catch((e) => { console.error(e); document.getElementById('loading-text').textContent = 'Error: ' + e.message; });

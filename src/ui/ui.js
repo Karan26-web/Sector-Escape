@@ -4,6 +4,7 @@
 import * as THREE from '../../vendor/three.module.js';
 import { assets } from '../engine/assets.js';
 import { audio } from '../engine/audio.js';
+import { vo } from '../engine/vo.js';
 import { delay } from '../engine/tween.js';
 import { CHAIN, formulaParts, choices, pickTruth, evaluatePick, solveSteps, sectorCoef, answerFor } from '../game/levels.js';
 import { formatNumber } from '../engine/util.js';
@@ -94,11 +95,24 @@ export const ui = {
       if (text && text !== this.text) { this.text = text; $('#loading-text').textContent = text; }
     },
     logo() { setImg($('#loading-logo'), 'ui_logo'); },
+    /** Everything is in. Browsers keep sound off until the player touches the page (every tablet on a first visit), so the
+     *  title, which greets the player aloud, waits for one tap: anywhere, or any key. */
+    tapToStart() {
+      const el = $('#loading-text'); el.textContent = 'Tap to start'; el.classList.add('tap');
+      return new Promise((res) => {
+        const go = () => { window.removeEventListener('pointerup', go); window.removeEventListener('keydown', go); el.classList.remove('tap'); res(); };
+        window.addEventListener('pointerup', go); window.addEventListener('keydown', go);
+      });
+    },
   },
   title: {
-    /** Play and How to play. There is no Continue (user 2026-10-27): every game starts from the very start. */
+    greeted: false,
+    /** Play and How to play. There is no Continue (user 2026-10-27): every game starts from the very start. The narrator
+     *  greets the player the first time the title is up with sound (once a session). */
     async show() {
-      ui.hideAll(); ui.show('title'); const c = await waitClick({ '#btn-play': 'play', '#btn-howto': 'howto' }); return c;
+      ui.hideAll(); ui.show('title');
+      if (!this.greeted && vo.play('title-welcome').started) { this.greeted = true; vo.play('title-choose'); }
+      const c = await waitClick({ '#btn-play': 'play', '#btn-howto': 'howto' }); vo.stop(); return c;
     },
     hide() { ui.hide('title'); },
   },
@@ -167,9 +181,10 @@ export const ui = {
       $('#hw-back').style.visibility = this.i === 0 ? 'hidden' : 'visible';
       $('#hw-next').textContent = this.i === 2 ? "Let's go!" : 'Next';
       audio.play('ui.whoosh');
+      if (this.voiced !== this.i) { this.voiced = this.i; vo.play(`howto-${this.i + 1}`, { mode: 'cut' }); }   // the narrator reads each card (a new card cuts the last one short)
     },
     async show() {
-      this.build(); ui.show('howto'); $('#screen-howto').classList.add('dim'); this.go(0);
+      this.build(); ui.show('howto'); $('#screen-howto').classList.add('dim'); this.voiced = -1; this.go(0);
       const bots = [...document.querySelectorAll('#hw-pic-0 .g-bot')], pf = this.poundFrames; let tick = 0;   // the guardians pound, out of step
       const anim = setInterval(() => { tick++; bots.forEach((im, k) => im.setAttribute('href', pf[(tick + k * 2) % pf.length])); }, 100);
       const onKey = (e) => { if (e.key === 'ArrowRight') this.go(this.i + 1); if (e.key === 'ArrowLeft') this.go(this.i - 1); };
@@ -180,7 +195,7 @@ export const ui = {
         const cleanup = () => { $('#hw-next').removeEventListener('click', next); $('#hw-back').removeEventListener('click', back); };
         $('#hw-next').addEventListener('click', next); $('#hw-back').addEventListener('click', back);
       });
-      clearInterval(anim); window.removeEventListener('keydown', onKey); audio.play('ui.confirm'); ui.hide('howto');
+      clearInterval(anim); window.removeEventListener('keydown', onKey); vo.stop(); audio.play('ui.confirm'); ui.hide('howto');
     },
   },
   /* ---------------------------------------------------------- the opening (user 2026-10-27): letterbox, the narrator, Karan
@@ -196,7 +211,7 @@ export const ui = {
     },
     start() { this.bind(); this.on = true; this.clear(); $('#cine').classList.add('on'); ui.hud.hide(); },
     end() { this.cancel(); this.on = false; $('#cine').classList.remove('on'); },
-    cancel() { this.token++; this.hurry = null; this.clear(); },
+    cancel() { this.token++; this.hurry = null; this.clear(); if (this.on) vo.stop(); },   // (only the opening's own voice: end() also runs at every scene's clean-up)
     clear() { $('#cine-dialog').classList.remove('show', 'done'); $('#cine-narration').classList.remove('show'); },
     /** Karan's face: the portrait sheet once that art exists (mood = its frame: 0 worried · 1 surprised · 2 determined),
      *  until then his idle frame cropped to head and shoulders. */
@@ -217,24 +232,30 @@ export const ui = {
       } catch (e) { console.warn('[portrait]', e); }
       return this._face;
     },
-    /** who: 'narrator' | 'karan'. Resolves when the line has been read (or tapped on), or at once if cancelled. */
-    async say(who, text, { mood = 0 } = {}) {
+    /** who: 'narrator' | 'karan'. line: its recorded voice-over (user 2026-11-05), spoken with the caption. Resolves when
+     *  the line has been said and read (or tapped on), or at once if cancelled. */
+    async say(who, text, { mood = 0, line = null } = {}) {
       const my = ++this.token, karan = who === 'karan', box = karan ? $('#cine-dialog') : $('#cine-narration'), el = karan ? $('#cine-line') : box;
       this.clear();
       if (karan) { const src = this.portrait(mood), im = $('#cine-portrait'); if (src) im.src = src; im.style.visibility = src ? '' : 'hidden'; }
+      const voice = line ? vo.play(line, { mode: 'cut' }) : null, spoken = !!(voice && voice.started);
+      let heard = !spoken; if (spoken) voice.then(() => { heard = true; });
       el.textContent = karan ? '' : text; void box.offsetWidth; box.classList.add('show'); audio.play(karan ? 'ui.panel' : 'cine.narration');
       if (karan) {
         let full = false; this.hurry = () => { full = true; };
         for (let i = 1; i <= text.length && !full; i++) {
           el.textContent = text.slice(0, i);
-          if (i % 2 === 0 && /\w/.test(text[i - 1])) audio.play('voice.karan', { minGap: 0.035 });
+          if (!spoken && i % 2 === 0 && /\w/.test(text[i - 1])) audio.play('voice.karan', { minGap: 0.035 });   // (his recorded voice says it: no blips)
           await delay(0.03); if (my !== this.token) return;
         }
         el.textContent = text; box.classList.add('done');
       }
+      // held for the voice to finish (and a breath), or, unspoken, for its reading time; a tap moves on (and stops the voice)
       let go = false; this.hurry = () => { go = true; };
-      const hold = Math.min(5.4, Math.max(2.4, 1.3 + text.length * 0.045));
-      for (let t = 0; t < hold && !go; t += 0.05) { await delay(0.05); if (my !== this.token) return; }
+      const read = Math.min(5.4, Math.max(2.4, 1.3 + text.length * 0.045)), hold = spoken ? read * 0.6 : read;
+      let after = 0;
+      for (let t = 0; (t < hold || !heard || after < 0.35) && !go; t += 0.05) { await delay(0.05); if (my !== this.token) return; if (heard) after += 0.05; }
+      if (!heard) vo.hush();
       this.hurry = null; box.classList.remove('show', 'done');
       await delay(0.3);
     },
@@ -381,12 +402,13 @@ export const ui = {
       const n = perArena.length, where = n === 1 ? 'the arena' : n === 2 ? 'both arenas' : `all ${n} arenas`;
       praise.innerHTML = flawless ? `${ICONS.check}<span>Not a single mistake in ${where}. Outstanding work!</span>` : ''; praise.classList.remove('show');
       const btn = $('#btn-next'); btn.style.visibility = 'hidden';
+      for (const id of ['end-escaped', 'end-key', 'end-know']) vo.play(id);   // the narrator closes the journey, and the key to it
       await sleep(400);
       for (const r of perArena) { const tr = document.createElement('tr'); tr.innerHTML = `<td>Arena ${r.id} · ${r.name}<span class="st">${'★'.repeat(r.stars)}${'☆'.repeat(3 - r.stars)}</span>${r.flawless ? '<span class="res-flawless">No mistakes</span>' : ''}</td><td>+${r.score}</td>`; tr.style.opacity = 0; rows.appendChild(tr); await sleep(60); tr.style.transition = 'opacity .3s'; tr.style.opacity = 1; audio.play('ui.count'); await sleep(220); }
       if (flawless) { praise.classList.add('show'); audio.play('praise'); }
       const t0 = performance.now(), dur = 800; await new Promise((res) => { const tick = (t) => { const k = Math.min(1, (t - t0) / dur); $('#res-total').textContent = Math.round(sessionTotal * k); if (k < 1) { if (Math.random() < 0.5) audio.play('ui.count', { minGap: 0.05 }); requestAnimationFrame(tick); } else res(); }; requestAnimationFrame(tick); });
       btn.style.visibility = 'visible';
-      await once(btn, 'click'); ui.hide('results');
+      await once(btn, 'click'); vo.stop(); ui.hide('results');
     },
   },
   gameover: { async show() { ui.hud.hide(); ui.panel.close(); ui.show('gameover'); $('#screen-gameover').classList.add('dim'); const c = await waitClick({ '#btn-retry': 'retry', '#btn-go-map': 'map' }); ui.hide('gameover'); return c; } },

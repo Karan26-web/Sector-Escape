@@ -27,12 +27,31 @@ import { assets } from '../engine/assets.js';
 import { tweens, delay } from '../engine/tween.js';
 import { polar, DEG, Ease, degDiff, toDeg, wrapDeg } from '../engine/util.js';
 import { audio } from '../engine/audio.js';
+import { vo } from '../engine/vo.js';
 import { ui } from '../ui/ui.js';
 
 const ABORT = Symbol('abort');
 const TIMEOUT = Symbol('timeout');
 const ANSWER_TIME = 90;   // s to answer each time the question is up (user 2026-10-28): a draining bar with the seconds left
 const GUARD_TOP = 3.7;   // from the top view the guardians (1 m beyond the arc) rise this far past the arc toward screen-up
+/** The voice-over (user 2026-11-05; engine/vo.js) by arena id: the narrator names the arena as it is revealed (Karan
+ *  answers in 5 and 7), asks the learner to read the drawing (2–4), asks the question as the dock opens, works the right
+ *  choice out aloud (1–4); Karan marks the way on as he leaves 4, 5 and 6. */
+const VO = {
+  intro: { 1: 'arena-1', 2: 'arena-2', 3: 'arena-3', 4: 'arena-4', 5: 'arena-5', 6: 'arena-6', 7: 'arena-7' },
+  reply: { 5: 'k-formula', 7: 'k-last-ring' },
+  look: { 2: 'look-2', 3: 'look-3', 4: 'look-4' },
+  ask: { 1: 'ask-mcq', 2: 'ask-theta', 3: 'ask-fraction', 4: 'ask-fraction', 5: 'ask-typed', 6: 'ask-typed-short', 7: 'ask-typed-short' },
+  work: { 1: 'work-1', 2: 'work-2', 3: 'work-3', 4: 'work-4' },
+  onward: { 4: 'k-halfway', 5: 'k-closer', 6: 'k-one-court' },
+};
+/** The narrator's line for a mistake on the hint ladder's 1st rung, by diagnosis code (no line of its own: "Check the
+ *  hint and try again."). */
+const VO_MISTAKE = { 'squared-fraction': 'fb-squared-fraction', 'half-turn': 'fb-half-turn', 'used-diameter': 'fb-diameter', 'not-squared': 'fb-not-squared', circumference: 'fb-circumference',
+  'arc-length': 'fb-arc-length', 'full-circle': 'fb-whole-circle', 'full-turn': 'fb-whole-circle', 'pi-included': 'fb-pi', radius: 'fb-radius', under: 'fb-not-quite', over: 'fb-not-quite', both: 'fb-not-quite' };
+const SPOT_HINTS = ['spot-hint-1', 'spot-hint-2', 'spot-hint-3'];
+const RETRY = ['k-try-again', 'k-see-mistake', 'k-one-more-try', 'k-got-this'];
+let rightLine = 0, cheer = 0;   // (the lines for a right shot and Karan's cheer take turns over a session)
 /** The part of the formula a mistake's idea is about (the hint ladder's 1st rung points at it): the fraction, π or r². */
 const PART = { 'squared-fraction': 'r', 'not-squared': 'r', 'arc-length': 'r', circumference: 'r', 'r-squared': 'r', 'pi-included': 'pi', 'forgot-pi': 'pi', 'pi-as-3': 'pi', both: ['f', 'r'] };
 const partOf = (d) => (d ? PART[d.code] || (d.type === 'angle' ? 'f' : d.type === 'radius' ? 'r' : null) : null);
@@ -45,7 +64,7 @@ export class ArenaScene {
     this.world = game.world; this.fx = game.fx; this.hero = game.hero; this.rig = game.world.rig; this.chain = game.chain; this.sector = game.sector; this.barrier = game.barrier; this.bots = game.bots;
     this.R = this.A.R; this.C = new THREE.Vector3(this.A.center.x, 0, this.A.center.z);
     this.next = index + 1 < CHAIN.arenas.length ? CHAIN.arenas[index + 1] : CHAIN.sanctuary;
-    this.shields = 3; this.maxShields = 3; this.misses = 0; this.firstTry = null; this.timeUsed = 0; this.attempt = 0; this.hintText = ''; this.solved = false;
+    this.shields = 3; this.maxShields = 3; this.misses = 0; this.firstTry = null; this.timeUsed = 0; this.attempt = 0; this.hintText = ''; this.solved = false; this.warned = false; this.urged = false;
     this.phase = 'init'; this.aborted = false; this.disposed = false; this._resolveFire = null; this.boss = null; this.pathDots = []; this.heroDown = null; this.storm = null;
     this.watch = this.V(this.A.watch); this.gapMid = this.W(this.A.exitDeg, this.R);
     this.world.addUpdatable(this);
@@ -220,7 +239,7 @@ export class ArenaScene {
   async flow() {
     const L = this.level;
     const prevShields = this.game.lastShields; this.game.lastShields = null;
-    if (prevShields != null && prevShields < this.maxShields) ui.hud.refillShields(prevShields, this.maxShields);   // show the refill (LXD)
+    if (prevShields != null && prevShields < this.maxShields) { ui.hud.refillShields(prevShields, this.maxShields); vo.play('shields-restored', { ttl: 4 }); }   // show the refill (LXD), and say it
     else ui.hud.setShields(this.shields, this.maxShields);
     audio.ambient.start('jungle'); audio.music.start('explore'); audio.music.setMode('explore');
     this.chain.setActiveArena(this.index); this.chain.setFocus(this.index, false, 0);
@@ -275,11 +294,19 @@ export class ArenaScene {
     const region = SDF.minus((x, z) => (open() ? through(x, z) : walk(x, z)), PILLARS);
     const first = this.opening || !save.load().moveTutorialSeen; let opened = false, taught = !first;   // (every start from the very beginning shows it)
     ui.hud.show(); controller.reveal({ demo: first });   // (its knob shows the move: no text box, the game is played on tablets)
+    // the walkthrough, spoken (user 2026-11-05): "Use the joystick or the WASD keys…" only on a computer (a tablet has only
+    // the stick), "Try it. Push the joystick forward." · "Good." as he moves · "Head through the glowing gate."
+    if (first) { if (!controller.touch) vo.play('tut-move'); vo.play('tut-try'); }
     await this.s(this.game.roam.run({
       region, yawDeg: cw.dirDeg, view: CAUSEWAY_VIEW,
       goal: { pos: this.V(A.spawn), reached: (p) => Math.hypot(p.x - A.center.x, p.z - A.center.z) < A.R - 1.5 },
       mark: door, near: 5, far: 16, highlight: (k, dt) => M.door(opened ? 0 : k, dt),
-      onMove: (m) => { if (!taught && m > 1.6) { taught = true; audio.play('tutorial.done'); const d = save.load(); d.moveTutorialSeen = true; save.write(); } },
+      onMove: (m) => {
+        if (taught || m <= 1.6) return;
+        taught = true; audio.play('tutorial.done'); const d = save.load(); d.moveTutorialSeen = true; save.write();
+        if (first) { vo.drop('tut-try'); vo.play('tut-good', { ttl: 6 }); vo.play('tut-gate', { ttl: 9, max: 3 }); }   // (after "Use the joystick…" if he moves during it)
+      },
+      onIdle: () => vo.play('tut-gate', { mode: 'drop', max: 3 }),
       onTick: (p) => { if (!opened && p.distanceTo(door) < 3.4) { opened = true; this.setPhase('gate'); M.doorOff(); this.chain.openStartGate(1.0); } },
     }));
     M.doorOff();
@@ -311,13 +338,16 @@ export class ArenaScene {
       const B = this.R * 0.5 + 3.5, Hc = B * 1.05, Dka = this.hero.distTo(this.gapMid);
       this.rig.moveTo({ pos: this.hero.pos.clone().addScaledVector(look, -B).add(new THREE.Vector3(0, Hc, 0)), target: this.hero.pos.clone().addScaledVector(look, Dka * 0.5).setY(1.0), fov: this.world.camera.aspect < 0.8 ? 74 : 56 }, 1.6);
     }
-    await this.s(delay(1.5));
+    // the narrator names the arena (Karan answers in 5 and 7) over the empty gap: the shot holds for the line (user 2026-11-05)
+    const named = vo.play(VO.intro[L.id]), reply = VO.reply[L.id] ? vo.play(VO.reply[L.id]) : null;
+    await this.s(Promise.race([Promise.all([delay(1.5), named, reply]), delay(10)]));
     this.setPhase('arrive'); audio.play('alarm'); audio.music.setMode(L.boss ? 'boss' : 'arena');
     if (L.boss && !this.boss) { this.boss = new Boss(this.world, this.fx, this.W(A.exitDeg, this.R + (A.bay ? A.bay.D * 0.5 : 0) + 5), this.game.bossLight); this.boss.roar(); }
     this.bots.calm = false;
+    const whoa = L.id === 1 ? vo.play('k-huge', { once: true }) : null;   // (the first squad he sees)
     await this.s(this.squadArrives());
     this.rig.shake(0.18, 0.4);
-    await this.s(delay(1.4));   // a beat of pounding: the urgency has to land before anything else happens
+    await this.s(Promise.race([Promise.all([delay(1.4), whoa]), delay(5)]));   // a beat of pounding: the urgency has to land before anything else happens
   }
   /** LXD: Karan's designated observation point, just behind the centre on the line from the gap through O. The player walks
    *  him there (user 2026-10-27): the spot glows on the floor, brighter as he nears it and whenever he stands still. The
@@ -331,9 +361,13 @@ export class ArenaScene {
     // the walk looks toward the spot, its goal (LXD 2026-10-29, F2): along the gap's heading, a spot well off to one side
     // started off-screen (ring 6) and slid into view in the bottom-left corner, under the stick
     const to = this.watch.clone().sub(this.hero.pos), yaw = Math.hypot(to.x, to.z) > 2 ? toDeg(to.x, to.z) : A.exitDeg;
+    // spoken (user 2026-11-05): the narrator shows the spot in ring 1, Karan spots it himself in ring 2; standing still, a hint
+    if (this.level.id === 1) vo.play('spot-first', { once: true }); else if (this.level.id === 2) vo.play('k-spotlight', { once: true });
+    let hint = 0;
     await this.s(this.game.roam.run({
       region: SDF.minus(ringsFloor(this.index), PILLARS), yawDeg: yaw, view: this.walkView(),   // (this ring, and back through the cleared ones)
       goal: { pos: this.watch, r: 0.75 }, near: 2.5, far: 10, highlight: (k, dt) => M.spotSet(k, dt), onBump: (p) => this.edgeBump(p),
+      onIdle: () => vo.play(SPOT_HINTS[hint++ % SPOT_HINTS.length], { mode: 'drop' }),
     }));
     M.spotOff();
     await this.s(this.hero.runTo(this.watch, 2.4, { within: 0.06 }));   // the last step onto the spot
@@ -366,7 +400,11 @@ export class ArenaScene {
     await this.s(this.rig.moveTo(this.tacticalPose(), 1.0, Ease.inOutCubic));
     audio.music.setMode(L.boss ? 'boss' : 'tension');
     this.setPhase('scan');
-    await this.s(this.sector.scan({ breachDeg: A.exitDeg, theta: A.theta, show: L.show }));
+    // ring 1 (once a session) is the lesson, spoken step by step: the radius, the angle θ, the sector (user 2026-11-05)
+    const lesson = L.id === 1 && !vo.said.get('scan-radius') ? (step) => vo.play(`scan-${step}`) : null;
+    await this.s(this.sector.scan({ breachDeg: A.exitDeg, theta: A.theta, show: L.show, say: lesson }));
+    // rings 2–4: read the drawing (ring 3 again: Karan knows the corner by now)
+    vo.play(L.id === 3 && save.load().cleared[3] ? 'k-corner' : VO.look[L.id]);
     await this.s(delay(0.3));
     // ---- the formula above the keypad (user, 2026-10-22): shown from the start on every ring; misses work it through.
     //      Filled while the dock is still off-screen, so the phone fit (sectorPose) measures the dock at its real height.
@@ -389,6 +427,7 @@ export class ArenaScene {
       if (this.moveOn()) return;
       if (picking) ui.pick.reshuffle();
       ui.panel.unlock();
+      vo.play(RETRY[(this.misses - 1) % RETRY.length], { ttl: 4 });   // Karan, ready to try again ("I see my mistake now.")
     };
     // a tablet turned (or the window resized) mid-question: frame the sector again once the dock has its new layout
     this.world.onResize = this._onResize = () => { this.refitIn = 0.25; };
@@ -403,8 +442,9 @@ export class ArenaScene {
         if (this.answerLeft == null) {   // (an unreadable entry keeps the time it had)
           // a new question: the last shot's numbers line fades out, then the bar opens where it was (user 2026-10-28)
           const after = ui.beamline.shown ? 0.32 : 0; ui.beamline.hide(true);
-          this.answerLeft = ANSWER_TIME; this.answerWarned = false; ui.timer.start(after, ANSWER_TIME);
+          this.answerLeft = ANSWER_TIME; this.answerWarned = false; this.urged = false; ui.timer.start(after, ANSWER_TIME);
         }
+        if (this.attempt === 1) vo.play(VO.ask[L.id], { ttl: 15 });   // the question, aloud, once (after the prompt to read the drawing)
         const t0 = this.world.elapsed;
         answer = await new Promise((res) => { this._resolveFire = res; });
         this._resolveFire = null; this.timeUsed += this.world.elapsed - t0;
@@ -420,8 +460,12 @@ export class ArenaScene {
       if (picking) {
         // the chosen formula is worked out on screen, right or wrong, and what it gives is fired (LXD 2026-10-27)
         this.setPhase('solve'); ui.panel.lock(); ui.panel.clearMistake(); ui.beamline.hide(false); this.answerLeft = null; ui.timer.hide();
-        await this.s(ui.formula.solveExpr(answer.expr));
         res = evaluatePick(answer.expr, R, A.theta, L, answer.sel);
+        // the right choice is worked out aloud with it ("90 over 360 is one quarter…"); after the full working's "Let's work it
+        // out together" it waits its turn, otherwise it cuts whatever was still being said
+        const told = res.status === 'correct' ? vo.play(VO.work[L.id], { mode: this.solved ? 'queue' : 'cut' }) : null;
+        await this.s(ui.formula.solveExpr(answer.expr));
+        if (told) await this.s(Promise.race([told, delay(7)]));
       } else {
         res = evaluateAnswer(answer, R, A.theta, { piForm });
         if (res.status === 'invalid') { ui.panel.setFeedback({ mistake: piForm ? 'Enter the number that goes in front of π.' : 'Enter a number like 38.5 or 77/2.', hint: this.hintText }); audio.play('ui.error'); this.attempt--; ui.panel.unlock(); continue; }
@@ -432,6 +476,7 @@ export class ArenaScene {
       //      break the barrier and strike the guardians behind the part of the arc they cover. A beam that falls short of
       //      the wall reaches neither: the guardians smash the glass themselves.
       this.setPhase('firing'); this.heroDown = null; ui.panel.lock(); ui.panel.clearMistake(); ui.beamline.hide(false);
+      if (!vo.play('fire', { once: true, mode: 'cut' }).started) vo.stop();   // "Time to fire!" (the first shot); a stale prompt never talks over a shot
       await this.s(this.rig.moveTo(this.tacticalPose(), 0.8, Ease.inOutCubic));
       this.hero.faceTo(this.gapMid); this.hero.cast(); await this.s(delay(0.25));   // Karan casts toward the gap; the charge gathers at O as his palm reaches out
       await this.s(this.sector.charge());
@@ -446,7 +491,7 @@ export class ArenaScene {
         },
         onBreak: () => {   // it gives way. Too small: the ones the shot missed storm in that instant, more pouring in behind them
           this.bots.idle = true;
-          if (res.status === 'under') this.storm = this.bots.swarm(this.hero.pos, { extra: this.reinforcements(), onContact: () => this.hitHero('swarm'), onBlow: (b) => this.blowOnHero(b) });
+          if (res.status === 'under') { this.storm = this.bots.swarm(this.hero.pos, { extra: this.reinforcements(), onContact: () => this.hitHero('swarm'), onBlow: (b) => this.blowOnHero(b) }); vo.play('k-not-enough', { mode: 'cut' }); }
         },
         // too big: the bounced rays have just knocked Karan down and the camera is pushing in on him; otherwise the whole ring
         onSlowEnd: () => (res.status === 'over' ? null : this.rig.moveTo(this.tacticalPose(), 0.6, Ease.inOutCubic)),
@@ -467,6 +512,11 @@ export class ArenaScene {
         await this.s(delay(0.6));   // (the camera is back over the whole ring: the stamp hangs below Karan, clear of the sector)
         const stamp = this.solved ? null : ui.stamp('perfect', 'PERFECT!', flawless ? praiseLine(L) : '', flawless ? 2.6 : 1.4);
         if (flawless) audio.play('praise');
+        // spoken: no mistakes → praise (chosen: "Nice work! First try!…", typed: "No choices, no help, and you still did it."),
+        // a right shot after misses → "Perfect shot! The barrier is gone." and its alternatives, after the full working →
+        // "Every mistake teaches something."; then Karan cheers (ring 2: he spotted the angle and the radius)
+        vo.play(this.solved ? 'fb-learn' : flawless ? (picking ? 'praise-first' : 'praise-typed') : ['right-perfect', 'right-just', 'well-done'][rightLine++ % 3], { mode: 'cut' });
+        if (!this.solved) vo.play(L.id === 2 ? 'k-easier' : ['k-yes', 'k-bullseye'][cheer++ % 2], { ttl: 5 });
         await this.s(Promise.all([delay(1.0), stamp]));   // let the gold snap of the wedge (and the praise) read before the way on lights up
         this.sector.releaseGhost(0.6); ui.panel.close(); ui.beamline.hide(); ui.setArenaCentre(null);
         this.sector.clearOverlays(true); await this.s(delay(0.3));
@@ -479,13 +529,14 @@ export class ArenaScene {
         // too small: the guardians the shot missed have been storming in since the glass gave way (more behind them, through
         // the same uncovered stretch); they reach Karan, surround him and pile on, until O's pulse throws them off
         const storm = this.storm, got = storm ? await this.s(storm.contact) : false; this.storm = null;
-        const stamp = ui.stamp('under', 'TOO SMALL', '', 1.5);
+        const stamp = ui.stamp('under', 'TOO SMALL', '', 1.5); vo.play('out-small', { ttl: 5, max: 2 });
         if (got) { await this.s(Promise.race([storm.allIn, delay(1.8)])); await this.s(delay(0.9)); }   // the pile-on: the whole crowd on him, blows from every side
         this.sector.pulse(); this.bots.pulseKill(); await this.s(delay(0.45));
         await this.s(this.hero.recover()); await this.s(stamp);
       } else {
         // too big: every guardian fell, but the excess rays bounced off the wall into Karan (during the shot); he gets up
-        await this.s(ui.stamp('over', 'TOO BIG', '', 1.3));
+        const stamp = ui.stamp('over', 'TOO BIG', '', 1.3); vo.play('out-big', { ttl: 5, max: 2 });
+        await this.s(stamp);
         if (this.heroDown) await this.s(this.heroDown);
       }
       // the lesson, from above, once the action is over: the shot against the sector (the dashed target around it, its red
@@ -510,6 +561,12 @@ export class ArenaScene {
     const step = Math.min(this.misses, MOVE_ON), last = this.moveOn();
     this.hintText = last ? '' : hintFor(step, diag, this.level);
     ui.panel.setFeedback({ mistake: diag ? diag.title : '', note: (diag && diag.note) || '', hint: this.hintText });
+    // spoken (user 2026-11-05): the 1st rung names the mistake ("That's the diameter. The radius is half of it."), the 2nd
+    // gives the way through ("Start with θ over 360…"; ring 3: "a right angle means one quarter"; a squaring mistake: "Which
+    // part is squared?"); the last shield is warned of once an arena
+    const right = this.level.show && this.level.show.angle === 'right' && diag && diag.type === 'angle';
+    if (!last) vo.play(step <= 1 ? VO_MISTAKE[diag && diag.code] || 'fb-hint' : right ? 'fb-right-angle' : diag && ['squared-fraction', 'not-squared'].includes(diag.code) ? 'fb-which-squared' : 'help-start', { ttl: 8 });
+    if (!last && this.shields === 1 && !this.warned) { this.warned = true; vo.play('shield-last', { ttl: 10 }); }
     if (last) return null;
     if (step <= 1) { ui.formula.point(partOf(diag)); return null; }
     return ui.formula.partial(diag && diag.type === 'radius' ? 'radius' : 'theta');
@@ -521,12 +578,15 @@ export class ArenaScene {
     const L = this.level;
     this.setPhase('solution'); this.solved = true; this.answerLeft = null; ui.timer.hide(); ui.panel.lock(); ui.beamline.hide(false);
     this.hintText = hintFor(MOVE_ON); ui.panel.setFeedback({ hint: this.hintText }); audio.play('ui.panel');
+    vo.play('help-together', { mode: 'cut' });   // "Let's work it out together." (then the working is talked through)
     if (picking) {   // the right choice lights up; its working follows as any choice's does (solveExpr), and it is fired
       const right = choices(L).find((c) => c.right); ui.pick.reveal(right.sel); await this.s(delay(0.9));
       return { expr: right.expr, sel: right.sel };
     }
     ui.panel.setValue('');   // (the last wrong entry does not stand beside the working)
-    await this.s(ui.formula.full()); ui.panel.setValue(answerFor(L)); await this.s(delay(1.6));
+    const told = vo.play('help-start');   // "Start with θ over 360. Now multiply by π and by the radius squared."
+    await this.s(ui.formula.full()); ui.panel.setValue(answerFor(L));
+    await this.s(Promise.race([Promise.all([delay(1.6), told]), delay(8)]));
     return answerFor(L);
   }
   /** The answer bar ran out (user 2026-10-28): the guardians have pounded the glass long enough. It gives way and they storm
@@ -543,7 +603,7 @@ export class ArenaScene {
     await this.s(this.barrier.breakAt({ fromDeg: A.exitDeg - A.theta / 2, spanDeg: A.theta }));
     this.bots.idle = true;
     const storm = this.bots.swarm(this.hero.pos, { extra: this.reinforcements(), onContact: () => this.hitHero('swarm'), onBlow: (b) => this.blowOnHero(b) });
-    if (await this.s(storm.contact)) { await this.s(Promise.race([storm.allIn, delay(1.8)])); await this.s(delay(0.9)); }
+    if (await this.s(storm.contact)) { vo.play('k-got-me', { mode: 'cut' }); await this.s(Promise.race([storm.allIn, delay(1.8)])); await this.s(delay(0.9)); }
     this.sector.pulse(); this.bots.pulseKill(); await this.s(delay(0.45));
     await this.s(this.hero.recover()); await this.s(stamp);
   }
@@ -573,6 +633,8 @@ export class ArenaScene {
     if (!holds) { this.shields--; ui.hud.setShields(this.shields, this.maxShields); }
     ui.damage();
     audio.play(kind === 'reflect' ? 'reflect.hit' : 'bot.hit'); audio.play('player.hurt'); if (!holds) audio.play('shield.break');
+    if (kind === 'reflect') vo.play('k-too-much', { mode: 'cut' });   // "Whoa! Too much power! It bounced back."
+    if (!holds) vo.play('k-lost-shield', { once: true, ttl: 4.5 });     // (the first shield he loses)
     this.fx.hit(this.hero.pos.clone().add(new THREE.Vector3(0, 1, 0))); this.rig.shake(0.6, 0.6);
     if (kind === 'reflect') {
       // thrown back away from the gap: frame (and hang TOO BIG below) where he will land, not where he stood
@@ -587,7 +649,7 @@ export class ArenaScene {
   /** A blow in the pile-on: no further shield (one per wrong shot), but every blow lands — a thud, sparks, a jolt. */
   blowOnHero(b) {
     if (this.aborted) return;
-    audio.play('swarm.blow', { pan: this.bots.pan(b), minGap: 0.07 });
+    audio.play('swarm.blow', { pan: this.bots.pan(b), minGap: 0.07 }); vo.play('k-ouch', { mode: 'drop', max: 3 });
     this.fx.sparks(this.hero.pos.clone().setY(0.4), 3, 0xff6040, 3, 0.4, 0.28); this.hero.flash(0xff6050, 0.18); this.rig.shake(0.1, 0.12);
   }
 
@@ -620,6 +682,8 @@ export class ArenaScene {
     // reward: the way on lights up in amber, from Karan's spot straight through O and the cleared gap
     this.chain.setFocus(this.index, false, 0.9, { cull: false });
     this.lightPath([this.hero.pos.clone(), through, spawn]);
+    // spoken (after the praise): ring 1 shows the way ("One gate down. Follow the glowing trail…"), Karan marks the way on
+    vo.play(this.level.id === 1 ? 'exit-first' : VO.onward[this.level.id], { ttl: 10, once: true });
     this.rig.moveTo({ pos: this.C.clone().addScaledVector(u, -(this.R * 0.8 + 6)).add(new THREE.Vector3(0, this.R * 0.9 + 9, 0)), target: nextC.clone().addScaledVector(u, -next.R * 0.35).add(new THREE.Vector3(0, 1, 0)), fov: 56 }, 1.3);
     await this.s(this.hero.celebrate(0.25));
     await this.s(delay(0.5));
@@ -632,6 +696,7 @@ export class ArenaScene {
       region: SDF.minus(floor, PILLARS), yawDeg: A.exitDeg, view: this.walkView(),
       goal: { pos: spawn, reached: (p) => Math.hypot(p.x - nextC.x, p.z - nextC.z) < next.R - 1.6 },
       mark: through, near: 3, far: 12, highlight: (k, dt) => M.gapSet(k, dt), onBump: (p) => this.edgeBump(p),
+      onIdle: () => vo.play('trail-hint', { mode: 'drop', max: 4 }),   // "Follow the light beam on the floor."
     }));
     M.gapOff(); this.clearPath(0.6);
     this.chain.cutRing = next.index; this.chain.keepSeals = true;
@@ -661,7 +726,9 @@ export class ArenaScene {
     // the run out, chased from behind his right shoulder like every walk (his back run is drawn three-quarter, up and to the right)
     rig.follow((out) => { out.pos.copy(hero.pos).addScaledVector(dir, -7).add(new THREE.Vector3(-dir.z * 2.6, 3.4, dir.x * 2.6)); out.target.copy(hero.pos).addScaledVector(dir, 8).add(new THREE.Vector3(0, 1.5, 0)); out.fov = 56; return out; }, 3);
     audio.play('gate.unlock'); game.fx.flash(gate.clone().add(new THREE.Vector3(0, 2.5, 0)), 0xffe0a0, 12, 0.8);
+    vo.play('k-door-open', { mode: 'cut' });   // "The temple door is open!"
     await hero.runTo(esc.clone().addScaledVector(dir, -1), 7);
+    vo.play('k-did-it');   // "I did it!" (the narrator closes the journey on the final screen)
     await hero.celebrate(1.4);
     audio.play('sting.clear');
   }
@@ -671,7 +738,8 @@ export class ArenaScene {
     if (this.refitIn > 0 && (this.refitIn -= Math.max(dt, 1 / 60)) <= 0 && this.phase === 'input') this.rig.moveTo(this.sectorPose(), 0.35, Ease.outCubic);
     if (this.answerLeft != null && this.phase === 'input' && dt > 0) {
       this.answerLeft = Math.max(0, this.answerLeft - dt); ui.timer.set(this.answerLeft / ANSWER_TIME, this.answerLeft);
-      if (!this.answerWarned && this.answerLeft < 15) { this.answerWarned = true; audio.play('timer.low'); }
+      if (!this.answerWarned && this.answerLeft < 15) { this.answerWarned = true; audio.play('timer.low'); vo.play('time-low', { mode: 'drop' }); }   // "The guardians are stirring!"
+      if (!this.urged && this.answerLeft < 6) { this.urged = true; vo.play('k-think', { mode: 'drop' }); }   // Karan: "Come on. Think! Quickly!"
       if (this.answerLeft === 0 && this._resolveFire) this._resolveFire(TIMEOUT);
     }
   }

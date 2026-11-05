@@ -150,8 +150,10 @@ export class Sector {
    *  the arc is traced) → the rest of the circle dims. Labels sit beside their lines, never on them.
    *  show (LXD 2026-10-27, per arena): angle 'symbol' θ = 90° · 'value' just the degrees, inside the angle · 'right' the
    *  right-angle square at O, no number; radius 'symbol' r = 7 m · 'value' just the length · 'diameter' the radius drawn on
-   *  through O to the far wall with the whole length on it (the learner halves it). */
-  async scan({ breachDeg, theta, show = {} }) {
+   *  through O to the far wall with the whole length on it (the learner halves it).
+   *  say(step) (the narrated lesson, user 2026-11-05): each step waits for its line: 'radius' once the radius is drawn,
+   *  'theta' while the radius sweeps (the sweep slows to the line), 'sector' as the rest of the circle dims. */
+  async scan({ breachDeg, theta, show = {}, say = null }) {
     const R = this.R, W = this.world, lw = Math.max(1, R / 9), a0 = breachDeg - theta / 2, a1 = breachDeg + theta / 2;   // line widths grow with the ring so they stay crisp from far
     const angle = show.angle || 'symbol', radius = show.radius || 'symbol', diameter = radius === 'diameter';
     // 1) the centre O: a bright point with a soft highlight (a glow, not a ring outline)
@@ -174,6 +176,7 @@ export class Sector {
     W.labels.add('radius', diameter ? `${2 * R} m` : radius === 'value' ? `${R} m` : `r = ${R} m`, { className: 'measure radius', worldPos: new THREE.Vector3(this.C.x + lp.x, 0.6, this.C.z + lp.z), push: dirV(ld - 90) });
     audio.play('label.pop');
     await delay(0.5);
+    if (say) await say('radius');
     // 3) the radius sweeps through θ, painting the sector: the second radius, the angle at O and the arc grow with it
     const sweeper = ribbon(R, 0.13 * lw, a0, 0xffffff, { dashed: false, opacity: 1, y: 0.075, order: 14 }); this.overlays.add(sweeper);
     this.fill = sectorMesh(R, a0, theta, 0x52ded8, 0.01); const fu = this.fill.material.uniforms; fu.progress.value = 1; fu.reveal.value = 0; fu.opacity.value = 0.32; this.overlays.add(this.fill);
@@ -190,10 +193,12 @@ export class Sector {
     if (angle !== 'right') W.labels.add('theta', text(0), { className: 'measure theta', worldPos: () => this.angleLabelPos(a0, this._sweep, theta, ar + 0.16 * lw) });
     const thLabel = W.labels.items.get('theta');
     audio.play('scan.sweep');
-    await tweenValue(0, theta, 1.6, (v) => {
+    const told = say ? say('theta') : null;   // ("The beam sweeps through an angle called theta" while it sweeps, "here, it's 90°" as it lands)
+    await tweenValue(0, theta, told && told.started ? 2.8 : 1.6, (v) => {
       this._sweep = v; sweeper.rotation.z = (a0 + v) * DEG; fu.reveal.value = v / theta; grow(v);
       if (thLabel) W.labels.set('theta', text(v));
     }, { ease: Ease.inOutSine });
+    if (told) await told;
     sweeper.material.color.setHex(0xf3ebd8); sweeper.material.opacity = 0.95;   // it stays as the second radius
     if (angle === 'right') {   // the right-angle square: two short sides from the radii to the far corner
       const sz = ar * 0.75, p0 = polar(a0, sz), p1 = polar(a1, sz), c = { x: p0.x + p1.x, z: p0.z + p1.z };
@@ -204,7 +209,7 @@ export class Sector {
     tweens.to(fu.opacity, { value: 0.18 }, { duration: 0.6 });
     const dim = new THREE.Mesh(new THREE.RingGeometry(0.01, R - 0.02, Math.max(24, Math.round((360 - theta) / 3)), 1, a1 * DEG, (360 - theta) * DEG), new THREE.MeshBasicMaterial({ color: 0x050c0a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
     dim.rotation.x = -Math.PI / 2; dim.position.y = 0.005; dim.renderOrder = 8; this.overlays.add(dim);
-    await tweenValue(0, 0.46, 0.5, (v) => (dim.material.opacity = v));
+    await Promise.all([tweenValue(0, 0.46, 0.5, (v) => (dim.material.opacity = v)), say ? say('sector') : null]);
   }
   /** Where θ's label sits (user 2026-10-27: "on top, just adjacent to the angle"): on the angle's bisector just past its
    *  arc (outer radius arcR), and only as far out as it must be to clear both radii, a narrow angle pushing it out a

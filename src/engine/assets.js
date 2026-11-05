@@ -3,6 +3,8 @@
 //  * reads assets/manifest.json
 //  * downloads and decodes every image before the game starts, with byte-accurate progress; a file that fails or stalls
 //    never blocks: it is retried as a plain image, then replaced by a procedural placeholder, so the game always plays
+//  * the voice-over's lines (manifest "vo") load in the same queue and are decoded to audio buffers (an offline audio
+//    context: no tap needed); a line that fails is simply not spoken
 // ---------------------------------------------------------------------------
 import * as THREE from '../../vendor/three.module.js';
 import { PLACEHOLDERS } from '../placeholders/index.js';
@@ -67,10 +69,24 @@ class ByteProgress {
   }
 }
 
+/** Decode audio bytes (callback form: older Safari has no promise version). Rejects on bad data or after IMG_MS. */
+let decoder = null;
+function decodeAudio(bytes) {
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC) return Promise.reject(new Error('no Web Audio'));
+  decoder = decoder || new OAC(1, 1, 44100);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('decoding timed out')), IMG_MS);
+    try { decoder.decodeAudioData(bytes, (b) => { clearTimeout(timer); resolve(b); }, (e) => { clearTimeout(timer); reject(e || new Error('could not decode')); }); }
+    catch (e) { clearTimeout(timer); reject(e); }
+  });
+}
+
 export class Assets {
   constructor() {
-    this.manifest = { images: {}, sfx: {}, music: {} };
+    this.manifest = { images: {}, sfx: {}, music: {}, vo: {} };
     this.images = new Map();     // name → HTMLImageElement | HTMLCanvasElement
+    this.voices = new Map();     // voice-over line id → AudioBuffer
     this.textures = new Map();   // cache key → THREE.Texture
     this.status = new Map();     // name → 'file' | 'placeholder' | 'missing'
     this.renderer = null;
@@ -86,28 +102,34 @@ export class Assets {
   }
 
   def(name) { return this.manifest.images[name] || null; }
+  /** A voice-over line: { path, who, text, dur, bytes } */
+  voDef(id) { return (this.manifest.vo || {})[id] || null; }
+  voice(id) { return this.voices.get(id) || null; }
   /** The file's own URL. ?v=<manifest version>: a replaced file gets a new URL, so no browser keeps showing a cached old copy.
    *  Loaded images use a blob: URL of the downloaded bytes instead; this is the fallback if that ever fails. */
-  fileUrl(name) {
-    const def = this.def(name); if (!def || !def.path) return '';
+  fileUrl(name, def = this.def(name)) {
+    if (!def || !def.path) return '';
     return ASSET_BASE + def.path + (this.manifest.version ? `?v=${encodeURIComponent(this.manifest.version)}` : '');
   }
 
-  /** Every manifest image, before the game starts: smallest files first (the bar moves from the first second and the big
-   *  files stream in at the end), PARALLEL at a time. `first` names jump the queue and `onFirst` runs once they are in (the
-   *  loading screen's logo). onProgress(0..1, name) follows the bytes. */
+  /** Every manifest image and voice-over line, before the game starts: smallest files first (the bar moves from the first
+   *  second and the big files stream in at the end), PARALLEL at a time. `first` names jump the queue and `onFirst` runs
+   *  once they are in (the loading screen's logo). onProgress(0..1, name) follows the bytes. Lines queue as 'vo:<id>'. */
   async loadAll(onProgress, { first = [], onFirst = null } = {}) {
-    const names = Object.keys(this.manifest.images).filter((n) => !this.images.has(n));
-    const known = names.map((n) => this.def(n).bytes).filter(Boolean).sort((a, b) => a - b);
+    const names = Object.keys(this.manifest.images).filter((n) => !this.images.has(n))
+      .concat(Object.keys(this.manifest.vo || {}).filter((id) => !this.voices.has(id)).map((id) => 'vo:' + id));
+    const entry = (n) => (n.startsWith('vo:') ? this.voDef(n.slice(3)) : this.def(n));
+    const known = names.map((n) => entry(n).bytes).filter(Boolean).sort((a, b) => a - b);
     const guess = known.length ? known[known.length >> 1] : 100000;     // a file without a size entry weighs the median
-    const size = (n) => this.def(n).bytes || guess;
+    const size = (n) => entry(n).bytes || guess;
     const queue = names.sort((a, b) => first.includes(b) - first.includes(a) || size(a) - size(b));
     const prog = new ByteProgress(queue, size, onProgress);
     const waiting = new Set(first.filter((n) => queue.includes(n)));
     if (onFirst && !waiting.size) onFirst();
     const worker = async () => {
       for (let n; (n = queue.shift()); ) {
-        await this.load(n, this.def(n), prog); prog.finish(n);
+        if (n.startsWith('vo:')) await this.loadVoice(n.slice(3), prog); else await this.load(n, this.def(n), prog);
+        prog.finish(n);
         if (waiting.delete(n) && !waiting.size && onFirst) onFirst();
       }
     };
@@ -140,6 +162,17 @@ export class Assets {
     }
     this.images.set(name, img);
     return img;
+  }
+
+  /** One voice-over line: downloaded (its bytes move the bar) and decoded. Never throws: a line that cannot load is not
+   *  spoken (its words are on screen where the game needs them). */
+  async loadVoice(id, prog = null) {
+    const def = this.voDef(id), name = 'vo:' + id; if (!def || !def.path) return null;
+    try {
+      const blob = await fetchBytes(this.fileUrl(name, def), (got, len) => prog && prog.bytes(name, got, len));
+      const buf = await decodeAudio(await blob.arrayBuffer());
+      this.voices.set(id, buf); return buf;
+    } catch (e) { console.warn(`[assets] voice ${id}: ${e.message || e}`); return null; }
   }
 
   has(name) { return this.images.has(name); }
